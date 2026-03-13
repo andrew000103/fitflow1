@@ -1,15 +1,15 @@
 :root {
-  --bg: #071115;
-  --surface: rgba(14, 24, 29, 0.82);
-  --border: rgba(233, 222, 204, 0.12);
-  --border-strong: rgba(233, 222, 204, 0.22);
-  --text-strong: #f7f0e2;
-  --text-soft: #c6bdaf;
-  --text-dim: #928a7d;
-  --accent: #ffd86b;
-  --accent-soft: #ffb894;
-  --font-body: 'Avenir Next', 'Segoe UI Variable', 'Pretendard', 'Noto Sans KR', sans-serif;
-  --font-display: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --border: #e5e7eb;
+  --border-strong: #cbd5e1;
+  --text-strong: #111827;
+  --text-soft: #475569;
+  --text-dim: #6b7280;
+  --accent: #111827;
+  --accent-soft: #334155;
+  --font-body: 'Avenir Next', 'Pretendard', 'Noto Sans KR', sans-serif;
+  --font-display: 'Avenir Next', 'Pretendard', 'Noto Sans KR', sans-serif;
 
   color: var(--text-soft);
   background: var(--bg);
@@ -34,6 +34,7 @@ body {
   margin: 0;
   min-width: 320px;
   background: var(--bg);
+  color: var(--text-soft);
 }
 
 a {
