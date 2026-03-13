@@ -1,251 +1,614 @@
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
-const pillars = [
+const pages = [
+  { id: 'workout', label: 'Workout' },
+  { id: 'diet', label: 'Diet' },
+  { id: 'community', label: 'Community' },
+  { id: 'weekly-progress', label: 'Weekly Progress' },
+]
+
+const starterPosts = [
   {
-    title: 'Workout OS',
-    description:
-      '세트 기록과 동시에 휴식 타이머가 시작되고, 루틴 종료 직후 운동 칼로리와 부위별 피로도가 자동 계산됩니다.',
-    points: ['세트당 횟수 입력 즉시 휴식 카운트', '운동 종료 후 소모 칼로리 계산', '부위별 피로도 히트맵'],
+    id: 1,
+    category: 'diet',
+    title: '감량기 점심 추천',
+    author: 'Mina',
+    body: '점심은 단백질 35g 이상, 오후 운동 전에는 탄수화물도 너무 낮추지 않는 조합이 효율적입니다.',
+    likes: 128,
+    comments: 18,
   },
   {
-    title: 'Daily Metabolism',
-    description:
-      '만보기, 활동 대사, 운동 데이터, 식단 로그를 합쳐 자정 기준으로 하루의 에너지 흐름을 정산합니다.',
-    points: ['걸음수와 활동 대사 누적', '섭취 칼로리 자동 집계', '자정 Net 칼로리 리포트'],
+    id: 2,
+    category: 'bulk',
+    title: '등 운동 후 회복 루틴',
+    author: 'Joon',
+    body: '광배 피로도가 높을 때는 다음 날 데드리프트보다 가벼운 로우와 걷기 볼륨 조절이 좋았습니다.',
+    likes: 94,
+    comments: 11,
   },
   {
-    title: 'AI Coaching Loop',
-    description:
-      '오늘의 회복 상태와 목표에 맞춰 운동 부위, 휴식 여부, 점심/저녁 메뉴, 커뮤니티 콘텐츠까지 개인화합니다.',
-    points: ['휴식 또는 운동 부위 추천', '벌크업/감량 메뉴 추천', '목표 기반 피드 알고리즘'],
+    id: 3,
+    category: 'maintain',
+    title: '휴식 시간에 보는 30초 스트레칭',
+    author: 'Sora',
+    body: '세트 사이 90초 휴식일 때 흉추 회전 스트레칭 2가지만 넣어도 다음 세트 집중도가 꽤 올라갑니다.',
+    likes: 76,
+    comments: 9,
   },
 ]
 
-const roadmap = [
-  {
-    label: 'During Workout',
-    title: '기록과 휴식이 동시에 돌아가는 운동 화면',
-    text: '한 세트의 횟수를 입력하는 순간 다음 세트까지의 타이머가 시작되고, 남은 시간이 10초 이하가 되면 커뮤니티 숏폼 위에 복귀 알림이 올라옵니다.',
-  },
-  {
-    label: 'End of Day',
-    title: '자정에 하루의 칼로리 손익을 자동 정산',
-    text: '운동, 걸음수, 활동 대사와 식단 기록을 합산해 Net 칼로리를 계산하고, 체중 유지/감량/증량 기준 권장 섭취량을 다시 제안합니다.',
-  },
-  {
-    label: 'Long-term Growth',
-    title: '주차별 시각화와 챌린지로 유지율 강화',
-    text: '주간 볼륨, 오운완 streak, 부위별 피로 누적, 프로그램 진행률을 하나의 대시보드에서 확인할 수 있습니다.',
-  },
-]
-
-const communitySignals = [
-  '운동 숏폼과 게시물 피드',
-  '추천, 댓글, 일간/주간/월간 인기글',
-  '다이어트·벌크업·유지 목표별 노출 최적화',
-  '운동 프로그램 무료 배포 및 판매',
+const weeklyData = [
+  { day: 'Mon', workout: 54, intake: 2120, steps: 9120 },
+  { day: 'Tue', workout: 62, intake: 1980, steps: 10840 },
+  { day: 'Wed', workout: 38, intake: 2240, steps: 8420 },
+  { day: 'Thu', workout: 71, intake: 2050, steps: 12610 },
+  { day: 'Fri', workout: 66, intake: 2310, steps: 11840 },
+  { day: 'Sat', workout: 49, intake: 2460, steps: 9540 },
+  { day: 'Sun', workout: 28, intake: 1890, steps: 13210 },
 ]
 
 function App() {
+  const [activePage, setActivePage] = useState('workout')
+
+  const [exerciseName, setExerciseName] = useState('Bench Press')
+  const [reps, setReps] = useState('8')
+  const [weight, setWeight] = useState('60')
+  const [restSeconds, setRestSeconds] = useState(90)
+  const [timeLeft, setTimeLeft] = useState(0)
+  const [sets, setSets] = useState([
+    { id: 1, exercise: 'Bench Press', reps: 8, weight: 60, volume: 480, calories: 38 },
+    { id: 2, exercise: 'Bench Press', reps: 8, weight: 60, volume: 480, calories: 38 },
+  ])
+
+  const [mealName, setMealName] = useState('닭가슴살 포케')
+  const [mealCalories, setMealCalories] = useState('520')
+  const [goal, setGoal] = useState('diet')
+  const [meals, setMeals] = useState([
+    { id: 1, name: '그릭요거트 볼', calories: 320 },
+    { id: 2, name: '닭가슴살 포케', calories: 520 },
+  ])
+
+  const [steps, setSteps] = useState(11284)
+  const [posts, setPosts] = useState(starterPosts)
+  const [postTitle, setPostTitle] = useState('')
+  const [postBody, setPostBody] = useState('')
+  const [filter, setFilter] = useState('all')
+
+  useEffect(() => {
+    if (timeLeft <= 0) {
+      return undefined
+    }
+
+    const timer = window.setInterval(() => {
+      setTimeLeft((current) => (current > 0 ? current - 1 : 0))
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [timeLeft])
+
+  const totalWorkoutCalories = useMemo(
+    () => sets.reduce((sum, set) => sum + set.calories, 0),
+    [sets],
+  )
+
+  const totalVolume = useMemo(
+    () => sets.reduce((sum, set) => sum + set.volume, 0),
+    [sets],
+  )
+
+  const fatigueScore = Math.min(100, Math.round(totalVolume / 18))
+  const fatigueLabel = fatigueScore >= 80 ? 'High' : fatigueScore >= 55 ? 'Moderate' : 'Low'
+
+  const consumedCalories = useMemo(
+    () => meals.reduce((sum, meal) => sum + meal.calories, 0),
+    [meals],
+  )
+
+  const stepCalories = Math.round(steps * 0.04)
+  const baseMetabolism = 1680
+  const totalBurn = baseMetabolism + stepCalories + totalWorkoutCalories
+  const netCalories = consumedCalories - totalBurn
+  const recommendedCalories =
+    goal === 'diet' ? totalBurn - 350 : goal === 'bulk' ? totalBurn + 280 : totalBurn
+
+  const filteredPosts = posts.filter((post) => filter === 'all' || post.category === filter)
+
+  const streak = 5
+  const weeklyWorkoutMinutes = weeklyData.reduce((sum, item) => sum + item.workout, 0)
+  const weeklyStepAverage = Math.round(
+    weeklyData.reduce((sum, item) => sum + item.steps, 0) / weeklyData.length,
+  )
+  const weeklyIntakeAverage = Math.round(
+    weeklyData.reduce((sum, item) => sum + item.intake, 0) / weeklyData.length,
+  )
+
+  function handleLogSet(event) {
+    event.preventDefault()
+
+    const repsNumber = Number(reps)
+    const weightNumber = Number(weight)
+    const volume = repsNumber * weightNumber
+    const calories = Math.max(12, Math.round(repsNumber * weightNumber * 0.08))
+
+    if (!exerciseName || repsNumber <= 0 || weightNumber <= 0) {
+      return
+    }
+
+    setSets((current) => [
+      {
+        id: Date.now(),
+        exercise: exerciseName,
+        reps: repsNumber,
+        weight: weightNumber,
+        volume,
+        calories,
+      },
+      ...current,
+    ])
+    setTimeLeft(restSeconds)
+  }
+
+  function handleAddMeal(event) {
+    event.preventDefault()
+
+    const calorieNumber = Number(mealCalories)
+    if (!mealName || calorieNumber <= 0) {
+      return
+    }
+
+    setMeals((current) => [
+      { id: Date.now(), name: mealName, calories: calorieNumber },
+      ...current,
+    ])
+  }
+
+  function handleCreatePost(event) {
+    event.preventDefault()
+
+    if (!postTitle || !postBody) {
+      return
+    }
+
+    setPosts((current) => [
+      {
+        id: Date.now(),
+        category: goal,
+        title: postTitle,
+        author: 'You',
+        body: postBody,
+        likes: 0,
+        comments: 0,
+      },
+      ...current,
+    ])
+    setPostTitle('')
+    setPostBody('')
+  }
+
+  function handleLikePost(postId) {
+    setPosts((current) =>
+      current.map((post) =>
+        post.id === postId ? { ...post, likes: post.likes + 1 } : post,
+      ),
+    )
+  }
+
+  const restWarning = timeLeft > 0 && timeLeft <= 10
+  const restClock = `${String(Math.floor(timeLeft / 60)).padStart(2, '0')}:${String(
+    timeLeft % 60,
+  ).padStart(2, '0')}`
+
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <a className="brand" href="#home">
+      <header className="app-header">
+        <div className="brand-block">
           <span className="brand-mark">FF</span>
-          <span className="brand-copy">
+          <div>
             <strong>FitFlow</strong>
-            <span>Adaptive health operating system</span>
-          </span>
-        </a>
+            <p>운동, 식단, 커뮤니티, 주간 리포트를 한 앱에서 운용</p>
+          </div>
+        </div>
 
-        <nav className="topnav" aria-label="Primary">
-          <a href="#pillars">Core</a>
-          <a href="#engine">Engine</a>
-          <a href="#community">Community</a>
-          <a href="#market">Marketplace</a>
-        </nav>
-
-        <a className="nav-cta" href="#launch">
-          MVP 설계 시작
-        </a>
+        <div className="header-stats">
+          <article>
+            <span>Today burn</span>
+            <strong>{totalBurn} kcal</strong>
+          </article>
+          <article>
+            <span>Steps</span>
+            <strong>{steps.toLocaleString()}</strong>
+          </article>
+        </div>
       </header>
 
-      <main id="home">
-        <section className="hero">
-          <div className="hero-copy">
-            <p className="eyebrow">Unified fitness, nutrition, recovery, and community</p>
-            <h1>운동 기록 앱이 아니라 하루 전체 대사와 회복을 관리하는 헬스케어 홈 베이스.</h1>
-            <p className="hero-text">
-              FitFlow는 세트 기록, 휴식 타이머, 걸음수, 식단, AI 추천, 커뮤니티, 프로그램 마켓을
-              하나의 루프 안에 묶어 매일의 행동과 결과를 연결합니다.
-            </p>
+      <div className="app-body">
+        <aside className="sidebar">
+          <nav className="page-nav" aria-label="Pages">
+            {pages.map((page) => (
+              <button
+                key={page.id}
+                type="button"
+                className={page.id === activePage ? 'page-link active' : 'page-link'}
+                onClick={() => setActivePage(page.id)}
+              >
+                {page.label}
+              </button>
+            ))}
+          </nav>
 
-            <div className="hero-actions">
-              <a className="button-primary" href="#launch">
-                정보 구조 보기
-              </a>
-              <a className="button-secondary" href="#engine">
-                핵심 계산 흐름
-              </a>
-            </div>
+          <section className="summary-card">
+            <p className="card-label">Recovery forecast</p>
+            <strong>{fatigueLabel} fatigue</strong>
+            <span>가슴/삼두 볼륨이 누적되어 내일은 등 또는 하체 추천</span>
+          </section>
 
-            <div className="hero-metrics">
-              <article>
-                <strong>14</strong>
-                <span>핵심 기능 축</span>
-              </article>
-              <article>
-                <strong>4</strong>
-                <span>데이터 루프</span>
-              </article>
-              <article>
-                <strong>24h</strong>
-                <span>자정 정산 사이클</span>
-              </article>
-            </div>
-          </div>
+          <section className="summary-card">
+            <p className="card-label">Goal mode</p>
+            <strong>{goal === 'diet' ? 'Diet cut' : goal === 'bulk' ? 'Lean bulk' : 'Maintain'}</strong>
+            <span>권장 섭취 {recommendedCalories} kcal</span>
+          </section>
+        </aside>
 
-          <div className="hero-panel">
-            <section className="device-card primary-card">
-              <div className="panel-header">
-                <span>Today Engine</span>
-                <span>06:42 PM</span>
-              </div>
-
-              <div className="live-set">
-                <div>
-                  <p>Bench Press</p>
-                  <strong>8 reps logged</strong>
+        <main className="page-panel">
+          {activePage === 'workout' && (
+            <section className="page-grid">
+              <div className="panel-card hero-card">
+                <div className="section-title">
+                  <div>
+                    <p className="card-label">Workout</p>
+                    <h1>세트 기록과 휴식 타이머</h1>
+                  </div>
+                  <div className={restWarning ? 'timer-chip warning' : 'timer-chip'}>
+                    {timeLeft > 0 ? `Rest ${restClock}` : 'Ready'}
+                  </div>
                 </div>
-                <span className="pulse-badge">Rest 01:20</span>
+
+                <form className="form-grid" onSubmit={handleLogSet}>
+                  <label>
+                    Exercise
+                    <input value={exerciseName} onChange={(event) => setExerciseName(event.target.value)} />
+                  </label>
+                  <label>
+                    Reps
+                    <input value={reps} onChange={(event) => setReps(event.target.value)} inputMode="numeric" />
+                  </label>
+                  <label>
+                    Weight (kg)
+                    <input value={weight} onChange={(event) => setWeight(event.target.value)} inputMode="decimal" />
+                  </label>
+                  <label>
+                    Rest seconds
+                    <input
+                      value={restSeconds}
+                      onChange={(event) => setRestSeconds(Number(event.target.value) || 0)}
+                      inputMode="numeric"
+                    />
+                  </label>
+                  <button className="primary-action" type="submit">
+                    세트 기록하기
+                  </button>
+                </form>
+
+                {restWarning && (
+                  <div className="alert-banner">
+                    휴식 종료 10초 이내입니다. 커뮤니티를 보고 있었다면 다음 세트로 복귀할 시간입니다.
+                  </div>
+                )}
               </div>
 
-              <div className="stack-list">
-                <article>
-                  <span>Workout burn</span>
-                  <strong>462 kcal</strong>
+              <div className="dual-column">
+                <article className="panel-card">
+                  <div className="section-title">
+                    <div>
+                      <p className="card-label">Live summary</p>
+                      <h2>오늘 운동 요약</h2>
+                    </div>
+                  </div>
+                  <div className="stat-grid">
+                    <div>
+                      <span>Total sets</span>
+                      <strong>{sets.length}</strong>
+                    </div>
+                    <div>
+                      <span>Volume</span>
+                      <strong>{totalVolume.toLocaleString()} kg</strong>
+                    </div>
+                    <div>
+                      <span>Workout burn</span>
+                      <strong>{totalWorkoutCalories} kcal</strong>
+                    </div>
+                    <div>
+                      <span>Fatigue</span>
+                      <strong>{fatigueScore}/100</strong>
+                    </div>
+                  </div>
                 </article>
-                <article>
-                  <span>Steps today</span>
-                  <strong>11,284</strong>
+
+                <article className="panel-card">
+                  <div className="section-title">
+                    <div>
+                      <p className="card-label">Fatigue map</p>
+                      <h2>부위별 피로도 예측</h2>
+                    </div>
+                  </div>
+                  <div className="fatigue-list">
+                    <div><span>Chest</span><strong>{Math.min(100, fatigueScore + 12)}%</strong></div>
+                    <div><span>Triceps</span><strong>{Math.min(100, fatigueScore + 8)}%</strong></div>
+                    <div><span>Back</span><strong>{Math.max(20, fatigueScore - 28)}%</strong></div>
+                    <div><span>Legs</span><strong>{Math.max(16, fatigueScore - 35)}%</strong></div>
+                  </div>
                 </article>
-                <article>
-                  <span>Net calories</span>
-                  <strong>-318 kcal</strong>
-                </article>
-              </div>
-            </section>
-
-            <section className="device-card secondary-card">
-              <div className="panel-header">
-                <span>AI Coach</span>
-                <span>Recovery 78%</span>
               </div>
 
-              <div className="coach-chip">오늘은 하체 휴식, 등 + 코어 추천</div>
-              <div className="meal-card">
-                <p>Dinner suggestion</p>
-                <strong>연어 포케 + 미소 수프</strong>
-                <span>고단백 / 유지 칼로리 대비 -120 kcal</span>
-              </div>
-              <div className="countdown-note">휴식 종료 10초 전, 숏폼 시청 중에도 복귀 알림 제공</div>
-            </section>
-          </div>
-        </section>
-
-        <section className="pillars-section" id="pillars">
-          <div className="section-heading">
-            <p className="eyebrow">Platform pillars</p>
-            <h2>기능을 나열하지 않고, 사용자의 하루를 움직이는 3개의 엔진으로 묶었습니다.</h2>
-          </div>
-
-          <div className="pillar-grid">
-            {pillars.map((pillar) => (
-              <article className="pillar-card" key={pillar.title}>
-                <h3>{pillar.title}</h3>
-                <p>{pillar.description}</p>
-                <ul>
-                  {pillar.points.map((point) => (
-                    <li key={point}>{point}</li>
+              <article className="panel-card full-width">
+                <div className="section-title">
+                  <div>
+                    <p className="card-label">Set history</p>
+                    <h2>기록된 세트</h2>
+                  </div>
+                </div>
+                <div className="history-list">
+                  {sets.map((set) => (
+                    <div className="history-row" key={set.id}>
+                      <strong>{set.exercise}</strong>
+                      <span>{set.reps} reps</span>
+                      <span>{set.weight} kg</span>
+                      <span>{set.volume} volume</span>
+                      <span>{set.calories} kcal</span>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </article>
-            ))}
-          </div>
-        </section>
+            </section>
+          )}
 
-        <section className="engine-section" id="engine">
-          <div className="section-heading narrow">
-            <p className="eyebrow">Experience architecture</p>
-            <h2>운동 중, 하루 마감, 주간 성장의 세 타이밍에서 제품 가치가 선명하게 보여야 합니다.</h2>
-          </div>
+          {activePage === 'diet' && (
+            <section className="page-grid">
+              <div className="panel-card hero-card">
+                <div className="section-title">
+                  <div>
+                    <p className="card-label">Diet</p>
+                    <h1>섭취 칼로리와 순소모 계산</h1>
+                  </div>
+                </div>
 
-          <div className="roadmap-grid">
-            {roadmap.map((item) => (
-              <article className="roadmap-card" key={item.title}>
-                <span className="roadmap-label">{item.label}</span>
-                <h3>{item.title}</h3>
-                <p>{item.text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
+                <div className="goal-toggle">
+                  {['diet', 'maintain', 'bulk'].map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={goal === mode ? 'toggle-chip active' : 'toggle-chip'}
+                      onClick={() => setGoal(mode)}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
 
-        <section className="community-section" id="community">
-          <div className="community-copy">
-            <p className="eyebrow">Community + retention</p>
-            <h2>휴식 시간의 짧은 공백을 커뮤니티 소비로 바꾸고, 다시 운동 복귀로 자연스럽게 연결합니다.</h2>
-            <p>
-              짧은 세션 기반 피드, 인기글 랭킹, 목표별 추천, 오운완 챌린지와 streak를 한 흐름으로
-              설계하면 콘텐츠 소비가 운동 이탈이 아니라 유지율 장치가 됩니다.
-            </p>
-          </div>
-
-          <div className="signal-board">
-            {communitySignals.map((signal) => (
-              <div className="signal-chip" key={signal}>
-                {signal}
+                <form className="form-grid" onSubmit={handleAddMeal}>
+                  <label>
+                    Meal name
+                    <input value={mealName} onChange={(event) => setMealName(event.target.value)} />
+                  </label>
+                  <label>
+                    Calories
+                    <input
+                      value={mealCalories}
+                      onChange={(event) => setMealCalories(event.target.value)}
+                      inputMode="numeric"
+                    />
+                  </label>
+                  <button className="primary-action" type="submit">
+                    식단 추가
+                  </button>
+                </form>
               </div>
-            ))}
-          </div>
-        </section>
 
-        <section className="market-section" id="market">
-          <article className="market-card">
-            <p className="eyebrow">Creator marketplace</p>
-            <h2>운동 프로그램을 구성해 무료 배포하거나 판매할 수 있는 트레이너/크리에이터 레이어.</h2>
-            <p>
-              사용자 기록 데이터와 연결된 프로그램은 단순 PDF보다 실행력이 높고, 구매 후 수행률과
-              후기까지 플랫폼 내에서 다시 순환시킬 수 있습니다.
-            </p>
-          </article>
+              <div className="dual-column">
+                <article className="panel-card">
+                  <p className="card-label">Daily energy</p>
+                  <h2>오늘 에너지 밸런스</h2>
+                  <label className="inline-field">
+                    Steps today
+                    <input
+                      value={steps}
+                      onChange={(event) => setSteps(Number(event.target.value) || 0)}
+                      inputMode="numeric"
+                    />
+                  </label>
+                  <div className="stat-grid compact">
+                    <div>
+                      <span>Consumed</span>
+                      <strong>{consumedCalories} kcal</strong>
+                    </div>
+                    <div>
+                      <span>Workout burn</span>
+                      <strong>{totalWorkoutCalories} kcal</strong>
+                    </div>
+                    <div>
+                      <span>Step burn</span>
+                      <strong>{stepCalories} kcal</strong>
+                    </div>
+                    <div>
+                      <span>Net</span>
+                      <strong>{netCalories} kcal</strong>
+                    </div>
+                  </div>
+                </article>
 
-          <article className="market-stats">
-            <div>
-              <strong>Weekly Progress</strong>
-              <span>볼륨, 칼로리, 걸음수, streak 가시화</span>
-            </div>
-            <div>
-              <strong>Recommendation Graph</strong>
-              <span>목표에 따라 피드와 메뉴 추천이 바뀌는 알고리즘 레이어</span>
-            </div>
-            <div>
-              <strong>Recovery Forecast</strong>
-              <span>운동 기록 기반 부위별 피로도 추정</span>
-            </div>
-          </article>
-        </section>
+                <article className="panel-card">
+                  <p className="card-label">Recommendation</p>
+                  <h2>권장 섭취량</h2>
+                  <div className="recommend-box">
+                    <strong>{recommendedCalories} kcal</strong>
+                    <span>
+                      현재 목표는 {goal}. 오늘 총 소모량을 기준으로 권장 섭취량을 자동 계산했습니다.
+                    </span>
+                  </div>
+                </article>
+              </div>
 
-        <section className="launch-section" id="launch">
-          <div>
-            <p className="eyebrow">Homepage foundation</p>
-            <h2>MVP 첫 화면은 “오늘 무엇을 해야 하는지”와 “어제 무엇이 쌓였는지”를 동시에 보여줘야 합니다.</h2>
-          </div>
-          <a className="button-primary" href="#home">
-            상단으로 이동
-          </a>
-        </section>
-      </main>
+              <article className="panel-card full-width">
+                <p className="card-label">Meal log</p>
+                <h2>오늘 식단 기록</h2>
+                <div className="history-list">
+                  {meals.map((meal) => (
+                    <div className="history-row" key={meal.id}>
+                      <strong>{meal.name}</strong>
+                      <span>{meal.calories} kcal</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </section>
+          )}
+
+          {activePage === 'community' && (
+            <section className="page-grid">
+              <div className="panel-card hero-card">
+                <div className="section-title">
+                  <div>
+                    <p className="card-label">Community</p>
+                    <h1>피드, 좋아요, 목표별 추천</h1>
+                  </div>
+                  <div className={restWarning ? 'timer-chip warning' : 'timer-chip subtle'}>
+                    {timeLeft > 0 ? `Rest ends in ${restClock}` : 'No active rest'}
+                  </div>
+                </div>
+
+                <div className="goal-toggle">
+                  {['all', 'diet', 'maintain', 'bulk'].map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={filter === mode ? 'toggle-chip active' : 'toggle-chip'}
+                      onClick={() => setFilter(mode)}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+
+                <form className="post-form" onSubmit={handleCreatePost}>
+                  <input
+                    placeholder="게시물 제목"
+                    value={postTitle}
+                    onChange={(event) => setPostTitle(event.target.value)}
+                  />
+                  <textarea
+                    placeholder="운동 팁이나 식단 후기를 적어보세요"
+                    value={postBody}
+                    onChange={(event) => setPostBody(event.target.value)}
+                    rows="4"
+                  />
+                  <button className="primary-action" type="submit">
+                    게시하기
+                  </button>
+                </form>
+              </div>
+
+              <article className="panel-card full-width">
+                <div className="section-title">
+                  <div>
+                    <p className="card-label">Feed</p>
+                    <h2>{filter === 'all' ? '전체 피드' : `${filter} 맞춤 피드`}</h2>
+                  </div>
+                </div>
+                <div className="post-list">
+                  {filteredPosts.map((post) => (
+                    <article className="post-card" key={post.id}>
+                      <div className="post-head">
+                        <div>
+                          <strong>{post.title}</strong>
+                          <span>{post.author}</span>
+                        </div>
+                        <span className="post-tag">{post.category}</span>
+                      </div>
+                      <p>{post.body}</p>
+                      <div className="post-actions">
+                        <button type="button" onClick={() => handleLikePost(post.id)}>
+                          추천 {post.likes}
+                        </button>
+                        <span>댓글 {post.comments}</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </article>
+            </section>
+          )}
+
+          {activePage === 'weekly-progress' && (
+            <section className="page-grid">
+              <div className="panel-card hero-card">
+                <div className="section-title">
+                  <div>
+                    <p className="card-label">Weekly progress</p>
+                    <h1>주간 성장과 streak 대시보드</h1>
+                  </div>
+                </div>
+                <div className="stat-grid">
+                  <div>
+                    <span>Workout minutes</span>
+                    <strong>{weeklyWorkoutMinutes} min</strong>
+                  </div>
+                  <div>
+                    <span>Avg steps</span>
+                    <strong>{weeklyStepAverage.toLocaleString()}</strong>
+                  </div>
+                  <div>
+                    <span>Avg intake</span>
+                    <strong>{weeklyIntakeAverage} kcal</strong>
+                  </div>
+                  <div>
+                    <span>Streak</span>
+                    <strong>{streak} days</strong>
+                  </div>
+                </div>
+              </div>
+
+              <article className="panel-card full-width">
+                <p className="card-label">Weekly chart</p>
+                <h2>요일별 운동 시간</h2>
+                <div className="bar-chart">
+                  {weeklyData.map((item) => (
+                    <div className="bar-column" key={item.day}>
+                      <div className="bar-track">
+                        <div className="bar-fill" style={{ height: `${item.workout}%` }} />
+                      </div>
+                      <strong>{item.day}</strong>
+                      <span>{item.workout}m</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <div className="dual-column">
+                <article className="panel-card">
+                  <p className="card-label">Highlights</p>
+                  <h2>이번 주 성과</h2>
+                  <div className="insight-list">
+                    <div>오운완 streak {streak}일 유지 중</div>
+                    <div>목요일 운동 시간이 가장 길었습니다</div>
+                    <div>일요일 걸음수가 최고치였습니다</div>
+                  </div>
+                </article>
+
+                <article className="panel-card">
+                  <p className="card-label">Next action</p>
+                  <h2>다음 주 추천</h2>
+                  <div className="insight-list">
+                    <div>수요일 운동 시간을 15분만 늘리면 주간 볼륨 균형이 좋아집니다</div>
+                    <div>평균 섭취량은 유지 구간에 가깝습니다</div>
+                    <div>피로도를 고려해 월요일은 하체보다 등 운동이 적절합니다</div>
+                  </div>
+                </article>
+              </div>
+            </section>
+          )}
+        </main>
+      </div>
     </div>
   )
 }
