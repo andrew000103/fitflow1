@@ -12,6 +12,21 @@ export default function AuthProvider({ children }) {
     let mounted = true
 
     async function initialize() {
+      const authSearchParams =
+        typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+      const authCode = authSearchParams?.get('code')
+
+      if (authCode) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(authCode)
+
+        if (exchangeError) {
+          console.error('exchangeCodeForSession error:', exchangeError.message)
+        } else if (typeof window !== 'undefined') {
+          const nextUrl = `${window.location.origin}${window.location.pathname}${window.location.hash || ''}`
+          window.history.replaceState({}, document.title, nextUrl)
+        }
+      }
+
       const { data, error } = await supabase.auth.getSession()
 
       if (!mounted) return

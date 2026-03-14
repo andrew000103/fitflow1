@@ -1,18 +1,11 @@
 import { useState } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import LanguageToggle from '../language/LanguageToggle.jsx'
 import { useLanguage } from '../language/useLanguage.js'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from './useAuth'
+import { getAuthRedirectUrl } from './authRecovery.js'
 import '../../styles/auth.css'
-
-function getAuthRedirectUrl() {
-  if (typeof window === 'undefined') {
-    return undefined
-  }
-
-  return `${window.location.origin}${window.location.pathname}#/auth`
-}
 
 export default function AuthPage() {
   const { user, isLoggedIn, isAnonymous, loading } = useAuth()
@@ -163,6 +156,7 @@ export default function AuthPage() {
               onChange={(e) => setEmail(e.target.value)}
               className="auth-input"
               autoComplete="email"
+              required
             />
 
             <input
@@ -172,7 +166,16 @@ export default function AuthPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="auth-input"
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              required
             />
+
+            {mode === 'login' ? (
+              <div className="auth-inline-link-row">
+                <Link className="auth-inline-link" to="/auth/forgot-password">
+                  {text.forgotPassword}
+                </Link>
+              </div>
+            ) : null}
 
             <button type="submit" className="auth-primary-button" disabled={submitting}>
               {submitting
@@ -227,28 +230,19 @@ export default function AuthPage() {
         <aside className="auth-side-card">
           <div>
             <span className="auth-kicker">FitFlow Start</span>
-            <div className="auth-side-stack">
-              <h2>Clear structure. Calm motion. One steady start.</h2>
-              <p>
-                삼성바이오로직스 홈페이지처럼 정돈된 구조와 절제된 강조를 참고해서, 진입 경험도 더 믿음직하게 정리했어.
-              </p>
-            </div>
           </div>
           <div className="auth-feature-list">
             <div className="auth-feature-item">
               <span>01</span>
-              <strong>Structured access</strong>
-              <p>진입 수단은 빠르게 고르되, 정보 구조는 한눈에 정리되도록 배치했어.</p>
+              <strong>오직 당신만을 위한 개인 맞춤형 헬스케어를 시작해요.</strong>
             </div>
             <div className="auth-feature-item">
               <span>02</span>
-              <strong>Unified tone</strong>
-              <p>로그인, 온보딩, 프로필 입력까지 하나의 브랜드 화면처럼 같은 결로 이어져.</p>
+              <strong>운동에 필요한 모든 흐름을 하나의 앱에서 자연스럽게 이어가요.</strong>
             </div>
             <div className="auth-feature-item">
               <span>03</span>
-              <strong>Subtle motion</strong>
-              <p>강한 효과 대신 부드러운 등장감과 얕은 반응만 남겨서 부담을 줄였어.</p>
+              <strong>친구들과 함께 더 건강한 라이프를 나누고 오래 이어가요.</strong>
             </div>
           </div>
         </aside>

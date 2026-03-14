@@ -99,6 +99,7 @@ function NutritionLauncherPage() {
   const [cravingInput, setCravingInput] = useState('')
   const [cheatRecommendation, setCheatRecommendation] = useState(null)
   const [isScratching, setIsScratching] = useState(false)
+  const [cheatRevealed, setCheatRevealed] = useState(false)
 
   const todayIso = formatLocalDate()
   const todayMeals = useMemo(
@@ -183,6 +184,7 @@ function NutritionLauncherPage() {
 
   useEffect(() => {
     setCheatRecommendation(createCheatMenuRecommendation(ffRecommendations, cravings, foodNameLanguage))
+    setCheatRevealed(false)
   }, [cravings, ffRecommendations, foodNameLanguage])
 
   function handleAddCraving() {
@@ -206,6 +208,7 @@ function NutritionLauncherPage() {
     window.setTimeout(() => {
       setCheatRecommendation(createCheatMenuRecommendation(ffRecommendations, cravings, foodNameLanguage))
       setIsScratching(false)
+      setCheatRevealed(true)
     }, 1200)
   }
 
@@ -337,7 +340,8 @@ function NutritionLauncherPage() {
 
           <div className="nutrition-food-chip-grid compact">
             {quickAccessTab === 'ff'
-              ? visibleFfRecommendations.map((food) => (
+              ? visibleFfRecommendations.length > 0
+                ? visibleFfRecommendations.map((food) => (
                   <Link
                     key={food.id}
                     className="quick-add-card compact"
@@ -347,9 +351,15 @@ function NutritionLauncherPage() {
                     <span>{food.nutritionPerServing.kcal} kcal</span>
                     <span>{tx(appLanguage, '추천', 'Pick')}</span>
                   </Link>
-                ))
-              : recentEntries.map((meal) =>
-                  meal.foodId && foodMap.has(meal.foodId) ? (
+                  ))
+                : (
+                  <div className="mini-panel nutrition-mobile-empty">
+                    {tx(appLanguage, '추천 메뉴를 준비 중이에요.', 'Preparing your recommended picks.')}
+                  </div>
+                  )
+              : recentEntries.length > 0
+                ? recentEntries.map((meal) =>
+                    meal.foodId && foodMap.has(meal.foodId) ? (
                     <Link
                       key={meal.id}
                       className="quick-add-card compact"
@@ -370,8 +380,13 @@ function NutritionLauncherPage() {
                       <span>{meal.calories} kcal</span>
                       <span>{tx(appLanguage, '최근', 'Recent')}</span>
                     </button>
-                  ),
-                )}
+                    ),
+                  )
+                : (
+                  <div className="mini-panel nutrition-mobile-empty">
+                    {tx(appLanguage, '최근 기록이 아직 없어요.', 'No recent nutrition logs yet.')}
+                  </div>
+                  )}
           </div>
         </article>
 
@@ -407,17 +422,21 @@ function NutritionLauncherPage() {
             type="button"
             onClick={handleScratchReveal}
           >
-            <div className={isScratching ? 'nutrition-cheat-result visible' : 'nutrition-cheat-result hidden'}>
+            <div className={isScratching || cheatRevealed ? 'nutrition-cheat-result visible' : 'nutrition-cheat-result hidden'}>
               <span>{tx(appLanguage, '치팅데이', 'Cheat day')}</span>
               <strong>
                 {isScratching
                   ? tx(appLanguage, '긁는 중...', 'Scratching...')
-                  : cheatRecommendation?.label || tx(appLanguage, '긁어서 메뉴 보기', 'Scratch to reveal')}
+                  : cheatRevealed
+                    ? cheatRecommendation?.label || tx(appLanguage, '오늘 메뉴 준비 중', 'Preparing today pick')
+                    : tx(appLanguage, '긁어서 메뉴 보기', 'Scratch to reveal')}
               </strong>
               <em>
                 {isScratching
                   ? tx(appLanguage, '조금만 더 참으면 오늘의 메뉴가 열려요.', 'Wait just a moment and your menu will appear.')
-                  : tx(appLanguage, '버튼을 누르면 복권 긁듯 메뉴가 공개돼요.', 'Tap to reveal today menu like scratching a lottery ticket.')}
+                  : cheatRevealed
+                    ? tx(appLanguage, '오늘은 이 메뉴로 기분 좋게 풀어가요.', 'This looks like a good pick for your reward meal.')
+                    : tx(appLanguage, '버튼을 누르면 복권 긁듯 메뉴가 공개돼요.', 'Tap to reveal today menu like scratching a lottery ticket.')}
               </em>
             </div>
             <div className="nutrition-cheat-scratch-layer" aria-hidden="true">

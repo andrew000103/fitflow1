@@ -1,7 +1,9 @@
 import AuthProvider from './features/auth/AuthProvider'
 import AuthPage from './features/auth/AuthPage'
+import ForgotPasswordPage from './features/auth/ForgotPasswordPage.jsx'
 import ProtectedRoute from './features/auth/ProtectedRoute'
 import OnboardingGate from './features/auth/OnboardingGate'
+import ResetPasswordPage from './features/auth/ResetPasswordPage.jsx'
 import LanguageProvider from './features/language/LanguageProvider.jsx'
 import { supabaseConfigError } from './lib/supabase.js'
 
@@ -14,28 +16,23 @@ import DashboardLayout from './components/DashboardLayout.jsx'
 import CommunityPage from './pages/CommunityPage.jsx'
 import ExerciseDatabasePage from './pages/ExerciseDatabasePage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
-
-import { TrainPage } from './features/workout/index.js'
-import InsightsPage from './features/workout/pages/InsightsPage.jsx'
-
 import NutritionLauncherPage from './pages/NutritionLauncherPage.jsx'
 import NutritionHubPage from './pages/NutritionHubPage.jsx'
 import AddFoodPage from './pages/AddFoodPage.jsx'
 import FoodDetailPage from './pages/FoodDetailPage.jsx'
 import CustomFoodPage from './pages/CustomFoodPage.jsx'
-
 import TrainProgramDetailPage from './pages/TrainProgramDetailPage.jsx'
 import TrainProgramBuilderPage from './pages/TrainProgramBuilderPage.jsx'
 import TrainTemplatesPage from './pages/TrainTemplatesPage.jsx'
 import TrainWorkoutPage from './pages/TrainWorkoutPage.jsx'
-
 import ProfileLauncherPage from './pages/ProfileLauncherPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
 import ProfileEditPage from './pages/ProfileEditPage.jsx'
-
 import ShopPage from './pages/ShopPage.jsx'
-
 import OnboardingPage from './pages/OnboardingPage'
+
+import { TrainPage } from './features/workout/index.js'
+import InsightsPage from './features/workout/pages/InsightsPage.jsx'
 
 function App() {
   if (supabaseConfigError) {
@@ -63,8 +60,12 @@ function App() {
             color: '#14263d',
           }}
         >
-          <span style={{ color: '#2563eb', fontSize: '0.82rem', fontWeight: 700 }}>FitFlow Setup</span>
-          <h1 style={{ margin: 0, fontSize: '2rem', lineHeight: 1.05 }}>앱 설정이 아직 연결되지 않았어요</h1>
+          <span style={{ color: '#2563eb', fontSize: '0.82rem', fontWeight: 700 }}>
+            FitFlow Setup
+          </span>
+          <h1 style={{ margin: 0, fontSize: '2rem', lineHeight: 1.05 }}>
+            앱 설정이 아직 연결되지 않았어요
+          </h1>
           <p style={{ margin: 0, color: '#60738a', lineHeight: 1.6 }}>
             배포 환경에서 Supabase 환경변수가 빠져 있어서 앱이 시작되지 못하고 있습니다.
           </p>
@@ -92,11 +93,12 @@ function App() {
     <LanguageProvider>
       <AuthProvider>
         <Routes>
-
-          {/* 로그인 페이지 */}
+          {/* 공개 라우트 */}
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
 
-          {/* 온보딩 페이지 */}
+          {/* 온보딩 */}
           <Route
             path="/onboarding"
             element={
@@ -116,7 +118,6 @@ function App() {
               </ProtectedRoute>
             }
           >
-
             <Route index element={<Navigate to="/train" replace />} />
 
             {/* TRAIN */}
@@ -151,6 +152,7 @@ function App() {
             <Route path="/profile/me" element={<ProfilePage />} />
             <Route path="/profile/edit" element={<ProfileEditPage />} />
             <Route path="/profile/nutrition" element={<NutritionHubPage entry="profile" />} />
+            <Route path="/profile/:profileUserId" element={<ProfilePage />} />
 
             {/* REDIRECTS */}
             <Route path="/community" element={<Navigate to="/connect" replace />} />
@@ -166,9 +168,7 @@ function App() {
             <Route path="/analytics/nutrition" element={<Navigate to="/profile/nutrition" replace />} />
 
             <Route path="*" element={<Navigate to="/train" replace />} />
-
           </Route>
-
         </Routes>
       </AuthProvider>
     </LanguageProvider>

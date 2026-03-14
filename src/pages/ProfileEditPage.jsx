@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import PageHeader from '../components/PageHeader.jsx'
 import { useAuth } from '../features/auth/useAuth.js'
+import { supabase } from '../lib/supabase.js'
 import {
   calculateProfileTargets,
+  deleteProfileBundle,
   emptyProfileForm,
   loadProfileBundle,
   normalizeProfileForm,
@@ -13,7 +15,7 @@ import { macroRatioPresetLabel, sexLabel, tx } from '../utils/appLanguage.js'
 import '../styles/personalization.css'
 
 function ProfileEditPage() {
-  const { appLanguage, userProfile, updateUserProfile } = useOutletContext()
+  const { appLanguage, userProfile, updateUserProfile, resetAllData } = useOutletContext()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState(emptyProfileForm)
@@ -21,6 +23,8 @@ function ProfileEditPage() {
   const [error, setError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [settingsAction, setSettingsAction] = useState('')
+  const [actionPending, setActionPending] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -75,6 +79,45 @@ function ProfileEditPage() {
     setSaveError('')
   }
 
+  async function handleLogout() {
+    setActionPending(true)
+    setSaveError('')
+
+    try {
+      resetAllData()
+      await supabase.auth.signOut()
+      navigate('/auth', { replace: true })
+    } catch (logoutError) {
+      setSaveError(logoutError.message || tx(appLanguage, '로그아웃 중 오류가 발생했어요.', 'Something went wrong while logging out.'))
+    } finally {
+      setActionPending(false)
+      setSettingsAction('')
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (!user?.id) {
+      setSaveError(tx(appLanguage, '로그인 정보를 다시 확인해 주세요.', 'Please refresh your login session and try again.'))
+      setSettingsAction('')
+      return
+    }
+
+    setActionPending(true)
+    setSaveError('')
+
+    try {
+      await deleteProfileBundle(user.id)
+      resetAllData()
+      await supabase.auth.signOut()
+      navigate('/auth', { replace: true, state: { deleted: true } })
+    } catch (deleteError) {
+      setSaveError(deleteError.message || tx(appLanguage, '회원탈퇴 처리 중 오류가 발생했어요.', 'Something went wrong while processing account deletion.'))
+    } finally {
+      setActionPending(false)
+      setSettingsAction('')
+    }
+  }
+
   async function handleSave(event) {
     event.preventDefault()
 
@@ -94,6 +137,7 @@ function ProfileEditPage() {
     try {
       await saveProfileBundle(user.id, form)
       updateUserProfile({
+        name: form.nickname?.trim() || userProfile?.name,
         macroRatioPreset: form.macroRatioPreset || 'balanced',
       })
       navigate('/profile/me', { replace: true, state: { saved: true } })
@@ -170,6 +214,10 @@ function ProfileEditPage() {
             </div>
             <div className="compact-grid profile-edit-grid">
               <label className="field-label profile-field-card">
+                {tx(appLanguage, '닉네임', 'Nickname')}
+                <input value={form.nickname} onChange={(event) => updateField('nickname', event.target.value)} disabled={saving} />
+              </label>
+              <label className="field-label profile-field-card">
                 {tx(appLanguage, '나이', 'Age')}
                 <input type="number" value={form.age} onChange={(event) => updateField('age', event.target.value)} disabled={saving} />
               </label>
@@ -245,8 +293,73 @@ function ProfileEditPage() {
               </div>
             </div>
           ) : null}
+
+          <div className="profile-form-section profile-settings-section">
+            <div className="profile-form-section-head">
+              <span>{tx(appLanguage, '설정', 'Settings')}</span>
+              <p>{tx(appLanguage, '로그아웃과 회원탈퇴는 여기서 진행할 수 있어요.', 'You can log out or leave the app from here.')}</p>
+            </div>
+            <div className="profile-settings-actions">
+              <button className="inline-action" type="button" onClick={() => setSettingsAction('logout')} disabled={saving || actionPending}>
+                {tx(appLanguage, '로그아웃', 'Log out')}
+              </button>
+              <button className="inline-action danger-soft" type="button" onClick={() => setSettingsAction('delete')} disabled={saving || actionPending}>
+                {tx(appLanguage, '회원탈퇴', 'Delete account')}
+              </button>
+            </div>
+          </div>
         </form>
       </article>
+
+      {settingsAction ? (
+        <>
+          <button
+            className="workout-finish-backdrop"
+            type="button"
+            aria-label={tx(appLanguage, '설정 확인 닫기', 'Close settings confirmation')}
+            onClick={() => !actionPending && setSettingsAction('')}
+          />
+          <section className="content-card workout-finish-modal" aria-label={tx(appLanguage, '설정 확인', 'Settings confirmation')}>
+            <div className="workout-finish-copy">
+              <h2>
+                {settingsAction === 'delete'
+                  ? tx(appLanguage, '회원탈퇴를 진행할까요?', 'Proceed with account deletion?')
+                  : tx(appLanguage, '로그아웃할까요?', 'Log out now?')}
+              </h2>
+              <p>
+                {settingsAction === 'delete'
+                  ? tx(
+                      appLanguage,
+                      '현재 버전에서는 앱에 저장된 프로필과 목표 데이터 삭제 후 로그아웃까지 진행돼요. Auth 계정 완전 삭제는 추후 서버 연동이 필요해요.',
+                      'This version removes your saved app profile and target data, then logs you out. Full Auth account deletion still needs server-side support.',
+                    )
+                  : tx(
+                      appLanguage,
+                      '현재 기기에서 세션을 종료하고 로그인 화면으로 이동해요.',
+                      'This ends your current session on this device and returns you to the login screen.',
+                    )}
+              </p>
+            </div>
+            <div className="workout-finish-actions">
+              <button className="inline-action" type="button" onClick={() => setSettingsAction('')} disabled={actionPending}>
+                {tx(appLanguage, '취소', 'Cancel')}
+              </button>
+              <button
+                className={settingsAction === 'delete' ? 'inline-action danger-soft' : 'inline-action primary-dark'}
+                type="button"
+                onClick={settingsAction === 'delete' ? handleDeleteAccount : handleLogout}
+                disabled={actionPending}
+              >
+                {actionPending
+                  ? tx(appLanguage, '처리 중...', 'Processing...')
+                  : settingsAction === 'delete'
+                    ? tx(appLanguage, '탈퇴 진행', 'Continue deletion')
+                    : tx(appLanguage, '로그아웃', 'Log out')}
+              </button>
+            </div>
+          </section>
+        </>
+      ) : null}
     </section>
   )
 }

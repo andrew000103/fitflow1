@@ -20,8 +20,12 @@ function createMissingSupabaseClient() {
     auth: {
       getSession: async () => ({ data: { session: null }, error: new Error(supabaseConfigError) }),
       getUser: async () => ({ data: { user: null }, error: new Error(supabaseConfigError) }),
+      exchangeCodeForSession: async () => createMissingConfigResponse(),
+      setSession: async () => createMissingConfigResponse(),
       signUp: async () => createMissingConfigResponse(),
       signInWithPassword: async () => createMissingConfigResponse(),
+      resetPasswordForEmail: async () => createMissingConfigResponse(),
+      updateUser: async () => createMissingConfigResponse(),
       signInWithOAuth: async () => createMissingConfigResponse(),
       signInAnonymously: async () => createMissingConfigResponse(),
       signOut: async () => createMissingConfigResponse(),
@@ -44,12 +48,26 @@ function createMissingSupabaseClient() {
             },
           }
         },
+        delete() {
+          return {
+            eq() {
+              return createMissingConfigResponse()
+            },
+          }
+        },
         upsert: async () => createMissingConfigResponse(),
       }
     },
+    rpc: async () => createMissingConfigResponse(),
   }
 }
 
 export const supabase = supabaseConfigError
   ? createMissingSupabaseClient()
-  : createClient(supabaseUrl, supabaseAnonKey)
+  : createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        flowType: 'pkce',
+        detectSessionInUrl: true,
+        persistSession: true,
+      },
+    })

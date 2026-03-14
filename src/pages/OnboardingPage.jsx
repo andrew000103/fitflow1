@@ -1,18 +1,30 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LanguageToggle from '../features/language/LanguageToggle.jsx'
 import { useLanguage } from '../features/language/useLanguage.js'
 import { supabase } from '../lib/supabase'
+import { loadDashboardState, saveDashboardState } from '../api/fitflowApi.ts'
 import { calculateHealthTargets } from '../lib/healthTargets'
+import { checkNicknameAvailability, saveProfileBundle, suggestNicknames } from '../features/profile/profileData.js'
 import '../styles/onboarding.css'
 
 const initialForm = {
+  nickname: '',
   age: '',
   heightCm: '',
   weightKg: '',
   gender: 'male',
   activityLevel: 'light',
   goalType: 'cut',
+}
+
+function normalizeNickname(value) {
+  return String(value || '').trim()
+}
+
+function isValidNickname(value) {
+  const normalizedNickname = normalizeNickname(value)
+  return normalizedNickname.length >= 2 && normalizedNickname.length <= 20
 }
 
 function StepCard({ step, title, description, children }) {
@@ -58,6 +70,10 @@ export default function OnboardingPage() {
   const [form, setForm] = useState(initialForm)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [nicknameStatus, setNicknameStatus] = useState('idle')
+  const [nicknameMessage, setNicknameMessage] = useState('')
+  const [nicknameSuggestions, setNicknameSuggestions] = useState([])
+  const nicknameRequestIdRef = useRef(0)
 
   const genderOptions = [
     { value: 'male', label: text.genderMale, hint: text.genderMaleHint },
@@ -79,6 +95,7 @@ export default function OnboardingPage() {
   ]
 
   const metricFields = [
+    { key: 'nickname', label: text.nickname, placeholder: text.nicknamePlaceholder, type: 'text' },
     { key: 'age', label: text.age, suffix: text.ageSuffix, placeholder: '25' },
     { key: 'heightCm', label: text.height, suffix: text.heightSuffix, placeholder: '175' },
     { key: 'weightKg', label: text.weight, suffix: text.weightSuffix, placeholder: '78' },
@@ -112,7 +129,101 @@ export default function OnboardingPage() {
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }))
+    if (key === 'nickname') {
+      setNicknameStatus('idle')
+      setNicknameMessage('')
+      setNicknameSuggestions([])
+    }
   }
+
+  async function handleNicknameCheck(nextNickname = form.nickname) {
+    const trimmedNickname = normalizeNickname(nextNickname)
+    const requestId = nicknameRequestIdRef.current + 1
+    nicknameRequestIdRef.current = requestId
+
+    if (!trimmedNickname) {
+      setNicknameStatus('error')
+      setNicknameMessage(text.nicknameRequired)
+      setNicknameSuggestions([])
+      return false
+    }
+
+    if (!isValidNickname(trimmedNickname)) {
+      setNicknameStatus('error')
+      setNicknameMessage(text.nicknameInvalid)
+      setNicknameSuggestions([])
+      return false
+    }
+
+    setNicknameStatus('checking')
+    setNicknameMessage('')
+    setNicknameSuggestions([])
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      const result = await checkNicknameAvailability(user?.id, trimmedNickname)
+      if (nicknameRequestIdRef.current !== requestId) {
+        return false
+      }
+
+      if (!result.supported) {
+        setNicknameStatus('skipped')
+        setNicknameMessage(text.nicknameCheckUnavailable)
+        return true
+      }
+
+      if (result.available) {
+        setNicknameStatus('available')
+        setNicknameMessage(text.nicknameAvailable)
+        return true
+      }
+
+      setNicknameStatus('duplicate')
+      setNicknameMessage(text.nicknameDuplicate)
+      const suggestions = await suggestNicknames(trimmedNickname)
+      if (nicknameRequestIdRef.current !== requestId) {
+        return false
+      }
+      setNicknameSuggestions(suggestions.slice(0, 5))
+      return false
+    } catch (checkError) {
+      if (nicknameRequestIdRef.current !== requestId) {
+        return false
+      }
+      setNicknameStatus('skipped')
+      setNicknameMessage(checkError.message || text.nicknameCheckUnavailable)
+      setNicknameSuggestions([])
+      return true
+    }
+  }
+
+  useEffect(() => {
+    const trimmedNickname = normalizeNickname(form.nickname)
+
+    if (!trimmedNickname) {
+      setNicknameStatus('idle')
+      setNicknameMessage('')
+      setNicknameSuggestions([])
+      return undefined
+    }
+
+    if (!isValidNickname(trimmedNickname)) {
+      setNicknameStatus('error')
+      setNicknameMessage(text.nicknameInvalid)
+      setNicknameSuggestions([])
+      return undefined
+    }
+
+    const debounceTimer = window.setTimeout(() => {
+      handleNicknameCheck(trimmedNickname)
+    }, 450)
+
+    return () => {
+      window.clearTimeout(debounceTimer)
+    }
+  }, [form.nickname, text.nicknameAvailable, text.nicknameCheckUnavailable, text.nicknameDuplicate, text.nicknameInvalid, text.nicknameRequired])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -121,9 +232,24 @@ export default function OnboardingPage() {
     const age = Number(form.age)
     const heightCm = Number(form.heightCm)
     const weightKg = Number(form.weightKg)
+    const trimmedNickname = normalizeNickname(form.nickname)
 
     if (!age || !heightCm || !weightKg) {
       setError(text.missingBodyError)
+      return
+    }
+
+    if (!trimmedNickname) {
+      setError(text.nicknameRequired)
+      setNicknameStatus('error')
+      setNicknameMessage(text.nicknameRequired)
+      return
+    }
+
+    if (!isValidNickname(trimmedNickname)) {
+      setError(text.nicknameInvalid)
+      setNicknameStatus('error')
+      setNicknameMessage(text.nicknameInvalid)
       return
     }
 
@@ -138,41 +264,30 @@ export default function OnboardingPage() {
       if (userError) throw userError
       if (!user) throw new Error(text.loginRequired)
 
-      const targets = calculateHealthTargets({
-        age,
-        heightCm,
-        weightKg,
-        gender: form.gender,
-        activityLevel: form.activityLevel,
-        goalType: form.goalType,
+      if (nicknameStatus !== 'available') {
+        const isNicknameOkay = await handleNicknameCheck(trimmedNickname)
+        if (!isNicknameOkay) {
+          setLoading(false)
+          return
+        }
+      }
+
+      await saveProfileBundle(user.id, {
+        ...form,
+        nickname: trimmedNickname,
       })
 
-      const now = new Date().toISOString()
-
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        user_id: user.id,
-        age,
-        height_cm: heightCm,
-        weight_kg: weightKg,
-        gender: form.gender,
-        activity_level: form.activityLevel,
-        goal_type: form.goalType,
-        onboarding_completed: true,
-        updated_at: now,
-      })
-
-      if (profileError) throw profileError
-
-      const { error: targetsError } = await supabase.from('user_targets').upsert({
-        user_id: user.id,
-        target_calories: targets.targetCalories,
-        target_protein_g: targets.targetProteinG,
-        target_steps: targets.targetSteps,
-        target_workouts_per_week: targets.targetWorkoutsPerWeek,
-        updated_at: now,
-      })
-
-      if (targetsError) throw targetsError
+      const persistedState = loadDashboardState(user.id)
+      saveDashboardState(
+        {
+          ...persistedState,
+          userProfile: {
+            ...(persistedState.userProfile && typeof persistedState.userProfile === 'object' ? persistedState.userProfile : {}),
+            name: trimmedNickname,
+          },
+        },
+        user.id,
+      )
 
       navigate('/')
     } catch (err) {
@@ -202,7 +317,7 @@ export default function OnboardingPage() {
 
           <aside className="onboarding-progress-card">
             <span className="onboarding-progress-label">{text.progressLabel}</span>
-            <strong>{completedCount} / 6</strong>
+            <strong>{completedCount} / 7</strong>
             <p>{text.progressDescription}</p>
             <div className="onboarding-progress-track" aria-hidden="true">
               <span style={{ width: `${(completedCount / 6) * 100}%` }} />
@@ -227,13 +342,51 @@ export default function OnboardingPage() {
                     <span>{field.label}</span>
                     <div className="onboarding-metric-input-wrap">
                       <input
-                        type="number"
+                        type={field.type || 'number'}
                         value={form[field.key]}
                         onChange={(event) => updateField(field.key, event.target.value)}
                         placeholder={field.placeholder}
                       />
-                      <em>{field.suffix}</em>
+                      {field.suffix ? <em>{field.suffix}</em> : null}
                     </div>
+                    {field.key === 'nickname' ? (
+                      <div className="onboarding-nickname-row">
+                        <span className="onboarding-nickname-rule">{text.nicknameRule}</span>
+                        {nicknameStatus === 'checking' ? (
+                          <span className="onboarding-nickname-feedback">{text.nicknameChecking}</span>
+                        ) : null}
+                        {nicknameMessage && nicknameStatus !== 'checking' ? (
+                          <span
+                            className={
+                              nicknameStatus === 'available'
+                                ? 'onboarding-nickname-feedback is-success'
+                                : nicknameStatus === 'duplicate' || nicknameStatus === 'error'
+                                ? 'onboarding-nickname-feedback is-error'
+                                : 'onboarding-nickname-feedback'
+                            }
+                          >
+                            {nicknameMessage}
+                          </span>
+                        ) : null}
+                        {nicknameStatus === 'duplicate' && nicknameSuggestions.length > 0 ? (
+                          <div className="onboarding-nickname-suggestions">
+                            <span className="onboarding-nickname-suggestions-label">{text.nicknameSuggestions}</span>
+                            <div className="onboarding-nickname-chip-row">
+                              {nicknameSuggestions.slice(0, 5).map((suggestion) => (
+                                <button
+                                  key={suggestion}
+                                  type="button"
+                                  className="onboarding-nickname-chip"
+                                  onClick={() => updateField('nickname', suggestion)}
+                                >
+                                  {suggestion}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </label>
                 ))}
               </div>

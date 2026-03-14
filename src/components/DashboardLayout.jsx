@@ -1,6 +1,8 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import AppIcon from './AppIcon.jsx'
+import NotificationPanel from '../features/notifications/NotificationPanel.jsx'
+import { useNotifications } from '../features/notifications/useNotifications.js'
 import { useAuth } from '../features/auth/useAuth.js'
 import {
   categoryLabels,
@@ -382,13 +384,13 @@ function DashboardLayout() {
   const { user } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false)
   const [persistedState] = useState(() => loadDashboardState(user?.id))
   const initialProgramState = useMemo(
     () => normalizePrograms(persistedState.programs, initialPrograms),
     [persistedState.programs],
   )
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [goal, setGoal] = useState(persistedState.goal || 'maintain')
   const [appLanguage, setAppLanguage] = useState(persistedState.appLanguage || persistedState.foodNameLanguage || getStoredLanguage())
   const [colorTheme, setColorTheme] = useState(persistedState.colorTheme || 'light')
@@ -483,6 +485,15 @@ function DashboardLayout() {
   const currentProgramDay = currentProgram
     ? getProgramPreviewDay(currentProgram, activeProgram?.currentWeek, activeProgram?.currentDay)
     : null
+  const {
+    notifications,
+    unreadCount,
+    loading: notificationsLoading,
+    error: notificationsError,
+    refresh: refreshNotifications,
+    markOneRead,
+    markAllRead,
+  } = useNotifications(user?.id)
 
   useEffect(() => {
     if (!programs.length) {
@@ -2028,15 +2039,24 @@ function DashboardLayout() {
     navigate('/train')
   }
 
+  async function handleLogout() {
+    try {
+      await supabase.auth.signOut()
+    } finally {
+      setSidebarOpen(false)
+      navigate('/auth', { replace: true })
+    }
+  }
+
   return (
     <div className="dashboard-shell">
-      <aside className={sidebarOpen ? `sidebar is-open${sidebarCollapsed ? ' is-collapsed' : ''}` : `sidebar${sidebarCollapsed ? ' is-collapsed' : ''}`}>
+      <aside className={sidebarOpen ? 'sidebar is-open' : 'sidebar'}>
         <div className="sidebar-brand">
           <button
             type="button"
             className="sidebar-mark"
-            aria-label={tx(appLanguage, '사이드바 접기 또는 펼치기', 'Toggle sidebar')}
-            onClick={() => setSidebarCollapsed((current) => !current)}
+            aria-label={tx(appLanguage, '사이드바 열기 또는 닫기', 'Toggle sidebar')}
+            onClick={() => setSidebarOpen((current) => !current)}
           >
             FF
           </button>
@@ -2091,7 +2111,7 @@ function DashboardLayout() {
         />
       )}
 
-      <div className={sidebarCollapsed ? 'content-shell is-collapsed' : 'content-shell'}>
+      <div className="content-shell">
         <header className="content-topbar">
           {showBackButton ? (
             <button
@@ -2120,17 +2140,45 @@ function DashboardLayout() {
             <span>{currentSection.subtitle}</span>
           </div>
 
-          {activeWorkout ? (
+          <div className="topbar-actions">
             <button
               type="button"
-              className="topbar-workout-pill"
-              onClick={() => navigate('/train/workout')}
+              className="topbar-notification-button"
+              aria-label={tx(appLanguage, '알림 열기', 'Open notifications')}
+              onClick={() => setNotificationPanelOpen(true)}
             >
-              <span><AppIcon name="workout" size="sm" /> {activeWorkout.title}</span>
-              <strong>{activeWorkoutMinutes}m</strong>
+              <AppIcon name="notification" size="sm" />
+              {unreadCount > 0 ? (
+                <span className="topbar-notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+              ) : null}
             </button>
-          ) : null}
+
+            {activeWorkout ? (
+              <button
+                type="button"
+                className="topbar-workout-pill"
+                onClick={() => navigate('/train/workout')}
+              >
+                <span><AppIcon name="workout" size="sm" /> {activeWorkout.title}</span>
+                <strong>{activeWorkoutMinutes}m</strong>
+              </button>
+            ) : null}
+          </div>
         </header>
+
+        {notificationPanelOpen ? (
+          <NotificationPanel
+            userId={user?.id}
+            notifications={notifications}
+            unreadCount={unreadCount}
+            loading={notificationsLoading}
+            error={notificationsError}
+            onClose={() => setNotificationPanelOpen(false)}
+            onRefresh={refreshNotifications}
+            onMarkAllRead={markAllRead}
+            onMarkOneRead={markOneRead}
+          />
+        ) : null}
 
         {showRestBanner ? (
           <button

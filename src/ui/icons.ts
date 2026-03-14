@@ -137,6 +137,11 @@ const MessageCircle = createIcon([
   { type: 'path', d: 'M5 17l-.8 3L7.8 18H12a7 7 0 1 0 0-14H10a7 7 0 0 0-5 12.1Z' },
 ])
 
+const Bell = createIcon([
+  { type: 'path', d: 'M6.5 17.5h11l-1.2-1.7a5 5 0 0 1-.8-2.8V10a3.5 3.5 0 1 0-7 0v3a5 5 0 0 1-.8 2.8L6.5 17.5Z' },
+  { type: 'path', d: 'M10 19a2 2 0 0 0 4 0' },
+])
+
 const Pencil = createIcon([
   { type: 'path', d: 'M4 20l4.5-1 9.3-9.3a1.7 1.7 0 0 0 0-2.4l-1.1-1.1a1.7 1.7 0 0 0-2.4 0L5 15.5 4 20Z' },
   { type: 'line', x1: 13.5, y1: 7.5, x2: 16.5, y2: 10.5 },
@@ -236,6 +241,7 @@ export const Icons = {
   chart: BarChart3,
   ai: Sparkles,
   comment: MessageCircle,
+  notification: Bell,
   community: Users,
   create: Pencil,
   detail: ClipboardList,
