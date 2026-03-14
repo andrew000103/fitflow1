@@ -36,14 +36,14 @@ function ProfileLauncherPage() {
           to="/profile/me"
           title="My Profile"
           subtitle="프로필, 내 글, 좋아요한 글, 분석 요약을 확인합니다."
-          icon="🙂"
+          icon="profile"
           cta="Open"
         />
         <TrainActionCard
           to="/profile/nutrition"
           title="Nutrition Manager"
           subtitle="식단 관리와 관련 설정을 바로 확인합니다."
-          icon="🍽️"
+          icon="nutrition"
           cta="Open"
         />
       </div>

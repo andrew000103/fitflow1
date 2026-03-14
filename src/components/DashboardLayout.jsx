@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
+import AppIcon from './AppIcon.jsx'
 import {
   categoryLabels,
   exerciseDatabaseSeed,
@@ -40,11 +41,12 @@ import {
 } from '../api/fitflowApi.ts'
 
 const navigation = [
-  { to: '/community', label: 'Community', icon: '💬' },
-  { to: '/history', label: 'History', icon: '🕘' },
-  { to: '/train', label: 'Train', icon: '🏋️' },
-  { to: '/nutrition', label: 'Nutrition', icon: '🍽️' },
-  { to: '/profile', label: 'Profile', icon: '🙂' },
+  { to: '/community', label: 'Community', icon: 'community' },
+  { to: '/history', label: 'History', icon: 'history' },
+  { to: '/train', label: 'Train', icon: 'train' },
+  { to: '/nutrition', label: 'Nutrition', icon: 'nutrition' },
+  { to: '/shop', label: 'Shop', icon: 'shop' },
+  { to: '/profile', label: 'Profile', icon: 'profile' },
 ]
 
 function getSectionMeta(pathname) {
@@ -56,6 +58,9 @@ function getSectionMeta(pathname) {
   }
   if (pathname.startsWith('/nutrition')) {
     return { title: 'Nutrition', subtitle: '반복 입력을 줄이고 빠르게 기록합니다.' }
+  }
+  if (pathname.startsWith('/shop')) {
+    return { title: 'Shop', subtitle: '프로그램 마켓과 구매 흐름이 들어올 공간입니다.' }
   }
   if (pathname.startsWith('/history')) {
     return { title: 'History', subtitle: '날짜를 고르고 필요한 기록만 다시 봅니다.' }
@@ -1099,7 +1104,7 @@ function DashboardLayout() {
               onClick={() => setSidebarOpen(false)}
             >
               <span className="nav-icon" aria-hidden="true">
-                {item.icon}
+                <AppIcon name={item.icon} size="sm" />
               </span>
               <span className="nav-label">{item.label}</span>
             </NavLink>
@@ -1138,7 +1143,7 @@ function DashboardLayout() {
               className="topbar-workout-pill"
               onClick={() => navigate('/train/workout')}
             >
-              <span>🏋️ {activeWorkout.title}</span>
+              <span><AppIcon name="workout" size="sm" /> {activeWorkout.title}</span>
               <strong>{activeWorkoutMinutes}m</strong>
             </button>
           ) : null}
@@ -1157,7 +1162,7 @@ function DashboardLayout() {
             className={({ isActive }) => (isActive ? 'mobile-tab active' : 'mobile-tab')}
           >
             <span className="nav-icon" aria-hidden="true">
-              {item.icon}
+              <AppIcon name={item.icon} size="sm" />
             </span>
             <span className="mobile-tab-label">{item.label}</span>
           </NavLink>

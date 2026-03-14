@@ -31,14 +31,14 @@ function CommunityLauncherPage() {
           to="/community/feed"
           title="Open Feed"
           subtitle="For You와 Following 피드를 보고 반응합니다."
-          icon="💬"
+          icon="feed"
           cta="Browse"
         />
         <TrainActionCard
           to="/community/feed"
           title="Hot Posts"
           subtitle="일간, 주간, 월간 인기글을 확인합니다."
-          icon="🏆"
+          icon="hot"
           cta="Open"
         />
       </div>

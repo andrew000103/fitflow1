@@ -89,9 +89,43 @@
 }
 
 .nav-icon {
-  width: 18px;
-  flex: 0 0 18px;
+  width: 20px;
+  flex: 0 0 20px;
   text-align: center;
+}
+
+.app-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid rgba(109, 94, 252, 0.12);
+  background: rgba(109, 94, 252, 0.08);
+  color: var(--accent-solid);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.app-icon-sm {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  font-size: 0.54rem;
+}
+
+.app-icon-md {
+  width: 22px;
+  height: 22px;
+}
+
+.app-icon-lg {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  font-size: 0.68rem;
 }
 
 .sidebar-link.active {
@@ -458,6 +492,10 @@
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
 }
 
+.train-action-card.is-static {
+  cursor: default;
+}
+
 .train-action-icon {
   width: 44px;
   height: 44px;
@@ -465,7 +503,14 @@
   place-items: center;
   border-radius: 14px;
   background: var(--accent-soft);
-  font-size: 1.15rem;
+  font-size: 1rem;
+}
+
+.train-action-icon .app-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .train-action-copy {
@@ -1015,7 +1060,13 @@
   border-radius: 16px;
   border: 1px solid var(--border);
   background: #f8fafc;
-  font-size: 1.4rem;
+}
+
+.profile-avatar .app-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  font-size: 0.7rem;
 }
 
 .profile-menu-grid {

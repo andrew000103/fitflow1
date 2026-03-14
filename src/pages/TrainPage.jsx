@@ -47,13 +47,13 @@ function TrainPage() {
           to={`/train/program/${currentProgram.id}`}
           title="Continue Program"
           subtitle={`Week ${currentProgram.week} · Day ${currentProgram.day} 이어서 진행`}
-          icon="🏋️"
+          icon="program"
           cta="Continue"
         />
         <TrainActionCard
           title="Start Empty Workout"
           subtitle="빈 운동을 바로 시작하거나 간단히 세팅합니다."
-          icon="➕"
+          icon="add"
           cta="Start"
           onClick={() => {
             startWorkout('empty')
@@ -64,14 +64,14 @@ function TrainPage() {
           to="/train/templates"
           title="Templates"
           subtitle="자주 쓰는 루틴 템플릿 목록을 확인합니다."
-          icon="🧩"
+          icon="template"
           cta="Browse"
         />
         <TrainActionCard
           to="/train/create-program"
           title="Create Program"
           subtitle="프로그램을 새로 만들고 저장합니다."
-          icon="✍️"
+          icon="create"
           cta="Create"
         />
       </div>

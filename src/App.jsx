@@ -15,6 +15,7 @@ import TrainWorkoutPage from './pages/TrainWorkoutPage.jsx'
 import NutritionHubPage from './pages/NutritionHubPage.jsx'
 import ProfileLauncherPage from './pages/ProfileLauncherPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
+import ShopPage from './pages/ShopPage.jsx'
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
         <Route path="/train/exercises" element={<ExerciseDatabasePage />} />
         <Route path="/nutrition" element={<NutritionLauncherPage />} />
         <Route path="/nutrition/diary" element={<NutritionHubPage entry="nutrition" />} />
+        <Route path="/shop" element={<ShopPage />} />
         <Route path="/analytics" element={<Navigate to="/profile/me" replace />} />
         <Route path="/analytics/overview" element={<Navigate to="/profile/me" replace />} />
         <Route path="/analytics/performance" element={<Navigate to="/profile/me" replace />} />

@@ -341,42 +341,42 @@ function CommunityPage() {
                       type="button"
                       onClick={() => likePost(post.id)}
                     >
-                      ❤️ {post.likes}
+                      Like {post.likes}
                     </button>
                     <button
                       className="inline-action"
                       type="button"
                       onClick={() => setOpenCommentPostId((current) => (current === post.id ? null : post.id))}
                     >
-                      💬 {postComments.length}
+                      Comments {postComments.length}
                     </button>
                     <button
                       className={isSaved ? 'inline-action active-soft' : 'inline-action'}
                       type="button"
                       onClick={() => toggleSavePost(post.id)}
                     >
-                      🔖
+                      Save
                     </button>
                     <button className="inline-action" type="button" onClick={() => sharePost(post.id)}>
-                      ↗
+                      Share
                     </button>
                     <button
                       className={isReported ? 'inline-action active-soft' : 'inline-action'}
                       type="button"
                       onClick={() => reportPost(post.id)}
                     >
-                      🚨
+                      Report
                     </button>
                     {isMine ? (
                       <>
                         <button className="inline-action" type="button" onClick={() => startEditing(post)}>
-                          ✏️
+                          Edit
                         </button>
                         <button className="inline-action" type="button" onClick={() => toggleHidePost(post.id)}>
-                          🙈
+                          Hide
                         </button>
                         <button className="inline-action" type="button" onClick={() => deletePost(post.id)}>
-                          🗑️
+                          Delete
                         </button>
                       </>
                     ) : null}
@@ -475,7 +475,7 @@ function CommunityPage() {
                 <div className="simple-row compact" key={post.id}>
                   <strong>#{index + 1} {post.title}</strong>
                   <span>점수 {post.score}</span>
-                  <span>❤️ {post.likes} · 💬 {post.commentCount}</span>
+                  <span>Like {post.likes} · Comments {post.commentCount}</span>
                 </div>
               ))}
             </div>

@@ -40,14 +40,14 @@ function NutritionLauncherPage() {
           to="/nutrition/diary"
           title="Open Diary"
           subtitle="오늘 식단 기록과 섭취 요약을 확인합니다."
-          icon="🍽️"
+          icon="diary"
           cta="Open"
         />
         <TrainActionCard
           to="/nutrition/diary"
           title="Search Food"
           subtitle="최근 먹은 음식과 검색 결과로 빠르게 기록합니다."
-          icon="🔎"
+          icon="search"
           cta="Search"
         />
       </div>

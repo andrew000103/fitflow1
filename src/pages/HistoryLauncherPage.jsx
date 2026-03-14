@@ -31,14 +31,14 @@ function HistoryLauncherPage() {
           to="/history/calendar"
           title="Calendar"
           subtitle="월간 캘린더와 날짜별 세션 기록을 봅니다."
-          icon="📅"
+          icon="calendar"
           cta="Open"
         />
         <TrainActionCard
           to="/history/calendar"
           title="Workout Logs"
           subtitle="세트 변화, PR, 식단 기록을 같이 회고합니다."
-          icon="🧾"
+          icon="history"
           cta="Review"
         />
       </div>

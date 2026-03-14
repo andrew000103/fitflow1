@@ -1,3 +1,4 @@
+import AppIcon from '../components/AppIcon.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import { Link, useOutletContext } from 'react-router-dom'
 import buildAnalyticsViewModel from '../components/analytics/buildAnalyticsViewModel.js'
@@ -40,7 +41,7 @@ function ProfilePage() {
       <div className="card-grid split">
         <article className="content-card">
           <div className="profile-head">
-            <div className="profile-avatar">🙂</div>
+            <div className="profile-avatar"><AppIcon name="profile" /></div>
             <div>
               <span className="card-kicker">Profile</span>
               <h2>Donghyun An</h2>
@@ -96,19 +97,19 @@ function ProfilePage() {
           <span className="card-kicker">My menus</span>
           <div className="profile-menu-grid">
             <Link className="template-chip" to="/history/calendar">
-              <strong>🏋️ 내 운동 기록</strong>
+              <strong>내 운동 기록</strong>
               <span>{sessions.length}개 세션을 회고합니다.</span>
             </Link>
             <Link className="template-chip" to="/nutrition/diary">
-              <strong>🍽️ 내 식단 기록</strong>
+              <strong>내 식단 기록</strong>
               <span>{meals.length}개 식단 기록을 관리합니다.</span>
             </Link>
             <Link className="template-chip" to="/train">
-              <strong>📚 내 프로그램</strong>
+              <strong>내 프로그램</strong>
               <span>{programs.length}개 프로그램을 관리합니다.</span>
             </Link>
             <div className="template-chip">
-              <strong>❤️ 좋아요한 게시물</strong>
+              <strong>좋아요한 게시물</strong>
               <span>{likedPosts.length}개 게시물을 여기서 바로 봅니다.</span>
             </div>
           </div>
@@ -131,9 +132,9 @@ function ProfilePage() {
             </label>
           </div>
           <div className="bullet-stack">
-            <div className="mini-panel">🔔 알림 설정: 휴식 타이머, 커뮤니티 반응, 식단 리마인더</div>
-            <div className="mini-panel">💳 구독 관리: Pro 배지, AI 추천 확장, 프로그램 마켓 기능</div>
-            <div className="mini-panel">🤖 추천 설정: {aiCoach.trainingTitle} · {aiCoach.training}</div>
+            <div className="mini-panel">알림 설정: 휴식 타이머, 커뮤니티 반응, 식단 리마인더</div>
+            <div className="mini-panel">구독 관리: Pro 배지, AI 추천 확장, 프로그램 마켓 기능</div>
+            <div className="mini-panel">추천 설정: {aiCoach.trainingTitle} · {aiCoach.training}</div>
           </div>
           <div className="program-chip-list">
             <Link className="inline-action" to="/profile/nutrition">
@@ -161,7 +162,7 @@ function ProfilePage() {
                 <div className="simple-row compact" key={post.id}>
                   <strong>{post.title}</strong>
                   <span>{hiddenPostIds.includes(post.id) ? '숨김 상태' : post.goalTag || post.category}</span>
-                  <span>❤️ {post.likes}</span>
+                  <span>Like {post.likes}</span>
                 </div>
               ))
             ) : (

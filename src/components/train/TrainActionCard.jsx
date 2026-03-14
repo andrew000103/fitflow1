@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
+import AppIcon from '../AppIcon.jsx'
 
 function TrainActionCard({ to, title, subtitle, icon, cta = 'Open', onClick }) {
   if (onClick) {
     return (
       <button type="button" className="train-action-card" onClick={onClick}>
         <span className="train-action-icon" aria-hidden="true">
-          {icon}
+          <AppIcon name={icon} />
         </span>
         <div className="train-action-copy">
           <strong>{title}</strong>
@@ -19,7 +20,7 @@ function TrainActionCard({ to, title, subtitle, icon, cta = 'Open', onClick }) {
   return (
     <Link className="train-action-card" to={to}>
       <span className="train-action-icon" aria-hidden="true">
-        {icon}
+        <AppIcon name={icon} />
       </span>
       <div className="train-action-copy">
         <strong>{title}</strong>
