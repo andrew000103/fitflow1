@@ -1,17 +1,19 @@
 import { Link, useOutletContext } from 'react-router-dom'
 import { useMemo, useState } from 'react'
 import PageHeader from '../components/PageHeader.jsx'
-import { exerciseDetails } from '../data/fitnessData.js'
+import { equipmentOptions, exerciseDetails, muscleGroupOptions } from '../data/fitnessData.js'
 import { calculateEstimated1RM, calculateExerciseVolume, summarizeExercisePerformance } from '../utils/fitnessMetrics.ts'
 
 function TrainWorkoutPage() {
   const {
     activeWorkout,
-    quickTemplates,
+    programs,
     categoryLabels,
     workoutCatalog,
+    exerciseDatabase,
     sets,
-    timeLeft,
+    isResting,
+    currentRestElapsed,
     nowTick,
     startWorkout,
     addExerciseToWorkout,
@@ -25,19 +27,59 @@ function TrainWorkoutPage() {
     toggleSuperset,
     toggleWorkoutSetComplete,
     removeWorkoutExercise,
+    stopRest,
     finishWorkout,
   } = useOutletContext()
 
   const [metaOpen, setMetaOpen] = useState(false)
-  const [quickAddCategory, setQuickAddCategory] = useState('chest')
+  const [exercisePickerOpen, setExercisePickerOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedMuscleGroup, setSelectedMuscleGroup] = useState('All')
+  const [selectedEquipment, setSelectedEquipment] = useState('All')
   const [targetWeight, setTargetWeight] = useState('100')
   const [barWeight, setBarWeight] = useState('20')
 
-  const restClock = `${String(Math.floor(timeLeft / 60)).padStart(2, '0')}:${String(timeLeft % 60).padStart(2, '0')}`
+  const restClock = `${String(Math.floor(currentRestElapsed / 60)).padStart(2, '0')}:${String(currentRestElapsed % 60).padStart(2, '0')}`
   const elapsedSeconds = activeWorkout ? Math.max(0, Math.floor((nowTick - activeWorkout.startedAt) / 1000)) : 0
   const elapsedClock = `${String(Math.floor(elapsedSeconds / 3600)).padStart(2, '0')}:${String(
     Math.floor((elapsedSeconds % 3600) / 60),
   ).padStart(2, '0')}:${String(elapsedSeconds % 60).padStart(2, '0')}`
+  const usageMap = useMemo(
+    () =>
+      sets.reduce((acc, item) => {
+        acc[item.exercise] = (acc[item.exercise] || 0) + 1
+        return acc
+      }, {}),
+    [sets],
+  )
+  const recentExercises = useMemo(
+    () => Array.from(new Map(sets.map((item) => [item.exercise, item])).values()).slice(0, 4),
+    [sets],
+  )
+  const filteredExercises = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+
+    return exerciseDatabase
+      .filter((exercise) => {
+        const matchesSearch =
+          !normalizedQuery ||
+          exercise.name.toLowerCase().includes(normalizedQuery) ||
+          exercise.target.toLowerCase().includes(normalizedQuery) ||
+          exercise.secondary.toLowerCase().includes(normalizedQuery)
+        const matchesMuscle =
+          selectedMuscleGroup === 'All' ||
+          exercise.target === selectedMuscleGroup ||
+          exercise.secondary === selectedMuscleGroup
+        const matchesEquipment =
+          selectedEquipment === 'All' || exercise.equipment === selectedEquipment
+
+        return matchesSearch && matchesMuscle && matchesEquipment
+      })
+      .sort((left, right) => {
+        const usageDelta = (usageMap[right.name] || 0) - (usageMap[left.name] || 0)
+        return usageDelta !== 0 ? usageDelta : left.name.localeCompare(right.name)
+      })
+  }, [exerciseDatabase, searchQuery, selectedEquipment, selectedMuscleGroup, usageMap])
 
   const plateResult = useMemo(() => {
     const target = Number(targetWeight)
@@ -64,13 +106,24 @@ function TrainWorkoutPage() {
     }
   }, [barWeight, targetWeight])
 
+  function handleAddExercise(exerciseName) {
+    addExerciseToWorkout(exerciseName)
+    setExercisePickerOpen(false)
+  }
+
+  function clearExerciseFilters() {
+    setSearchQuery('')
+    setSelectedMuscleGroup('All')
+    setSelectedEquipment('All')
+  }
+
   if (!activeWorkout) {
     return (
       <section className="page-section">
         <PageHeader
           eyebrow="Train / Workout"
           title="Start Workout"
-          description="빈 운동을 바로 시작하거나 템플릿으로 진입할 수 있습니다."
+          description="빈 운동을 바로 시작하거나, 현재 사용할 Program을 선택해서 진입할 수 있습니다."
         />
 
         <div className="train-action-grid">
@@ -82,19 +135,19 @@ function TrainWorkoutPage() {
             </div>
             <span className="train-action-cta">Start</span>
           </button>
-          {quickTemplates.map((template) => (
+          {programs.slice(0, 2).map((program) => (
             <button
-              key={template.id}
+              key={program.id}
               type="button"
               className="train-action-card"
-              onClick={() => startWorkout('template', template)}
+              onClick={() => startWorkout('program', program)}
             >
-              <span className="train-action-icon">🧩</span>
+              <span className="train-action-icon">📚</span>
               <div className="train-action-copy">
-                <strong>{template.label}</strong>
-                <span>{template.exercises.slice(0, 2).join(' · ')}</span>
+                <strong>{program.title}</strong>
+                <span>{program.category} · {program.durationWeeks} weeks</span>
               </div>
-              <span className="train-action-cta">Use</span>
+              <span className="train-action-cta">Start</span>
             </button>
           ))}
         </div>
@@ -110,16 +163,20 @@ function TrainWorkoutPage() {
           <h1>{activeWorkout.title}</h1>
           <div className="train-meta-row">
             <span className="status-chip active">Elapsed {elapsedClock}</span>
-            <span className={timeLeft > 0 ? 'status-chip active' : 'status-chip'}>
-              Rest {timeLeft > 0 ? restClock : 'Ready'}
+            <span className={isResting ? 'status-chip active' : 'status-chip'}>
+              Rest {isResting ? restClock : 'Ready'}
             </span>
-            {timeLeft > 0 && timeLeft <= 10 ? <span className="pill-tag accent">곧 시작</span> : null}
           </div>
         </div>
         <div className="train-hero-actions">
           <button className="icon-chip" type="button" onClick={() => setMetaOpen((current) => !current)}>
             Details
           </button>
+          {isResting ? (
+            <button className="icon-chip" type="button" onClick={stopRest}>
+              End Rest
+            </button>
+          ) : null}
           <button className="inline-action primary-dark" type="button" onClick={finishWorkout}>
             Finish
           </button>
@@ -129,28 +186,97 @@ function TrainWorkoutPage() {
       <article className="content-card workout-focus-card">
         <div className="feed-head">
           <div>
-            <span className="card-kicker">Quick actions</span>
-            <h2>지금 필요한 것만 보이게 정리했습니다.</h2>
+            <span className="card-kicker">Add exercise</span>
+            <h2>전체 목록에서 검색하고 필요할 때만 필터링합니다.</h2>
           </div>
-          <button className="inline-action" type="button" onClick={() => addExerciseToWorkout(quickAddCategory)}>
-            Add {categoryLabels[quickAddCategory]}
+          <button className="inline-action" type="button" onClick={() => setExercisePickerOpen((current) => !current)}>
+            {exercisePickerOpen ? 'Close' : 'Browse exercises'}
           </button>
         </div>
-        <div className="quick-pills">
-          {Object.entries(categoryLabels).map(([key, label]) => (
-            <button
-              key={key}
-              className={quickAddCategory === key ? 'pill-tag accent' : 'pill-tag'}
-              type="button"
-              onClick={() => setQuickAddCategory(key)}
-            >
-              {label}
-            </button>
-          ))}
-          <Link className="pill-tag" to="/train/exercises">
-            Exercise DB
-          </Link>
-        </div>
+        {recentExercises.length > 0 ? (
+          <div className="quick-pills">
+            {recentExercises.map((exercise) => (
+              <button
+                key={exercise.exercise}
+                className="pill-tag"
+                type="button"
+                onClick={() => handleAddExercise(exercise.exercise)}
+              >
+                + {exercise.exercise}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {exercisePickerOpen ? (
+          <div className="workout-add-sheet">
+            <div className="stack-form">
+              <label className="field-label">
+                Search
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="운동명 또는 타겟 부위를 검색"
+                />
+              </label>
+              <div className="compact-grid">
+                <label className="field-label">
+                  Muscle Group
+                  <select value={selectedMuscleGroup} onChange={(event) => setSelectedMuscleGroup(event.target.value)}>
+                    {muscleGroupOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field-label">
+                  Equipment
+                  <select value={selectedEquipment} onChange={(event) => setSelectedEquipment(event.target.value)}>
+                    {equipmentOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="filter-row">
+                <button className="inline-action" type="button" onClick={clearExerciseFilters}>
+                  Clear filters
+                </button>
+                <Link className="inline-action" to="/train/exercises">
+                  Open DB
+                </Link>
+              </div>
+            </div>
+
+            <div className="database-list">
+              {filteredExercises.length > 0 ? (
+                filteredExercises.map((exercise) => (
+                  <button
+                    className="database-row workout-database-row"
+                    key={exercise.name}
+                    type="button"
+                    onClick={() => handleAddExercise(exercise.name)}
+                  >
+                    <div className="database-icon">{exercise.icon}</div>
+                    <div className="database-copy">
+                      <strong>{exercise.name}</strong>
+                      <span>
+                        {exercise.target} · {exercise.secondary}
+                      </span>
+                      <span>{exercise.equipment} · {usageMap[exercise.name] || 0} times</span>
+                    </div>
+                    <span className="inline-action">Add</span>
+                  </button>
+                ))
+              ) : (
+                <div className="mini-panel">조건에 맞는 운동이 없습니다. 검색어나 필터를 조정해보세요.</div>
+              )}
+            </div>
+          </div>
+        ) : null}
       </article>
 
       {metaOpen ? (
@@ -200,9 +326,9 @@ function TrainWorkoutPage() {
       ) : null}
 
       <article className="content-card rest-focus-card">
-        <span className="card-kicker">Rest timer</span>
-        <strong>{timeLeft > 0 ? restClock : 'Ready for next set'}</strong>
-        <p>{timeLeft > 0 ? '세트 완료 후 자동으로 시작됩니다.' : '세트를 체크하면 다음 휴식이 자동으로 시작됩니다.'}</p>
+        <span className="card-kicker">Rest stopwatch</span>
+        <strong>{isResting ? restClock : 'Rest Ready'}</strong>
+        <p>{isResting ? '현재 쉬는 시간을 누적해서 표시합니다.' : '세트를 완료하면 휴식 스톱워치가 자동으로 시작됩니다.'}</p>
       </article>
 
       <div className="exercise-stack">
@@ -350,7 +476,7 @@ function TrainWorkoutPage() {
       </div>
 
       <div className="sticky-cta-bar">
-        <button className="inline-action" type="button" onClick={() => addExerciseToWorkout(quickAddCategory)}>
+        <button className="inline-action" type="button" onClick={() => setExercisePickerOpen(true)}>
           Add exercise
         </button>
         <button className="inline-action primary-dark" type="button" onClick={finishWorkout}>

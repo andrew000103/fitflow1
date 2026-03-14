@@ -1,51 +1,41 @@
 import { Link, useOutletContext } from 'react-router-dom'
 import PageHeader from '../components/PageHeader.jsx'
-import TrainActionCard from '../components/train/TrainActionCard.jsx'
+import { goalLabel, healthStatusLabel, tx } from '../utils/appLanguage.js'
 
 function ProfileLauncherPage() {
-  const { goal, streakDays, programs, savedPostIds } = useOutletContext()
+  const { appLanguage, userProfile, healthConnection, recommendedCalories, netCalories } = useOutletContext()
+  const goalText = goalLabel(appLanguage, userProfile.goal)
 
   return (
     <section className="page-section">
       <PageHeader
-        eyebrow="Profile"
-        title="Profile"
-        description="내 정보, 설정, 기록 관리는 각각의 상세 화면에서 확인합니다."
+        eyebrow={tx(appLanguage, '프로필', 'Profile')}
+        title={tx(appLanguage, '프로필', 'Profile')}
+        description={tx(appLanguage, '개인 상태, 목표, 대사 정보와 건강 데이터 연결을 관리합니다.', 'Manage your personal status, goals, metabolism, and health connection.')}
       />
 
       <div className="launcher-stat-row">
         <article className="launcher-stat-card">
-          <span className="card-kicker">Goal</span>
-          <strong>{goal}</strong>
-          <p>현재 목표와 기록 방향을 관리합니다.</p>
+          <span className="card-kicker">{tx(appLanguage, '목표', 'Goal')}</span>
+          <strong>{goalText}</strong>
+          <p>{userProfile.targetWeightKg} kg {tx(appLanguage, '목표로 조정 중입니다.', 'target in progress.')}</p>
         </article>
         <article className="launcher-stat-card">
-          <span className="card-kicker">Streak</span>
-          <strong>{streakDays} days</strong>
-          <p>일일 기록 리듬을 유지하고 있습니다.</p>
+          <span className="card-kicker">{tx(appLanguage, '목표 kcal', 'Target kcal')}</span>
+          <strong>{recommendedCalories} kcal</strong>
+          <p>{tx(appLanguage, '오늘 기준 권장 섭취 칼로리입니다.', 'Recommended intake for today.')}</p>
         </article>
         <article className="launcher-stat-card">
-          <span className="card-kicker">Saved</span>
-          <strong>{savedPostIds.length} posts</strong>
-          <p>{programs.length} programs in library</p>
+          <span className="card-kicker">{tx(appLanguage, '건강', 'Health')}</span>
+          <strong>{healthStatusLabel(appLanguage, healthConnection.status)}</strong>
+          <p>Net {Math.round(netCalories)} kcal</p>
         </article>
       </div>
 
-      <div className="train-action-grid">
-        <TrainActionCard
-          to="/profile/me"
-          title="My Profile"
-          subtitle="프로필, 내 글, 좋아요한 글, 인사이트를 확인합니다."
-          icon="profile"
-          cta="Open"
-        />
-        <TrainActionCard
-          to="/profile/nutrition"
-          title="Nutrition Manager"
-          subtitle="식단 관리와 관련 설정을 바로 확인합니다."
-          icon="nutrition"
-          cta="Open"
-        />
+      <div className="sticky-cta-bar">
+        <Link className="inline-action primary-dark" to="/profile/me">
+          {tx(appLanguage, '프로필 열기', 'Open Profile')}
+        </Link>
       </div>
     </section>
   )

@@ -4,9 +4,10 @@ import {
   MUSCLE_LABELS,
   normalizeExerciseKey,
 } from '../data/exerciseMuscleMap.js'
-import { MUSCLE_RECOVERY_RATES } from '../data/muscleRecoveryRates.js'
+import { MUSCLE_RECOVERY_PROFILES, MUSCLE_RECOVERY_RATES } from '../data/muscleRecoveryRates.js'
 
 const DEFAULT_RPE = 8
+const DEFAULT_REST_SECONDS = 90
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
@@ -40,6 +41,32 @@ export function getRpeFactor(rpe = DEFAULT_RPE) {
   return 1.3
 }
 
+export function getRestDensityFactor(restSeconds = DEFAULT_REST_SECONDS) {
+  if (restSeconds <= 45) return 1.15
+  if (restSeconds <= 75) return 1.08
+  if (restSeconds <= 120) return 1
+  if (restSeconds <= 180) return 0.94
+  return 0.88
+}
+
+export function getSetStimulusScore(setItem) {
+  const weight = Number(setItem.weight ?? setItem.weightKg ?? 0)
+  const reps = Number(setItem.reps ?? 0)
+  const volume = Math.max(0, weight * reps)
+  const rpeFactor = getRpeFactor(Number(setItem.rpe || DEFAULT_RPE))
+  const restFactor = getRestDensityFactor(Number(setItem.restSeconds ?? setItem.restSecAfter ?? DEFAULT_REST_SECONDS))
+  const repFactor = reps > 0 ? 0.82 + clamp(reps, 1, 20) * 0.022 : 0.82
+  const intensityFactor = weight > 0 ? 0.9 + clamp(weight / 120, 0, 0.35) : 0.9
+
+  // Use sqrt(volume) so heavy sets matter more without letting one giant set
+  // overpower the whole fatigue map.
+  return (Math.sqrt(Math.max(volume, 1)) / 6) * rpeFactor * restFactor * repFactor * intensityFactor
+}
+
+export function getMuscleRecoveryProfile(muscle) {
+  return MUSCLE_RECOVERY_PROFILES[muscle] || { dailyRecovery: 0.22, label: 'Moderate' }
+}
+
 export function calculateWorkoutMuscleLoad(workoutSets, exerciseMuscleMap = EXERCISE_MUSCLE_MAP) {
   const totals = createEmptyMuscleMap()
 
@@ -48,7 +75,7 @@ export function calculateWorkoutMuscleLoad(workoutSets, exerciseMuscleMap = EXER
       exerciseMuscleMap[normalizeExerciseKey(setItem.exerciseName)] ||
       getExerciseMuscleContribution(setItem.exerciseName, setItem.category)
 
-    const setScore = 1 * getRpeFactor(Number(setItem.rpe || DEFAULT_RPE))
+    const setScore = getSetStimulusScore(setItem)
 
     Object.entries(contribution).forEach(([muscle, share]) => {
       totals[muscle] += setScore * share
@@ -65,7 +92,7 @@ export function applyFatigueDecay(fatigueEntries, recoveryRates = MUSCLE_RECOVER
     const daysPassed = typeof entry.daysPassed === 'number' ? entry.daysPassed : getDaysPassed(entry.date, now)
 
     Object.entries(entry.loads || {}).forEach(([muscle, load]) => {
-      const recoveryRate = recoveryRates[muscle] || 0.78
+      const recoveryRate = recoveryRates[muscle] || 1 - getMuscleRecoveryProfile(muscle).dailyRecovery
       const decayed = load * Math.pow(recoveryRate, daysPassed)
       totals[muscle] += decayed
     })
@@ -77,7 +104,7 @@ export function applyFatigueDecay(fatigueEntries, recoveryRates = MUSCLE_RECOVER
 export function normalizeMuscleScores(rawFatigue) {
   return Object.fromEntries(
     Object.entries(rawFatigue).map(([muscle, value]) => {
-      const normalized = 100 * (1 - Math.exp(-(value || 0) / 3.4))
+      const normalized = 100 * (1 - Math.exp(-(value || 0) / 12))
       return [muscle, Math.round(clamp(normalized, 0, 100))]
     }),
   )
@@ -105,6 +132,7 @@ export function getRecoveryRecommendation(scores) {
       label: MUSCLE_LABELS[muscle],
       score,
       level: getFatigueLevel(score),
+      recovery: getMuscleRecoveryProfile(muscle),
     }))
     .sort((a, b) => b.score - a.score)
 
@@ -122,6 +150,9 @@ export function calculateMuscleFatigue(sessions, now = new Date()) {
       (exercise.timeline || []).map((setItem) => ({
         exerciseName: exercise.name,
         category: exercise.category,
+        weight: Number(setItem.weight || 0),
+        reps: Number(setItem.reps || 0),
+        restSeconds: Number(setItem.restSeconds || setItem.restSecAfter || session.restSeconds || DEFAULT_REST_SECONDS),
         rpe: Number(setItem.rpe || session.rpe || DEFAULT_RPE),
       })),
     )

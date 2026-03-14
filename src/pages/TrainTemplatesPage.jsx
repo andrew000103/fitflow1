@@ -1,55 +1,150 @@
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useOutletContext } from 'react-router-dom'
 import PageHeader from '../components/PageHeader.jsx'
+import { tx } from '../utils/appLanguage.js'
+
+const categoryOptions = ['All', 'Bodybuilding', 'Powerbuilding', 'Athletic', 'Diet / Cutting', 'General Strength', 'Beginner', 'Home Training']
+const sortOptions = ['Popular', 'Highest Rated', 'Most Used', 'Newest']
 
 function TrainTemplatesPage() {
-  const { quickTemplates, startWorkout } = useOutletContext()
-  const navigate = useNavigate()
+  const { appLanguage, programs, useProgram, activeProgram } = useOutletContext()
+  const [query, setQuery] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('All')
+  const [selectedSort, setSelectedSort] = useState('Popular')
+
+  const visiblePrograms = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+
+    return programs
+      .filter((program) => program.visibility === 'public' || activeProgram?.programId === program.id || program.authorId === 'me')
+      .filter((program) => {
+        const matchesQuery =
+          !normalizedQuery ||
+          program.title.toLowerCase().includes(normalizedQuery) ||
+          program.description.toLowerCase().includes(normalizedQuery) ||
+          program.authorName.toLowerCase().includes(normalizedQuery)
+        const matchesCategory = selectedCategory === 'All' || program.category === selectedCategory
+        return matchesQuery && matchesCategory
+      })
+      .sort((left, right) => {
+        if (selectedSort === 'Highest Rated') {
+          return (right.averageRating || 0) - (left.averageRating || 0)
+        }
+        if (selectedSort === 'Most Used') {
+          return (right.useCount || 0) - (left.useCount || 0)
+        }
+        if (selectedSort === 'Newest') {
+          return right.id.localeCompare(left.id)
+        }
+        return (right.likes || 0) - (left.likes || 0)
+      })
+  }, [activeProgram?.programId, programs, query, selectedCategory, selectedSort])
 
   return (
     <section className="page-section">
       <PageHeader
-        eyebrow="Train / Templates"
-        title="Templates"
-        description="템플릿을 고르고 바로 운동을 시작할 수 있습니다."
+        eyebrow={tx(appLanguage, '운동 / 프로그램', 'Train / Programs')}
+        title={tx(appLanguage, '프로그램 둘러보기', 'Browse Programs')}
+        description={tx(appLanguage, '몇 주짜리 훈련 계획을 탐색하고, 현재 진행할 프로그램을 선택합니다.', 'Browse multi-week programs and choose your current plan.')}
       />
 
-      <div className="train-action-grid">
-        {quickTemplates.map((template) => (
-          <button
-            key={template.id}
-            type="button"
-            className="train-action-card"
-            onClick={() => {
-              startWorkout('template', template)
-              navigate('/train/workout')
-            }}
-          >
-            <span className="train-action-icon" aria-hidden="true">
-              🧩
-            </span>
-            <div className="train-action-copy">
-              <strong>{template.label}</strong>
-              <span>{template.exercises.slice(0, 3).join(' · ')}</span>
+      <article className="content-card">
+        <div className="stack-form">
+          <label className="field-label">
+            {tx(appLanguage, '프로그램 검색', 'Search programs')}
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={tx(appLanguage, '프로그램명, 목표, 작성자 검색', 'Search by title, goal, or creator')}
+            />
+          </label>
+          <div className="program-chip-list">
+            {categoryOptions.map((item) => (
+              <button
+                key={item}
+                type="button"
+                className={selectedCategory === item ? 'inline-action active-soft' : 'inline-action'}
+                onClick={() => setSelectedCategory(item)}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+          <div className="program-chip-list">
+            {sortOptions.map((item) => (
+              <button
+                key={item}
+                type="button"
+                className={selectedSort === item ? 'inline-action active-soft' : 'inline-action'}
+                onClick={() => setSelectedSort(item)}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+      </article>
+
+      <div className="simple-list">
+        {visiblePrograms.map((program) => (
+          <article className="content-card" key={program.id}>
+            <div className="feed-head">
+              <div>
+                <span className="card-kicker">{program.category}</span>
+                <h2>{program.title}</h2>
+              </div>
+              <span className="pill-tag">{program.visibility}</span>
             </div>
-            <span className="train-action-cta">Use</span>
-          </button>
+            <p>{program.description}</p>
+            <div className="summary-grid tight">
+              <div>
+                <span>{tx(appLanguage, '기간', 'Duration')}</span>
+                <strong>{program.durationWeeks} {tx(appLanguage, '주', 'weeks')}</strong>
+              </div>
+              <div>
+                <span>{tx(appLanguage, '빈도', 'Frequency')}</span>
+                <strong>{program.sessionsPerWeek}/week</strong>
+              </div>
+              <div>
+                <span>{tx(appLanguage, '작성자', 'Creator')}</span>
+                <strong>{program.authorName}</strong>
+              </div>
+              <div>
+                <span>{tx(appLanguage, '평점', 'Rating')}</span>
+                <strong>{program.averageRating || 0} / 5</strong>
+              </div>
+              <div>
+                <span>{tx(appLanguage, '좋아요', 'Likes')}</span>
+                <strong>{program.likes || 0}</strong>
+              </div>
+              <div>
+                <span>{tx(appLanguage, '후기', 'Reviews')}</span>
+                <strong>{program.reviewCount || 0}</strong>
+              </div>
+            </div>
+            <div className="program-chip-list">
+              {(program.tags || []).map((tag) => (
+                <span key={tag} className="pill-tag">
+                  {tag}
+                </span>
+              ))}
+            </div>
+            <div className="program-chip-list">
+              <button className="inline-action" type="button" onClick={() => useProgram(program.id)}>
+                {tx(appLanguage, '프로그램 사용', 'Use Program')}
+              </button>
+              <Link className="inline-action" to={`/train/program/${program.id}`}>
+                {tx(appLanguage, '상세 보기', 'View details')}
+              </Link>
+            </div>
+          </article>
         ))}
       </div>
 
       <div className="sticky-cta-bar">
-        <button className="inline-action" type="button" onClick={() => navigate('/train')}>
-          Back
-        </button>
-        <button
-          className="inline-action primary-dark"
-          type="button"
-          onClick={() => {
-            startWorkout('template', quickTemplates[0])
-            navigate('/train/workout')
-          }}
-        >
-          Quick start
-        </button>
+        <Link className="inline-action" to="/train/create-program">
+          {tx(appLanguage, '프로그램 만들기', 'Create Program')}
+        </Link>
       </div>
     </section>
   )

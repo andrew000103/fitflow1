@@ -1,5 +1,6 @@
 import { Link, useOutletContext } from 'react-router-dom'
 import PageHeader from '../components/PageHeader.jsx'
+import AppIcon from '../components/AppIcon.jsx'
 import buildAnalyticsViewModel from '../components/analytics/buildAnalyticsViewModel.js'
 
 function AnalyticsRecoveryPage() {
@@ -23,7 +24,7 @@ function AnalyticsRecoveryPage() {
 
       <div className="card-grid split analytics-detail-grid">
         <article className="content-card">
-          <span className="card-kicker">🎯 Muscle fatigue</span>
+          <span className="card-kicker"><AppIcon name="goal" size="sm" /> Muscle fatigue</span>
           <div className="radar-list">
             {fatigueRows.map((item) => (
               <div className="radar-row" key={item.category}>
@@ -38,7 +39,7 @@ function AnalyticsRecoveryPage() {
         </article>
 
         <article className="content-card">
-          <span className="card-kicker">🗓️ Frequency heatmap</span>
+          <span className="card-kicker"><AppIcon name="calendar" size="sm" /> Frequency heatmap</span>
           <div className="heatmap-grid">
             {heatmapPattern.flatMap((week, weekIndex) =>
               week.map((value, dayIndex) => (
@@ -57,7 +58,7 @@ function AnalyticsRecoveryPage() {
       </div>
 
       <article className="content-card">
-        <span className="card-kicker">🤖 AI insights</span>
+        <span className="card-kicker"><AppIcon name="ai" size="sm" /> AI insights</span>
         <div className="bullet-stack">
           <div className="mini-panel">{aiCoach.trainingTitle} · {aiCoach.training}</div>
           <div className="mini-panel">{aiCoach.nutritionTitle} · {aiCoach.nutrition}</div>

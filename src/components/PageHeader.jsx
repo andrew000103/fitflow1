@@ -1,9 +1,9 @@
 function PageHeader({ eyebrow, title, description }) {
   return (
     <header className="page-header">
-      <span className="page-eyebrow">{eyebrow}</span>
+      {eyebrow ? <span className="page-eyebrow">{eyebrow}</span> : null}
       <h1>{title}</h1>
-      <p>{description}</p>
+      {description ? <p>{description}</p> : null}
     </header>
   )
 }

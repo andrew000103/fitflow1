@@ -1,5 +1,6 @@
 import { Link, useOutletContext } from 'react-router-dom'
 import PageHeader from '../components/PageHeader.jsx'
+import AppIcon from '../components/AppIcon.jsx'
 import buildAnalyticsViewModel from '../components/analytics/buildAnalyticsViewModel.js'
 
 function AnalyticsPage() {
@@ -28,22 +29,22 @@ function AnalyticsPage() {
 
       <div className="card-grid four-up analytics-summary-grid">
         <article className="content-card">
-          <span className="card-kicker">🏋️ Weekly volume</span>
+          <span className="card-kicker"><AppIcon name="activity" size="sm" /> Weekly volume</span>
           <strong>{totalVolume.toLocaleString()} kg</strong>
           <p>이번 주 누적 볼륨</p>
         </article>
         <article className="content-card">
-          <span className="card-kicker">📆 Workout count</span>
+          <span className="card-kicker"><AppIcon name="calendar" size="sm" /> Workout count</span>
           <strong>{weeklyWorkoutCount} sessions</strong>
           <p>최근 7일 기준 운동 횟수</p>
         </article>
         <article className="content-card">
-          <span className="card-kicker">♻️ Recovery</span>
+          <span className="card-kicker"><AppIcon name="health" size="sm" /> Recovery</span>
           <strong>{fatigueLabel} {fatigueScore}</strong>
           <p>현재 누적 피로도 상태</p>
         </article>
         <article className="content-card">
-          <span className="card-kicker">✅ Adherence</span>
+          <span className="card-kicker"><AppIcon name="goal" size="sm" /> Adherence</span>
           <strong>{routineAdherence}%</strong>
           <p>루틴 이행률</p>
         </article>
@@ -51,7 +52,7 @@ function AnalyticsPage() {
 
       <div className="card-grid split analytics-detail-grid">
         <article className="content-card">
-          <span className="card-kicker">🍱 Stacked bar · 탄단지 비율</span>
+          <span className="card-kicker"><AppIcon name="nutrition" size="sm" /> Stacked bar · 탄단지 비율</span>
           <div className="stacked-macro">
             {macroBars.map((item) => (
               <div className="stacked-segment" key={item.label}>
@@ -68,7 +69,7 @@ function AnalyticsPage() {
         </article>
 
         <article className="content-card">
-          <span className="card-kicker">🔥 Intake vs burn</span>
+          <span className="card-kicker"><AppIcon name="calories" size="sm" /> Intake vs burn</span>
           <div className="calorie-compare-list">
             {calorieTrend.map((item) => (
               <div className="compare-row" key={item.day}>

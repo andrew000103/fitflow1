@@ -2,11 +2,18 @@ export const DASHBOARD_STATE_KEY = 'fitflow-dashboard-state'
 
 export interface DashboardStatePayload {
   goal?: string
+  userProfile?: unknown
+  healthConnection?: unknown
+  weightHistory?: unknown[]
+  lastWeightCheckInDate?: string
   steps?: number
   sets?: unknown[]
   meals?: unknown[]
   posts?: unknown[]
   programs?: unknown[]
+  activeProgram?: unknown
+  programLikes?: unknown[]
+  programReviews?: unknown[]
   exerciseDatabase?: unknown[]
   sessions?: unknown[]
   savedPostIds?: Array<string | number>
@@ -17,6 +24,11 @@ export interface DashboardStatePayload {
   commentsByPost?: Record<string, unknown>
   shareEvents?: unknown[]
   lastWorkoutSummary?: unknown
+  foods?: unknown[]
+  customFoods?: unknown[]
+  foodMergeCandidates?: unknown[]
+  appLanguage?: string
+  foodNameLanguage?: string
 }
 
 export function loadDashboardState(): DashboardStatePayload {
@@ -53,9 +65,11 @@ export function clearDashboardState() {
 }
 
 export function createPostRecord({
+  id,
   title,
   body,
   author = 'You',
+  authorId = 'me',
   category,
   type = 'tip',
   goalTag = category,
@@ -64,10 +78,22 @@ export function createPostRecord({
   hasVideo = false,
   attachWorkoutCard = false,
   attachDietCard = false,
+  coverImage = '',
+  media = [],
+  routineData,
+  mealData,
+  carouselSlides = [],
+  aiMeta = null,
+  estimatedReadSeconds = 20,
+  mediaCount,
+  status = 'published',
+  createdAt = new Date().toISOString(),
 }: {
+  id?: string | number
   title: string
   body: string
   author?: string
+  authorId?: string
   category: string
   type?: string
   goalTag?: string
@@ -76,12 +102,23 @@ export function createPostRecord({
   hasVideo?: boolean
   attachWorkoutCard?: boolean
   attachDietCard?: boolean
+  coverImage?: string
+  media?: unknown[]
+  routineData?: unknown
+  mealData?: unknown
+  carouselSlides?: unknown[]
+  aiMeta?: unknown
+  estimatedReadSeconds?: number
+  mediaCount?: number
+  status?: string
+  createdAt?: string
 }) {
   return {
-    id: Date.now(),
+    id: id || Date.now(),
     category,
     title,
     author,
+    authorId,
     body,
     type,
     goalTag,
@@ -90,6 +127,16 @@ export function createPostRecord({
     hasVideo,
     attachWorkoutCard,
     attachDietCard,
+    coverImage,
+    media,
+    routineData,
+    mealData,
+    carouselSlides,
+    aiMeta,
+    estimatedReadSeconds,
+    mediaCount: mediaCount ?? (Array.isArray(media) ? media.length : 0),
+    status,
+    createdAt,
     likes: 0,
     comments: 0,
     hidden: false,
@@ -106,6 +153,10 @@ export function createMealRecord({
   serving = 1,
   favorite = false,
   loggedDate,
+  foodId,
+  sourceType = 'manual',
+  selectedUnitLabel = '1 serving',
+  grams,
 }: {
   name: string
   calories: number
@@ -116,6 +167,10 @@ export function createMealRecord({
   serving?: number
   favorite?: boolean
   loggedDate: string
+  foodId?: string
+  sourceType?: string
+  selectedUnitLabel?: string
+  grams?: number
 }) {
   return {
     id: Date.now(),
@@ -128,6 +183,10 @@ export function createMealRecord({
     serving,
     favorite,
     loggedDate,
+    foodId,
+    sourceType,
+    selectedUnitLabel,
+    grams,
     createdAt: 'Just now',
   }
 }

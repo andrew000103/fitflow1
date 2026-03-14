@@ -1,5 +1,6 @@
 import { Link, useOutletContext } from 'react-router-dom'
 import PageHeader from '../components/PageHeader.jsx'
+import AppIcon from '../components/AppIcon.jsx'
 import TrainActionCard from '../components/train/TrainActionCard.jsx'
 
 function AnalyticsLauncherPage() {
@@ -14,7 +15,7 @@ function AnalyticsLauncherPage() {
       />
 
       <div className="train-entry-header">
-        <span className="pill-tag accent">📈 {totalVolume.toLocaleString()} kg this week</span>
+        <span className="pill-tag accent"><AppIcon name="trend" size="sm" /> {totalVolume.toLocaleString()} kg this week</span>
         <span className="mini-panel">Recovery: {fatigueLabel} · Avg steps {weeklyStepAverage.toLocaleString()}</span>
       </div>
 

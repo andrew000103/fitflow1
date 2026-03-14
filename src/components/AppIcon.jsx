@@ -1,44 +1,12 @@
-const ICON_LABELS = {
-  add: '+',
-  ai: 'AI',
-  analytics: 'AN',
-  calendar: 'CL',
-  chart: 'CH',
-  comment: 'CM',
-  connect: 'CN',
-  community: 'CO',
-  create: 'CR',
-  detail: 'DT',
-  diary: 'DY',
-  edit: 'ED',
-  equipment: 'EQ',
-  feed: 'FD',
-  hide: 'HD',
-  history: 'HI',
-  hot: 'HT',
-  image: 'IM',
-  like: 'LK',
-  nutrition: 'NU',
-  profile: 'PF',
-  program: 'PG',
-  recovery: 'RC',
-  report: 'RP',
-  save: 'SV',
-  search: 'SC',
-  seller: 'SL',
-  share: 'SH',
-  shop: 'SP',
-  style: 'ST',
-  template: 'TP',
-  train: 'TR',
-  trend: 'TD',
-  workout: 'WK',
-}
+import { Icons } from '../ui/icons.ts'
 
 function AppIcon({ name, size = 'md' }) {
+  const Icon = Icons[name] || Icons.activity
+  const iconSize = size === 'sm' ? 16 : size === 'lg' ? 22 : 18
+
   return (
     <span className={`app-icon app-icon-${size}`} aria-hidden="true">
-      {ICON_LABELS[name] || name}
+      <Icon size={iconSize} strokeWidth={2} />
     </span>
   )
 }

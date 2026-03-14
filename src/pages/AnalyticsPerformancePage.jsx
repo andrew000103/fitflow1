@@ -1,5 +1,6 @@
 import { Link, useOutletContext } from 'react-router-dom'
 import PageHeader from '../components/PageHeader.jsx'
+import AppIcon from '../components/AppIcon.jsx'
 import buildAnalyticsViewModel from '../components/analytics/buildAnalyticsViewModel.js'
 
 function AnalyticsPerformancePage() {
@@ -16,7 +17,7 @@ function AnalyticsPerformancePage() {
 
       <div className="card-grid split analytics-detail-grid">
         <article className="content-card">
-          <span className="card-kicker">📉 Line chart · 체중 변화</span>
+          <span className="card-kicker"><AppIcon name="trend" size="sm" /> Line chart · 체중 변화</span>
           <div className="line-chart">
             {bodyWeightTrend.map((item) => {
               const ratio = ((item.weight - weightMin) / Math.max(0.1, weightMax - weightMin)) * 100
@@ -34,7 +35,7 @@ function AnalyticsPerformancePage() {
         </article>
 
         <article className="content-card">
-          <span className="card-kicker">📦 Bar chart · 주간 볼륨</span>
+          <span className="card-kicker"><AppIcon name="chart" size="sm" /> Bar chart · 주간 볼륨</span>
           <div className="bar-strip">
             {weeklyData.map((item) => (
               <div className="bar-item" key={item.day}>
@@ -50,7 +51,7 @@ function AnalyticsPerformancePage() {
       </div>
 
       <article className="content-card">
-        <span className="card-kicker">🏅 PR trend</span>
+        <span className="card-kicker"><AppIcon name="stats" size="sm" /> PR trend</span>
         <div className="simple-list">
           {topPRs.map((item) => (
             <div className="simple-row" key={`${item.session}-${item.name}`}>
