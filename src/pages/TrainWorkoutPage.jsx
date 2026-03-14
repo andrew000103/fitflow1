@@ -2,7 +2,7 @@ import { Link, useOutletContext } from 'react-router-dom'
 import { useMemo, useState } from 'react'
 import PageHeader from '../components/PageHeader.jsx'
 import { equipmentOptions, exerciseDetails, muscleGroupOptions } from '../data/fitnessData.js'
-import { calculateEstimated1RM, calculateExerciseVolume, summarizeExercisePerformance } from '../utils/fitnessMetrics.ts'
+import { calculateEstimated1RM, calculateExerciseVolume, detectExercisePRs, summarizeExercisePerformance } from '../utils/fitnessMetrics.ts'
 
 function TrainWorkoutPage() {
   const {
@@ -11,6 +11,7 @@ function TrainWorkoutPage() {
     categoryLabels,
     workoutCatalog,
     exerciseDatabase,
+    sessions,
     sets,
     isResting,
     currentRestElapsed,
@@ -355,6 +356,32 @@ function TrainWorkoutPage() {
               isCompleted: setItem.completed,
             })),
           })
+          const previousBest = sessions
+            .flatMap((session) => session.exercises)
+            .filter((item) => item.name === exercise.name)
+            .reduce(
+              (best, item) => ({
+                maxWeightKg: Math.max(best.maxWeightKg, item.maxWeight || 0),
+                maxSetVolumeKg: Math.max(best.maxSetVolumeKg, item.maxVolume || 0),
+                maxEstimated1RMKg: Math.max(best.maxEstimated1RMKg, item.estimated1RM || 0),
+                maxExerciseVolumeKg: Math.max(
+                  best.maxExerciseVolumeKg,
+                  item.timeline.reduce((sum, setItem) => sum + Number(setItem.weight || 0) * Number(setItem.reps || 0), 0),
+                ),
+              }),
+              { maxWeightKg: 0, maxSetVolumeKg: 0, maxEstimated1RMKg: 0, maxExerciseVolumeKg: 0 },
+            )
+          const prResult = detectExercisePRs(
+            {
+              name: exercise.name,
+              sets: exercise.sets.map((setItem) => ({
+                weightKg: Number(setItem.weight || 0),
+                reps: Number(setItem.reps || 0),
+                isCompleted: setItem.completed,
+              })),
+            },
+            previousBest,
+          )
 
           return (
             <article className="content-card exercise-card" key={exercise.id}>
@@ -390,6 +417,13 @@ function TrainWorkoutPage() {
                 <span>Set Vol {performance.maxSetVolumeKg || '-'} kg</span>
                 <span>Total {exerciseVolume || '-'} kg</span>
               </div>
+
+              {prResult.isMaxWeightPR || prResult.isExerciseVolumePR ? (
+                <div className="exercise-pr-row">
+                  {prResult.isMaxWeightPR ? <span className="pill-tag accent">Weight PR</span> : null}
+                  {prResult.isExerciseVolumePR ? <span className="pill-tag accent">Volume PR</span> : null}
+                </div>
+              ) : null}
 
               <div className="set-list">
                 {exercise.sets.map((setItem, index) => (

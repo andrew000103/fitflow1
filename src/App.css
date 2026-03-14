@@ -1057,6 +1057,18 @@ body[data-theme='dark'] .connect-modal-backdrop {
   color: var(--text-soft);
 }
 
+.profile-big3-panel {
+  gap: 8px;
+}
+
+.profile-big3-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+}
+
 .profile-accent-chip {
   background: rgba(18, 122, 146, 0.1);
   border-color: rgba(18, 122, 146, 0.2);
@@ -2157,6 +2169,9 @@ body[data-theme='dark'] .connect-modal-backdrop {
 }
 
 .rest-banner {
+  position: sticky;
+  top: 70px;
+  z-index: 14;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2615,6 +2630,12 @@ body[data-theme='dark'] .connect-modal-backdrop {
 .exercise-name-row {
   display: grid;
   gap: 4px;
+}
+
+.exercise-pr-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .set-row.mobile {
@@ -3533,6 +3554,7 @@ body[data-theme='dark'] .connect-modal-backdrop {
   }
 
   .rest-banner {
+    top: 62px;
     margin: -2px 12px 0;
     flex-direction: column;
     align-items: flex-start;

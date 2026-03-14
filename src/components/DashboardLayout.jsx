@@ -1078,6 +1078,9 @@ function DashboardLayout() {
               return setItem
             }
             const nextCompleted = !setItem.completed
+            if (nextCompleted) {
+              startRest()
+            }
             if (nextCompleted && !setItem.logged) {
               const reps = Number(setItem.reps)
               const weight = Number(setItem.weight)
@@ -1098,10 +1101,8 @@ function DashboardLayout() {
           }),
         }
       })
-
       if (logPayload) {
         logSet(logPayload)
-        startRest()
       }
 
       return {

@@ -18,6 +18,7 @@ function ProfilePage() {
     colorTheme,
     setColorTheme,
     userProfile,
+    sessions,
     updateUserProfile,
     healthConnection,
     updateHealthConnection,
@@ -72,6 +73,37 @@ function ProfilePage() {
   }, [userProfile])
 
   const recentWeightEntries = useMemo(() => weightHistory.slice(0, 4), [weightHistory])
+  const big3Summary = useMemo(() => {
+    const bests = {
+      bench: 0,
+      squat: 0,
+      deadlift: 0,
+    }
+
+    sessions.forEach((session) => {
+      session.exercises.forEach((exercise) => {
+        const name = String(exercise.name || '').toLowerCase()
+        const maxWeight = Number(exercise.maxWeight || 0)
+
+        if (name === 'bench press') {
+          bests.bench = Math.max(bests.bench, maxWeight)
+        }
+
+        if (name === 'back squat' || name === 'squat') {
+          bests.squat = Math.max(bests.squat, maxWeight)
+        }
+
+        if (name === 'deadlift' || name === 'conventional deadlift' || name === 'trap bar deadlift') {
+          bests.deadlift = Math.max(bests.deadlift, maxWeight)
+        }
+      })
+    })
+
+    return {
+      ...bests,
+      total: bests.bench + bests.squat + bests.deadlift,
+    }
+  }, [sessions])
 
   const goalText = goalLabel(appLanguage, userProfile.goal)
   const profileBio =
@@ -262,6 +294,15 @@ function ProfilePage() {
             <div>
               <span>{tx(appLanguage, '단위', 'Units')}</span>
               <strong>{unitSystemLabel(appLanguage, userProfile.unitSystem)}</strong>
+            </div>
+          </div>
+          <div className="mini-panel profile-big3-panel">
+            <span>{tx(appLanguage, '3대 PR', 'Big 3 PR')}</span>
+            <strong>{big3Summary.total} kg</strong>
+            <div className="profile-big3-breakdown">
+              <span>Bench {big3Summary.bench} kg</span>
+              <span>Squat {big3Summary.squat} kg</span>
+              <span>Deadlift {big3Summary.deadlift} kg</span>
             </div>
           </div>
         </article>
