@@ -3,6 +3,7 @@ import AuthPage from './features/auth/AuthPage'
 import ProtectedRoute from './features/auth/ProtectedRoute'
 import OnboardingGate from './features/auth/OnboardingGate'
 import LanguageProvider from './features/language/LanguageProvider.jsx'
+import { supabaseConfigError } from './lib/supabase.js'
 
 import './App.css'
 import './styles/language.css'
@@ -37,6 +38,56 @@ import ShopPage from './pages/ShopPage.jsx'
 import OnboardingPage from './pages/OnboardingPage'
 
 function App() {
+  if (supabaseConfigError) {
+    return (
+      <div
+        style={{
+          minHeight: '100svh',
+          display: 'grid',
+          placeItems: 'center',
+          padding: '24px',
+          background:
+            'radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 30%), radial-gradient(circle at top right, rgba(14, 165, 233, 0.08), transparent 26%), #f6fbff',
+        }}
+      >
+        <div
+          style={{
+            width: 'min(100%, 560px)',
+            display: 'grid',
+            gap: '12px',
+            padding: '24px',
+            borderRadius: '24px',
+            border: '1px solid rgba(37, 99, 235, 0.12)',
+            background: 'rgba(255, 255, 255, 0.92)',
+            boxShadow: '0 18px 40px rgba(37, 99, 235, 0.08)',
+            color: '#14263d',
+          }}
+        >
+          <span style={{ color: '#2563eb', fontSize: '0.82rem', fontWeight: 700 }}>FitFlow Setup</span>
+          <h1 style={{ margin: 0, fontSize: '2rem', lineHeight: 1.05 }}>앱 설정이 아직 연결되지 않았어요</h1>
+          <p style={{ margin: 0, color: '#60738a', lineHeight: 1.6 }}>
+            배포 환경에서 Supabase 환경변수가 빠져 있어서 앱이 시작되지 못하고 있습니다.
+          </p>
+          <div
+            style={{
+              padding: '14px 16px',
+              borderRadius: '16px',
+              background: '#eff6ff',
+              color: '#1d4ed8',
+              fontFamily: 'monospace',
+              fontSize: '0.88rem',
+            }}
+          >
+            {supabaseConfigError}
+          </div>
+          <p style={{ margin: 0, color: '#60738a', lineHeight: 1.6 }}>
+            Cloudflare Pages에 `VITE_SUPABASE_URL`과 `VITE_SUPABASE_ANON_KEY`를 추가한 뒤 다시 배포하면 정상적으로 열립니다.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <LanguageProvider>
       <AuthProvider>

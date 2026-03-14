@@ -6,6 +6,14 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from './useAuth'
 import '../../styles/auth.css'
 
+function getAuthRedirectUrl() {
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+
+  return `${window.location.origin}${window.location.pathname}#/auth`
+}
+
 export default function AuthPage() {
   const { user, isLoggedIn, isAnonymous, loading } = useAuth()
   const { text } = useLanguage('auth')
@@ -19,6 +27,7 @@ export default function AuthPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const redirectTo = location.state?.from?.pathname || '/train'
+  const authRedirectUrl = getAuthRedirectUrl()
 
   if (!loading && isLoggedIn) {
     return <Navigate to={redirectTo} replace />
@@ -35,7 +44,7 @@ export default function AuthPage() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth`,
+            emailRedirectTo: authRedirectUrl,
           },
         })
 
@@ -72,7 +81,7 @@ export default function AuthPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth`,
+          redirectTo: authRedirectUrl,
         },
       })
 
