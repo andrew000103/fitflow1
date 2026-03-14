@@ -13,7 +13,7 @@
 
   color: var(--text-soft);
   background: var(--bg);
-  font: 17px/1.5 var(--font-body);
+  font: 15px/1.45 var(--font-body);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

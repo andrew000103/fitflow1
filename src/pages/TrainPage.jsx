@@ -2,6 +2,7 @@ import { Link, useOutletContext } from 'react-router-dom'
 import { useMemo, useState } from 'react'
 import PageHeader from '../components/PageHeader.jsx'
 import { exerciseDetails } from '../data/fitnessData.js'
+import { calculateEstimated1RM, calculateExerciseVolume, summarizeExercisePerformance } from '../utils/fitnessMetrics.ts'
 
 function TrainPage() {
   const {
@@ -29,6 +30,7 @@ function TrainPage() {
     removeWorkoutExercise,
     finishWorkout,
     createProgram,
+    aiCoach,
   } = useOutletContext()
   const [plateOpen, setPlateOpen] = useState(false)
   const [targetWeight, setTargetWeight] = useState('100')
@@ -39,6 +41,7 @@ function TrainPage() {
   const [programCategory, setProgramCategory] = useState('chest')
   const [programExercise, setProgramExercise] = useState(workoutCatalog.chest[0])
   const [programExercises, setProgramExercises] = useState(['Bench Press', 'Seated Cable Row'])
+  const [programCreatorOpen, setProgramCreatorOpen] = useState(false)
 
   const restClock = `${String(Math.floor(timeLeft / 60)).padStart(2, '0')}:${String(timeLeft % 60).padStart(2, '0')}`
   const elapsedSeconds = activeWorkout ? Math.max(0, Math.floor((nowTick - activeWorkout.startedAt) / 1000)) : 0
@@ -219,20 +222,26 @@ function TrainPage() {
           {activeWorkout.exercises.map((exercise) => {
             const previousRecord = sets.find((item) => item.exercise === exercise.name)
             const detail = exerciseDetails[exercise.name]
-            const estimated1RM = exercise.sets.reduce((best, setItem) => {
-              const weight = Number(setItem.weight || 0)
-              const reps = Number(setItem.reps || 0)
-              const estimate = reps > 0 ? Math.round(weight * (1 + reps / 30)) : 0
+            const performance = summarizeExercisePerformance({
+              name: exercise.name,
+              sets: exercise.sets.map((setItem) => ({
+                weightKg: Number(setItem.weight || 0),
+                reps: Number(setItem.reps || 0),
+                isCompleted: setItem.completed,
+              })),
+            })
+            const liveEstimated1RM = exercise.sets.reduce((best, setItem) => {
+              const estimate = calculateEstimated1RM(Number(setItem.weight || 0), Number(setItem.reps || 0))
               return estimate > best ? estimate : best
             }, 0)
-            const highestWeight = exercise.sets.reduce(
-              (best, setItem) => Math.max(best, Number(setItem.weight || 0)),
-              0,
-            )
-            const highestVolume = exercise.sets.reduce(
-              (best, setItem) => Math.max(best, Number(setItem.weight || 0) * Number(setItem.reps || 0)),
-              0,
-            )
+            const exerciseVolume = calculateExerciseVolume({
+              name: exercise.name,
+              sets: exercise.sets.map((setItem) => ({
+                weightKg: Number(setItem.weight || 0),
+                reps: Number(setItem.reps || 0),
+                isCompleted: setItem.completed,
+              })),
+            })
 
             return (
               <article className="content-card exercise-card" key={exercise.id}>
@@ -273,9 +282,10 @@ function TrainPage() {
 
                 <div className="exercise-stats">
                   <span>Previous {previousRecord ? `${previousRecord.weight}kg x ${previousRecord.reps}` : '-'}</span>
-                  <span>Est. 1RM {estimated1RM || '-'} kg</span>
-                  <span>Best Weight {highestWeight || '-'} kg</span>
-                  <span>Best Volume {highestVolume || '-'} kg</span>
+                  <span>Est. 1RM {liveEstimated1RM || '-'} kg</span>
+                  <span>Best Weight {performance.maxWeightKg || '-'} kg</span>
+                  <span>Best Volume {performance.maxSetVolumeKg || '-'} kg</span>
+                  <span>Total Volume {exerciseVolume || '-'} kg</span>
                 </div>
 
                 <div className="set-grid-header">
@@ -389,6 +399,12 @@ function TrainPage() {
 
         <div className="train-side-stack">
           <article className="content-card">
+            <span className="card-kicker">AI coach</span>
+            <h2>{aiCoach.trainingTitle}</h2>
+            <div className="mini-panel">{aiCoach.training}</div>
+          </article>
+
+          <article className="content-card">
             <span className="card-kicker">Workout streak</span>
             <h2>{currentProgram.streakWeeks}주 연속 운동 중</h2>
             <p>오운완 챌린지와 연결해 주차별 루틴 유지율을 높일 수 있습니다.</p>
@@ -413,7 +429,7 @@ function TrainPage() {
 
       <article className="content-card">
         <span className="card-kicker">Quick templates</span>
-        <div className="template-row">
+        <div className="template-row compact">
           {quickTemplates.map((template) => (
             <button
               key={template.id}
@@ -430,60 +446,71 @@ function TrainPage() {
 
       <div className="card-grid split">
         <article className="content-card">
-          <span className="card-kicker">Program creator</span>
-          <h2>Create Program</h2>
-          <form className="stack-form" onSubmit={handleCreateProgram}>
-            <label className="field-label">
-              Program name
-              <input value={programName} onChange={(event) => setProgramName(event.target.value)} placeholder="예: Push Pull Legs Builder" />
-            </label>
-            <div className="compact-grid">
-              <label className="field-label">
-                Week
-                <input value={programWeek} onChange={(event) => setProgramWeek(event.target.value)} inputMode="numeric" />
-              </label>
-              <label className="field-label">
-                Day
-                <input value={programDay} onChange={(event) => setProgramDay(event.target.value)} inputMode="numeric" />
-              </label>
+          <div className="feed-head">
+            <div>
+              <span className="card-kicker">Program creator</span>
+              <h2>Create Program</h2>
             </div>
-            <div className="compact-grid">
-              <label className="field-label">
-                Category
-                <select value={programCategory} onChange={(event) => handleProgramCategoryChange(event.target.value)}>
-                  {Object.entries(categoryLabels).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field-label">
-                Exercise
-                <select value={programExercise} onChange={(event) => setProgramExercise(event.target.value)}>
-                  {workoutCatalog[programCategory].map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <button className="inline-action" type="button" onClick={addProgramExercise}>
-              운동 추가
+            <button className="inline-action" type="button" onClick={() => setProgramCreatorOpen((current) => !current)}>
+              {programCreatorOpen ? 'Hide' : 'Open'}
             </button>
-            <div className="program-chip-list">
-              {programExercises.map((item) => (
-                <button key={item} type="button" className="template-chip removable" onClick={() => removeProgramExercise(item)}>
-                  <strong>{item}</strong>
-                  <span>제거하려면 탭</span>
-                </button>
-              ))}
-            </div>
-            <button className="inline-action primary-dark" type="submit">
-              Create Program
-            </button>
-          </form>
+          </div>
+          {programCreatorOpen ? (
+            <form className="stack-form" onSubmit={handleCreateProgram}>
+              <label className="field-label">
+                Program name
+                <input value={programName} onChange={(event) => setProgramName(event.target.value)} placeholder="예: Push Pull Legs Builder" />
+              </label>
+              <div className="compact-grid">
+                <label className="field-label">
+                  Week
+                  <input value={programWeek} onChange={(event) => setProgramWeek(event.target.value)} inputMode="numeric" />
+                </label>
+                <label className="field-label">
+                  Day
+                  <input value={programDay} onChange={(event) => setProgramDay(event.target.value)} inputMode="numeric" />
+                </label>
+              </div>
+              <div className="compact-grid">
+                <label className="field-label">
+                  Category
+                  <select value={programCategory} onChange={(event) => handleProgramCategoryChange(event.target.value)}>
+                    {Object.entries(categoryLabels).map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field-label">
+                  Exercise
+                  <select value={programExercise} onChange={(event) => setProgramExercise(event.target.value)}>
+                    {workoutCatalog[programCategory].map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <button className="inline-action" type="button" onClick={addProgramExercise}>
+                운동 추가
+              </button>
+              <div className="program-chip-list">
+                {programExercises.map((item) => (
+                  <button key={item} type="button" className="template-chip removable" onClick={() => removeProgramExercise(item)}>
+                    <strong>{item}</strong>
+                    <span>제거하려면 탭</span>
+                  </button>
+                ))}
+              </div>
+              <button className="inline-action primary-dark" type="submit">
+                Create Program
+              </button>
+            </form>
+          ) : (
+            <div className="mini-panel">프로그램 생성은 필요할 때만 펼쳐서 사용합니다.</div>
+          )}
         </article>
 
         {lastWorkoutSummary ? (

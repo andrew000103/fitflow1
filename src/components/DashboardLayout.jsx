@@ -13,35 +13,109 @@ import {
   weeklyData,
   workoutCatalog,
 } from '../data/fitnessData.js'
+import {
+  EXAMPLE_MUSCLE_DISTRIBUTIONS,
+  calculateDailyBurn,
+  calculateEstimated1RM,
+  calculateMuscleFatigue,
+  calculateNetCalories,
+  calculateRecommendedCalories,
+  resolveRestSeconds,
+  summarizeExercisePerformance,
+} from '../utils/fitnessMetrics.ts'
+import {
+  recommendCommunityContent,
+  recommendMeal,
+  recommendTodayWorkout,
+} from '../utils/recommendationEngine.ts'
+import {
+  clearDashboardState,
+  createCommentRecord,
+  createMealRecord,
+  createPostRecord,
+  createReplyRecord,
+  createShareEvent,
+  loadDashboardState,
+  saveDashboardState,
+} from '../api/fitflowApi.ts'
 
 const navigation = [
-  { to: '/community', label: 'Community' },
-  { to: '/history', label: 'History' },
-  { to: '/train', label: 'Train' },
-  { to: '/analytics', label: 'Analytics' },
-  { to: '/profile', label: 'Profile' },
+  { to: '/community', label: 'Community', icon: '💬' },
+  { to: '/history', label: 'History', icon: '🕘' },
+  { to: '/train', label: 'Train', icon: '🏋️' },
+  { to: '/nutrition', label: 'Nutrition', icon: '🍽️' },
+  { to: '/analytics', label: 'Analytics', icon: '📈' },
+  { to: '/profile', label: 'Profile', icon: '🙂' },
 ]
 
-function loadPersistedState() {
-  if (typeof window === 'undefined') {
-    return {}
+function formatLocalDate(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function daysBetween(dateString, baseDate = new Date()) {
+  const [year, month, day] = dateString.split('-').map(Number)
+  const target = new Date(year, month - 1, day)
+  const base = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate())
+  return Math.round((base.getTime() - target.getTime()) / 86400000)
+}
+
+function inferMuscleDistribution(exerciseName, category) {
+  const normalizedName = exerciseName.toLowerCase().replace(/\s+/g, '_')
+  if (EXAMPLE_MUSCLE_DISTRIBUTIONS[normalizedName]) {
+    return EXAMPLE_MUSCLE_DISTRIBUTIONS[normalizedName]
   }
 
-  const raw = window.localStorage.getItem('fitflow-dashboard-state')
-  if (!raw) {
-    return {}
+  const categoryMap = {
+    chest: { chest: 0.7, triceps: 0.2, front_delts: 0.1 },
+    shoulders: { front_delts: 0.3, middle_delts: 0.4, rear_delts: 0.2, triceps: 0.1 },
+    back: { lats: 0.45, upper_back: 0.35, biceps: 0.2 },
+    legs: { quadriceps: 0.4, glutes: 0.3, hamstrings: 0.2, lower_back: 0.1 },
+    abs: { abs: 0.85, lower_back: 0.15 },
+    arms: { biceps: 0.35, triceps: 0.45, forearms: 0.2 },
   }
 
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return {}
+  return categoryMap[category] || { abs: 1 }
+}
+
+function mapCategoryToMuscles(category) {
+  const categoryMap = {
+    chest: ['chest', 'triceps', 'front_delts'],
+    shoulders: ['front_delts', 'middle_delts', 'rear_delts'],
+    back: ['lats', 'upper_back', 'biceps'],
+    legs: ['quadriceps', 'glutes', 'hamstrings', 'lower_back'],
+    abs: ['abs'],
+    arms: ['biceps', 'triceps', 'forearms'],
   }
+
+  return categoryMap[category] || []
+}
+
+const defaultCommentsByPost = {
+  1: [
+    {
+      id: '1-a',
+      author: 'Hana',
+      content: '벤치 탑셋 좋네요. 셋업 팁도 궁금합니다.',
+      replies: [{ id: '1-a-1', author: 'Mina', content: '다음엔 셋업 영상도 같이 올려볼게요.' }],
+    },
+  ],
+  2: [
+    {
+      id: '2-a',
+      author: 'Jisoo',
+      content: '벌크 저녁 메뉴 참고했습니다.',
+      replies: [],
+    },
+  ],
 }
 
 function DashboardLayout() {
-  const [persistedState] = useState(() => loadPersistedState())
+  const [persistedState] = useState(() => loadDashboardState())
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [goal, setGoal] = useState(persistedState.goal || 'maintain')
   const [steps, setSteps] = useState(persistedState.steps || 11284)
   const [timeLeft, setTimeLeft] = useState(0)
@@ -53,6 +127,13 @@ function DashboardLayout() {
     persistedState.exerciseDatabase || exerciseDatabaseSeed,
   )
   const [sessions, setSessions] = useState(persistedState.sessions || initialSessions)
+  const [savedPostIds, setSavedPostIds] = useState(persistedState.savedPostIds || [])
+  const [reportedPostIds, setReportedPostIds] = useState(persistedState.reportedPostIds || [])
+  const [followedAuthors, setFollowedAuthors] = useState(persistedState.followedAuthors || ['Mina'])
+  const [commentsByPost, setCommentsByPost] = useState(
+    persistedState.commentsByPost || defaultCommentsByPost,
+  )
+  const [shareEvents, setShareEvents] = useState(persistedState.shareEvents || [])
   const [activeWorkout, setActiveWorkout] = useState(null)
   const [nowTick, setNowTick] = useState(() => Date.now())
   const [lastWorkoutSummary, setLastWorkoutSummary] = useState(
@@ -61,21 +142,38 @@ function DashboardLayout() {
   const currentProgram = programs[0]
 
   useEffect(() => {
-    window.localStorage.setItem(
-      'fitflow-dashboard-state',
-      JSON.stringify({
-        goal,
-        steps,
-        sets,
-        meals,
-        posts,
-        programs,
-        exerciseDatabase,
-        sessions,
-        lastWorkoutSummary,
-      }),
-    )
-  }, [exerciseDatabase, goal, lastWorkoutSummary, meals, posts, programs, sessions, sets, steps])
+    saveDashboardState({
+      goal,
+      steps,
+      sets,
+      meals,
+      posts,
+      programs,
+      exerciseDatabase,
+      sessions,
+      savedPostIds,
+      reportedPostIds,
+      followedAuthors,
+      commentsByPost,
+      shareEvents,
+      lastWorkoutSummary,
+    })
+  }, [
+    commentsByPost,
+    exerciseDatabase,
+    followedAuthors,
+    goal,
+    lastWorkoutSummary,
+    meals,
+    posts,
+    programs,
+    reportedPostIds,
+    savedPostIds,
+    sessions,
+    sets,
+    shareEvents,
+    steps,
+  ])
 
   useEffect(() => {
     if (timeLeft <= 0) {
@@ -97,51 +195,94 @@ function DashboardLayout() {
     return () => window.clearInterval(timer)
   }, [activeWorkout])
 
-  const totalWorkoutCalories = useMemo(
-    () => sets.reduce((sum, item) => sum + item.calories, 0),
-    [sets],
-  )
+  const totalWorkoutCalories = useMemo(() => sets.reduce((sum, item) => sum + item.calories, 0), [sets])
   const totalVolume = useMemo(() => sets.reduce((sum, item) => sum + item.volume, 0), [sets])
   const consumedCalories = useMemo(() => meals.reduce((sum, item) => sum + item.calories, 0), [meals])
   const totalProtein = useMemo(() => meals.reduce((sum, item) => sum + item.protein, 0), [meals])
   const stepCalories = Math.round(steps * 0.04)
   const baseMetabolism = 1680
-  const totalBurn = baseMetabolism + stepCalories + totalWorkoutCalories
-  const netCalories = consumedCalories - totalBurn
-  const fatigueScore = Math.min(100, Math.round(totalVolume / 18))
+  const totalBurn = calculateDailyBurn({
+    bmrCalories: baseMetabolism,
+    stepCalories,
+    exerciseCalories: totalWorkoutCalories,
+  })
+  const netCalories = calculateNetCalories(consumedCalories, totalBurn)
+  const recommendedCaloriesRange = calculateRecommendedCalories(totalBurn, goal === 'diet' ? 'cut' : goal)
+  const fatigueByMuscle = useMemo(
+    () =>
+      calculateMuscleFatigue(
+        sessions.map((session) => ({
+          daysAgo: Math.max(0, daysBetween(session.date)),
+          exercises: session.exercises.map((exercise) => ({
+            muscleDistribution: inferMuscleDistribution(exercise.name, exercise.category),
+            sets: exercise.timeline.map((setItem) => ({
+              weightKg: Number(setItem.weight || 0),
+              reps: Number(setItem.reps || 0),
+              isCompleted: true,
+            })),
+          })),
+        })),
+      ),
+    [sessions],
+  )
+  const fatigueScore = Math.max(
+    ...Object.values(fatigueByMuscle).map((value) => Number(value || 0)),
+    Math.min(100, Math.round(totalVolume / 18)),
+  )
   const fatigueLabel = fatigueScore >= 80 ? 'High' : fatigueScore >= 55 ? 'Moderate' : 'Low'
-  const recommendedCalories =
-    goal === 'diet' ? totalBurn - 350 : goal === 'bulk' ? totalBurn + 280 : totalBurn
+  const recommendedCalories = recommendedCaloriesRange.target
   const weeklyWorkoutMinutes = weeklyData.reduce((sum, item) => sum + item.workout, 0)
   const weeklyStepAverage = Math.round(
     weeklyData.reduce((sum, item) => sum + item.steps, 0) / weeklyData.length,
   )
   const streakDays = Math.max(3, Math.min(9, Math.ceil(sets.length / 2)))
-  const dominantCategory = Object.entries(
-    sets.reduce((acc, item) => {
-      acc[item.category] = (acc[item.category] || 0) + item.volume
-      return acc
-    }, {}),
-  ).sort(([, a], [, b]) => b - a)[0]?.[0] || 'chest'
+  const recentCategories = sessions
+    .slice(0, 3)
+    .flatMap((session) => session.exercises.map((exercise) => exercise.category))
+  const recentMuscles = recentCategories.flatMap((category) => mapCategoryToMuscles(category))
+  const interactionTags = posts
+    .filter((post) => savedPostIds.includes(post.id) || followedAuthors.includes(post.author))
+    .slice(0, 5)
+    .flatMap((post) => [post.category, post.title.toLowerCase().includes('식단') ? '식단' : '운동 팁'])
+  const todayMealTotals = meals
+    .filter((meal) => meal.loggedDate === formatLocalDate(new Date()))
+    .reduce(
+      (acc, meal) => {
+        acc.calories += meal.calories || 0
+        acc.carbs += meal.carbs || 0
+        acc.protein += meal.protein || 0
+        acc.fat += meal.fat || 0
+        return acc
+      },
+      { calories: 0, carbs: 0, protein: 0, fat: 0 },
+    )
+  const workoutRecommendation = recommendTodayWorkout({
+    recentMuscles,
+    fatigueByMuscle,
+    availableMinutes: activeWorkout ? 60 : 45,
+    programMuscles: currentProgram?.exercises.flatMap((item) => mapCategoryToMuscles(item.category)) || [],
+    consecutiveTrainingDays: Math.min(3, sessions.slice(0, 3).length),
+  })
+  const mealRecommendation = recommendMeal({
+    remainingCalories: recommendedCalories - todayMealTotals.calories,
+    remainingCarbs: Math.max(0, 220 - todayMealTotals.carbs),
+    remainingProtein: Math.max(0, 150 - todayMealTotals.protein),
+    remainingFat: Math.max(0, 60 - todayMealTotals.fat),
+    goalType: goal === 'diet' ? 'cut' : goal,
+    timeOfDay: todayMealTotals.calories < 400 ? 'lunch' : 'dinner',
+  })
+  const communityRecommendation = recommendCommunityContent({
+    goalType: goal === 'diet' ? 'cut' : goal,
+    interactionTags,
+    recentMuscles,
+  })
   const aiCoach = {
-    training:
-      fatigueScore >= 80
-        ? '오늘은 휴식 또는 상대 피로가 낮은 부위를 추천합니다.'
-        : dominantCategory === 'chest'
-          ? '가슴 피로가 누적되어 등 또는 하체 루틴으로 균형을 맞추는 편이 좋습니다.'
-          : '현재 피로도는 관리 가능한 수준이라 계획한 루틴을 이어가도 됩니다.',
-    nutrition:
-      goal === 'diet'
-        ? '감량 모드에서는 단백질을 유지하면서 저녁 탄수화물을 약간 줄이는 구성이 적절합니다.'
-        : goal === 'bulk'
-          ? '증량 모드에서는 운동 후 탄수화물과 단백질을 함께 올려 회복과 총섭취를 확보하세요.'
-          : '유지 모드에서는 총 섭취를 권장 칼로리 근처로 맞추는 것이 우선입니다.',
-    community:
-      goal === 'diet'
-        ? '감량 식단 후기와 저칼로리 고단백 피드를 우선 노출합니다.'
-        : goal === 'bulk'
-          ? '벌크업 식단, 고중량 탑셋 공유, 상체 볼륨 루틴 콘텐츠를 우선 노출합니다.'
-          : '유지 단계에서는 회복 팁, 균형 식단, 중간 강도 루틴 콘텐츠를 우선 노출합니다.',
+    training: workoutRecommendation.message,
+    trainingTitle: workoutRecommendation.title,
+    nutrition: mealRecommendation.message,
+    nutritionTitle: mealRecommendation.title,
+    community: communityRecommendation.message,
+    communityTitle: communityRecommendation.title,
   }
 
   function logSet({ category, exercise, reps, weight, restSeconds }) {
@@ -461,7 +602,11 @@ function DashboardLayout() {
                   exercise: exercise.name,
                   reps,
                   weight,
-                  restSeconds: 90,
+                  restSeconds: resolveRestSeconds({
+                    movementType: ['chest', 'back', 'legs'].includes(exercise.category)
+                      ? 'compound'
+                      : 'isolation',
+                  }),
                 }
               }
             }
@@ -512,7 +657,39 @@ function DashboardLayout() {
     const durationMinutes = Math.max(1, Math.round((Date.now() - activeWorkout.startedAt) / 60000))
     const sessionVolume = completedSets.reduce((sum, item) => sum + item.volume, 0)
     const topSet = completedSets.sort((a, b) => b.weight - a.weight)[0]
-    const prCount = completedSets.filter((item) => item.weight >= 80).length
+    const prCount = activeWorkout.exercises.reduce((count, exercise) => {
+      const summary = summarizeExercisePerformance({
+        name: exercise.name,
+        sets: exercise.sets.map((setItem) => ({
+          weightKg: Number(setItem.weight || 0),
+          reps: Number(setItem.reps || 0),
+          isCompleted: setItem.completed,
+        })),
+      })
+      const previousBest = sessions
+        .flatMap((session) => session.exercises)
+        .filter((item) => item.name === exercise.name)
+        .reduce(
+          (best, item) => ({
+            maxWeightKg: Math.max(best.maxWeightKg, item.maxWeight || 0),
+            maxSetVolumeKg: Math.max(best.maxSetVolumeKg, item.maxVolume || 0),
+            maxEstimated1RMKg: Math.max(best.maxEstimated1RMKg, item.estimated1RM || 0),
+            maxExerciseVolumeKg: Math.max(
+              best.maxExerciseVolumeKg,
+              item.timeline.reduce((sum, setItem) => sum + Number(setItem.weight || 0) * Number(setItem.reps || 0), 0),
+            ),
+          }),
+          { maxWeightKg: 0, maxSetVolumeKg: 0, maxEstimated1RMKg: 0, maxExerciseVolumeKg: 0 },
+        )
+
+      const hasPR =
+        summary.maxWeightKg > previousBest.maxWeightKg ||
+        summary.maxSetVolumeKg > previousBest.maxSetVolumeKg ||
+        summary.maxEstimated1RMKg > previousBest.maxEstimated1RMKg ||
+        summary.maxExerciseVolumeKg > previousBest.maxExerciseVolumeKg
+
+      return count + (hasPR ? 1 : 0)
+    }, 0)
     const muscleLoad = completedSets.reduce((acc, item) => {
       acc[item.category] = (acc[item.category] || 0) + item.volume
       return acc
@@ -531,7 +708,7 @@ function DashboardLayout() {
     setSessions((current) => [
       {
         id: `session-${Date.now()}`,
-        date: new Date().toISOString().slice(0, 10),
+        date: formatLocalDate(new Date()),
         title: activeWorkout.title,
         durationMinutes,
         totalVolume: sessionVolume,
@@ -545,15 +722,9 @@ function DashboardLayout() {
           const bestByWeight = [...completed].sort(
             (left, right) => Number(right.weight || 0) - Number(left.weight || 0),
           )[0]
-          const maxVolume = completed.reduce(
-            (best, setItem) =>
-              Math.max(best, Number(setItem.weight || 0) * Number(setItem.reps || 0)),
-            0,
-          )
+          const maxVolume = completed.reduce((best, setItem) => Math.max(best, Number(setItem.weight || 0) * Number(setItem.reps || 0)), 0)
           const estimated1RM = completed.reduce((best, setItem) => {
-            const weight = Number(setItem.weight || 0)
-            const reps = Number(setItem.reps || 0)
-            const estimate = reps > 0 ? Math.round(weight * (1 + reps / 30)) : 0
+            const estimate = calculateEstimated1RM(Number(setItem.weight || 0), Number(setItem.reps || 0))
             return Math.max(best, estimate)
           }, 0)
           return {
@@ -578,15 +749,29 @@ function DashboardLayout() {
     setTimeLeft(0)
   }
 
-  function addMeal({ name, calories, protein }) {
+  function addMeal({
+    name,
+    calories,
+    protein,
+    carbs = 0,
+    fat = 0,
+    mealType = 'lunch',
+    serving = 1,
+    favorite = false,
+    loggedDate,
+  }) {
     setMeals((current) => [
-      {
-        id: Date.now(),
+      createMealRecord({
         name,
         calories,
         protein,
-        createdAt: 'Just now',
-      },
+        carbs,
+        fat,
+        mealType,
+        serving,
+        favorite,
+        loggedDate: loggedDate || formatLocalDate(new Date()),
+      }),
       ...current,
     ])
   }
@@ -599,19 +784,84 @@ function DashboardLayout() {
     addMeal(found)
   }
 
-  function addPost({ title, body }) {
+  function addPost({
+    title,
+    body,
+    type = 'tip',
+    goalTag = goal,
+    hashtags = [],
+    photoCount = 0,
+    hasVideo = false,
+    attachWorkoutCard = false,
+    attachDietCard = false,
+  }) {
     setPosts((current) => [
-      {
-        id: Date.now(),
-        category: goal,
+      createPostRecord({
         title,
-        author: 'You',
         body,
-        likes: 0,
-        comments: 0,
-      },
+        category: goal,
+        type,
+        goalTag,
+        hashtags,
+        photoCount,
+        hasVideo,
+        attachWorkoutCard,
+        attachDietCard,
+      }),
       ...current,
     ])
+  }
+
+  function toggleSavePost(postId) {
+    setSavedPostIds((current) =>
+      current.includes(postId) ? current.filter((id) => id !== postId) : [...current, postId],
+    )
+  }
+
+  function reportPost(postId) {
+    setReportedPostIds((current) => (current.includes(postId) ? current : [...current, postId]))
+  }
+
+  function toggleFollowAuthor(author) {
+    setFollowedAuthors((current) =>
+      current.includes(author) ? current.filter((item) => item !== author) : [...current, author],
+    )
+  }
+
+  function addComment(postId, content) {
+    if (!content.trim()) {
+      return
+    }
+
+    setCommentsByPost((current) => ({
+      ...current,
+      [postId]: [createCommentRecord(content), ...(current[postId] || [])],
+    }))
+  }
+
+  function addReply(postId, commentId, content) {
+    if (!content.trim()) {
+      return
+    }
+
+    setCommentsByPost((current) => ({
+      ...current,
+      [postId]: (current[postId] || []).map((comment) =>
+        comment.id === commentId
+          ? {
+              ...comment,
+              replies: [
+                ...comment.replies,
+                createReplyRecord(content),
+              ],
+            }
+          : comment,
+      ),
+    }))
+  }
+
+  function sharePost(postId) {
+    setShareEvents((current) => [...current, createShareEvent(postId)])
   }
 
   function createProgram({ name, week, day, exercises }) {
@@ -663,9 +913,14 @@ function DashboardLayout() {
     setPrograms(initialPrograms)
     setExerciseDatabase(exerciseDatabaseSeed)
     setSessions(initialSessions)
+    setSavedPostIds([])
+    setReportedPostIds([])
+    setFollowedAuthors(['Mina'])
+    setCommentsByPost(defaultCommentsByPost)
+    setShareEvents([])
     setActiveWorkout(null)
     setLastWorkoutSummary(null)
-    window.localStorage.removeItem('fitflow-dashboard-state')
+    clearDashboardState()
   }
 
   const outletContext = {
@@ -677,6 +932,11 @@ function DashboardLayout() {
     sets,
     meals,
     posts,
+    savedPostIds,
+    reportedPostIds,
+    followedAuthors,
+    commentsByPost,
+    shareEvents,
     programs,
     streakDays,
     aiCoach,
@@ -707,6 +967,12 @@ function DashboardLayout() {
     addMeal,
     quickAddSuggestedMeal,
     addPost,
+    toggleSavePost,
+    reportPost,
+    toggleFollowAuthor,
+    addComment,
+    addReply,
+    sharePost,
     createProgram,
     createCustomExercise,
     likePost,
@@ -718,8 +984,10 @@ function DashboardLayout() {
     totalBurn,
     netCalories,
     recommendedCalories,
+    recommendedCaloriesRange,
     fatigueScore,
     fatigueLabel,
+    fatigueByMuscle,
     weeklyWorkoutMinutes,
     weeklyStepAverage,
     weeklyData,
@@ -727,13 +995,21 @@ function DashboardLayout() {
 
   return (
     <div className="dashboard-shell">
-      <aside className={sidebarOpen ? 'sidebar is-open' : 'sidebar'}>
+      <aside className={sidebarOpen ? `sidebar is-open${sidebarCollapsed ? ' is-collapsed' : ''}` : `sidebar${sidebarCollapsed ? ' is-collapsed' : ''}`}>
         <div className="sidebar-brand">
           <span className="sidebar-mark">FF</span>
-          <div>
+          <div className="sidebar-brand-copy">
             <strong>FitFlow</strong>
             <p>Community, Train, Nutrition, AI</p>
           </div>
+          <button
+            type="button"
+            className="sidebar-collapse"
+            aria-label="Collapse sidebar"
+            onClick={() => setSidebarCollapsed((current) => !current)}
+          >
+            {sidebarCollapsed ? '→' : '←'}
+          </button>
         </div>
 
         <nav className="sidebar-nav" aria-label="Sidebar">
@@ -744,7 +1020,10 @@ function DashboardLayout() {
               className={({ isActive }) => (isActive ? 'sidebar-link active' : 'sidebar-link')}
               onClick={() => setSidebarOpen(false)}
             >
-              {item.label}
+              <span className="nav-icon" aria-hidden="true">
+                {item.icon}
+              </span>
+              <span className="nav-label">{item.label}</span>
             </NavLink>
           ))}
         </nav>
@@ -759,7 +1038,7 @@ function DashboardLayout() {
         />
       )}
 
-      <div className="content-shell">
+      <div className={sidebarCollapsed ? 'content-shell is-collapsed' : 'content-shell'}>
         <header className="content-topbar">
           <button
             type="button"
@@ -772,7 +1051,7 @@ function DashboardLayout() {
 
           <div className="topbar-copy">
             <strong>FitFlow MVP IA</strong>
-            <span>초기 탭은 Community / History / Train / Analytics / Profile 구조입니다.</span>
+            <span>Community / History / Train / Nutrition / Analytics / Profile</span>
           </div>
         </header>
 
@@ -788,7 +1067,10 @@ function DashboardLayout() {
             to={item.to}
             className={({ isActive }) => (isActive ? 'mobile-tab active' : 'mobile-tab')}
           >
-            {item.label}
+            <span className="nav-icon" aria-hidden="true">
+              {item.icon}
+            </span>
+            <span className="mobile-tab-label">{item.label}</span>
           </NavLink>
         ))}
       </nav>

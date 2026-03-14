@@ -176,8 +176,30 @@ export const initialSets = [
 ]
 
 export const initialMeals = [
-  { id: 1, name: 'Greek Yogurt Bowl', calories: 320, protein: 24, createdAt: '08:10' },
-  { id: 2, name: 'Chicken Poke', calories: 520, protein: 38, createdAt: '13:10' },
+  {
+    id: 1,
+    name: 'Greek Yogurt Bowl',
+    calories: 320,
+    protein: 24,
+    carbs: 32,
+    fat: 9,
+    mealType: 'breakfast',
+    favorite: true,
+    loggedDate: '2026-03-14',
+    createdAt: '08:10',
+  },
+  {
+    id: 2,
+    name: 'Chicken Poke',
+    calories: 520,
+    protein: 38,
+    carbs: 54,
+    fat: 14,
+    mealType: 'lunch',
+    favorite: false,
+    loggedDate: '2026-03-14',
+    createdAt: '13:10',
+  },
 ]
 
 export const initialPosts = [
@@ -232,11 +254,13 @@ export const programs = [
 ]
 
 export const foodSuggestions = [
-  { name: 'Chicken Poke', calories: 520, protein: 38 },
-  { name: 'Greek Yogurt Bowl', calories: 320, protein: 24 },
-  { name: 'Salmon Rice Bowl', calories: 610, protein: 36 },
-  { name: 'Protein Shake', calories: 210, protein: 27 },
-  { name: 'Egg Sandwich', calories: 430, protein: 22 },
+  { name: 'Chicken Poke', calories: 520, protein: 38, carbs: 54, fat: 14, mealType: 'lunch', favorite: false },
+  { name: 'Greek Yogurt Bowl', calories: 320, protein: 24, carbs: 32, fat: 9, mealType: 'breakfast', favorite: true },
+  { name: 'Salmon Rice Bowl', calories: 610, protein: 36, carbs: 62, fat: 18, mealType: 'dinner', favorite: false },
+  { name: 'Protein Shake', calories: 210, protein: 27, carbs: 12, fat: 4, mealType: 'snack', favorite: true },
+  { name: 'Egg Sandwich', calories: 430, protein: 22, carbs: 39, fat: 17, mealType: 'breakfast', favorite: false },
+  { name: 'Beef Bibimbap', calories: 680, protein: 31, carbs: 74, fat: 22, mealType: 'dinner', favorite: false },
+  { name: 'Tuna Salad Wrap', calories: 390, protein: 28, carbs: 33, fat: 12, mealType: 'lunch', favorite: false },
 ]
 
 export const muscleGroupOptions = [

@@ -18,6 +18,7 @@ function App() {
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/train" element={<TrainPage />} />
         <Route path="/train/exercises" element={<ExerciseDatabasePage />} />
+        <Route path="/nutrition" element={<NutritionHubPage entry="nutrition" />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/analytics/nutrition" element={<NutritionHubPage entry="analytics" />} />
         <Route path="/profile" element={<ProfilePage />} />
