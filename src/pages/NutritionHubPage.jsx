@@ -36,7 +36,7 @@ function normalizeMeal(meal, index) {
   }
 }
 
-function NutritionHubPage({ entry }) {
+function NutritionHubPage() {
   const {
     addMeal,
     meals,
@@ -493,7 +493,7 @@ function NutritionHubPage({ entry }) {
           <div className="mini-panel">🍜 외식 메뉴 자동 추정: 메뉴명만 입력하면 칼로리와 탄단지 추정</div>
           <div className="mini-panel">🧾 OCR / 영수증 분석: 영수증과 사진에서 음식 항목을 읽어 자동 기록</div>
         </div>
-        <Link className="inline-action" to={entry === 'analytics' ? '/analytics' : '/profile'}>
+        <Link className="inline-action" to="/profile/me">
           이전 탭으로 돌아가기
         </Link>
       </article>

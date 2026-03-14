@@ -574,6 +574,23 @@
   background: rgba(248, 250, 252, 0.9);
 }
 
+.summary-grid-block {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.summary-grid-block span {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+}
+
+.summary-grid-block strong {
+  display: block;
+  margin-top: 4px;
+}
+
 .summary-grid strong {
   display: block;
   margin-top: 4px;

@@ -12,10 +12,6 @@ import TrainProgramDetailPage from './pages/TrainProgramDetailPage.jsx'
 import TrainProgramBuilderPage from './pages/TrainProgramBuilderPage.jsx'
 import TrainTemplatesPage from './pages/TrainTemplatesPage.jsx'
 import TrainWorkoutPage from './pages/TrainWorkoutPage.jsx'
-import AnalyticsPage from './pages/AnalyticsPage.jsx'
-import AnalyticsLauncherPage from './pages/AnalyticsLauncherPage.jsx'
-import AnalyticsPerformancePage from './pages/AnalyticsPerformancePage.jsx'
-import AnalyticsRecoveryPage from './pages/AnalyticsRecoveryPage.jsx'
 import NutritionHubPage from './pages/NutritionHubPage.jsx'
 import ProfileLauncherPage from './pages/ProfileLauncherPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
@@ -37,11 +33,11 @@ function App() {
         <Route path="/train/exercises" element={<ExerciseDatabasePage />} />
         <Route path="/nutrition" element={<NutritionLauncherPage />} />
         <Route path="/nutrition/diary" element={<NutritionHubPage entry="nutrition" />} />
-        <Route path="/analytics" element={<AnalyticsLauncherPage />} />
-        <Route path="/analytics/overview" element={<AnalyticsPage />} />
-        <Route path="/analytics/performance" element={<AnalyticsPerformancePage />} />
-        <Route path="/analytics/recovery" element={<AnalyticsRecoveryPage />} />
-        <Route path="/analytics/nutrition" element={<NutritionHubPage entry="analytics" />} />
+        <Route path="/analytics" element={<Navigate to="/profile/me" replace />} />
+        <Route path="/analytics/overview" element={<Navigate to="/profile/me" replace />} />
+        <Route path="/analytics/performance" element={<Navigate to="/profile/me" replace />} />
+        <Route path="/analytics/recovery" element={<Navigate to="/profile/me" replace />} />
+        <Route path="/analytics/nutrition" element={<Navigate to="/profile/me" replace />} />
         <Route path="/profile" element={<ProfileLauncherPage />} />
         <Route path="/profile/me" element={<ProfilePage />} />
         <Route path="/profile/nutrition" element={<NutritionHubPage entry="profile" />} />

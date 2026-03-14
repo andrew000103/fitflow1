@@ -10,6 +10,8 @@ export interface DashboardStatePayload {
   exerciseDatabase?: unknown[]
   sessions?: unknown[]
   savedPostIds?: Array<string | number>
+  likedPostIds?: Array<string | number>
+  hiddenPostIds?: Array<string | number>
   reportedPostIds?: Array<string | number>
   followedAuthors?: string[]
   commentsByPost?: Record<string, unknown>
@@ -90,6 +92,7 @@ export function createPostRecord({
     attachDietCard,
     likes: 0,
     comments: 0,
+    hidden: false,
   }
 }
 

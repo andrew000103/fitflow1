@@ -257,7 +257,7 @@ function HistoryPage() {
                 <div className="mini-panel">선택한 날짜의 식단 기록이 아직 없습니다.</div>
               )}
             </div>
-            <Link className="inline-action" to="/analytics/nutrition">
+            <Link className="inline-action" to="/nutrition/diary">
               Nutrition diary 열기
             </Link>
           </article>
@@ -315,8 +315,8 @@ function HistoryPage() {
       )}
 
       <div className="sticky-cta-bar">
-        <Link className="inline-action" to="/analytics/overview">
-          Open analytics
+        <Link className="inline-action" to="/profile/me">
+          Open profile insights
         </Link>
         <Link className="inline-action primary-dark" to="/nutrition/diary">
           Review nutrition

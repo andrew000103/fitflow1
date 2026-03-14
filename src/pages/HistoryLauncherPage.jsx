@@ -47,8 +47,8 @@ function HistoryLauncherPage() {
         <Link className="pill-tag" to="/history/calendar">
           Today
         </Link>
-        <Link className="pill-tag" to="/analytics/overview">
-          Weekly overview
+        <Link className="pill-tag" to="/profile/me">
+          Profile insights
         </Link>
       </div>
     </section>

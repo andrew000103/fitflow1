@@ -1,7 +1,9 @@
 import PageHeader from '../components/PageHeader.jsx'
 import { Link, useOutletContext } from 'react-router-dom'
+import buildAnalyticsViewModel from '../components/analytics/buildAnalyticsViewModel.js'
 
 function ProfilePage() {
+  const context = useOutletContext()
   const {
     goal,
     setGoal,
@@ -11,17 +13,21 @@ function ProfilePage() {
     aiCoach,
     resetAllData,
     posts,
+    likedPostIds,
+    hiddenPostIds,
     programs,
     meals,
     sessions,
-  } = useOutletContext()
+  } = context
+  const analytics = buildAnalyticsViewModel(context)
 
   const currentWeight = 77.7
   const targetWeight = goal === 'diet' ? 74 : goal === 'bulk' ? 82 : 78
   const followerCount = 128
   const followingCount = 64
-  const savedPosts = Math.max(6, Math.ceil(posts.length * 1.5))
   const goalLabel = goal === 'diet' ? '감량' : goal === 'bulk' ? '벌크업' : '체중 유지'
+  const myPosts = posts.filter((post) => post.author === 'You')
+  const likedPosts = posts.filter((post) => likedPostIds.includes(post.id))
 
   return (
     <section className="page-section">
@@ -66,7 +72,7 @@ function ProfilePage() {
           <div className="summary-grid tight">
             <div>
               <span>내 게시물 수</span>
-              <strong>{posts.length}</strong>
+              <strong>{myPosts.length}</strong>
             </div>
             <div>
               <span>팔로워</span>
@@ -77,8 +83,8 @@ function ProfilePage() {
               <strong>{followingCount}</strong>
             </div>
             <div>
-              <span>저장한 게시물</span>
-              <strong>{savedPosts}</strong>
+              <span>좋아요한 게시물</span>
+              <strong>{likedPosts.length}</strong>
             </div>
           </div>
           <div className="mini-panel">{aiCoach.communityTitle} · {aiCoach.community}</div>
@@ -101,10 +107,10 @@ function ProfilePage() {
               <strong>📚 내 프로그램</strong>
               <span>{programs.length}개 프로그램을 관리합니다.</span>
             </Link>
-            <Link className="template-chip" to="/community/feed">
-              <strong>🔖 저장한 게시물</strong>
-              <span>커뮤니티 피드에서 저장 콘텐츠를 모아봅니다.</span>
-            </Link>
+            <div className="template-chip">
+              <strong>❤️ 좋아요한 게시물</strong>
+              <span>{likedPosts.length}개 게시물을 여기서 바로 봅니다.</span>
+            </div>
           </div>
         </article>
 
@@ -139,6 +145,101 @@ function ProfilePage() {
           </div>
         </article>
       </div>
+
+      <div className="card-grid split">
+        <article className="content-card">
+          <div className="feed-head">
+            <div>
+              <span className="card-kicker">My community</span>
+              <h2>내가 쓴 글</h2>
+            </div>
+            <span className="pill-tag">{myPosts.length} posts</span>
+          </div>
+          <div className="simple-list">
+            {myPosts.length > 0 ? (
+              myPosts.map((post) => (
+                <div className="simple-row compact" key={post.id}>
+                  <strong>{post.title}</strong>
+                  <span>{hiddenPostIds.includes(post.id) ? '숨김 상태' : post.goalTag || post.category}</span>
+                  <span>❤️ {post.likes}</span>
+                </div>
+              ))
+            ) : (
+              <div className="mini-panel">아직 작성한 게시물이 없습니다.</div>
+            )}
+          </div>
+          <Link className="inline-action" to="/community/feed">
+            Community로 이동
+          </Link>
+        </article>
+
+        <article className="content-card">
+          <div className="feed-head">
+            <div>
+              <span className="card-kicker">Liked posts</span>
+              <h2>좋아요한 게시물</h2>
+            </div>
+            <span className="pill-tag">{likedPosts.length} likes</span>
+          </div>
+          <div className="simple-list">
+            {likedPosts.length > 0 ? (
+              likedPosts.map((post) => (
+                <div className="simple-row compact" key={post.id}>
+                  <strong>{post.title}</strong>
+                  <span>{post.author}</span>
+                  <span>{post.goalTag || post.category}</span>
+                </div>
+              ))
+            ) : (
+              <div className="mini-panel">아직 좋아요한 게시물이 없습니다.</div>
+            )}
+          </div>
+        </article>
+      </div>
+
+      <article className="content-card">
+        <div className="feed-head">
+          <div>
+            <span className="card-kicker">Analytics in profile</span>
+            <h2>기록 분석</h2>
+          </div>
+          <span className="pill-tag accent">Integrated</span>
+        </div>
+        <div className="card-grid four-up analytics-summary-grid">
+          <div className="summary-grid-block">
+            <span>Weekly volume</span>
+            <strong>{analytics.totalVolume.toLocaleString()} kg</strong>
+          </div>
+          <div className="summary-grid-block">
+            <span>Workout count</span>
+            <strong>{analytics.weeklyWorkoutCount} sessions</strong>
+          </div>
+          <div className="summary-grid-block">
+            <span>Recovery</span>
+            <strong>{analytics.fatigueLabel} {analytics.fatigueScore}</strong>
+          </div>
+          <div className="summary-grid-block">
+            <span>Net calories</span>
+            <strong>{analytics.netCalories} kcal</strong>
+          </div>
+        </div>
+        <div className="card-grid split analytics-detail-grid">
+          <div className="mini-panel">
+            권장 섭취량 {analytics.recommendedCalories} kcal · 범위 {analytics.recommendedCaloriesRange.min}-{analytics.recommendedCaloriesRange.max} kcal
+          </div>
+          <div className="mini-panel">
+            {aiCoach.trainingTitle} · {aiCoach.training}
+          </div>
+        </div>
+        <div className="program-chip-list">
+          <Link className="inline-action" to="/history/calendar">
+            History 보기
+          </Link>
+          <Link className="inline-action" to="/nutrition/diary">
+            Nutrition 보기
+          </Link>
+        </div>
+      </article>
     </section>
   )
 }

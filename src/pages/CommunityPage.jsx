@@ -26,6 +26,8 @@ function CommunityPage() {
   const {
     posts,
     savedPostIds,
+    likedPostIds,
+    hiddenPostIds,
     reportedPostIds,
     followedAuthors,
     commentsByPost,
@@ -33,6 +35,9 @@ function CommunityPage() {
     likePost,
     addPost,
     toggleSavePost,
+    toggleHidePost,
+    updatePost,
+    deletePost,
     reportPost,
     toggleFollowAuthor,
     addComment,
@@ -55,6 +60,9 @@ function CommunityPage() {
   const [openCommentPostId, setOpenCommentPostId] = useState(null)
   const [commentDrafts, setCommentDrafts] = useState({})
   const [replyDrafts, setReplyDrafts] = useState({})
+  const [editingPostId, setEditingPostId] = useState(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editBody, setEditBody] = useState('')
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -87,6 +95,7 @@ function CommunityPage() {
 
   const filteredPosts = useMemo(() => {
     return posts
+      .filter((post) => !hiddenPostIds.includes(post.id))
       .filter((post) => {
         if (feedTab === 'following') {
           return followedAuthors.includes(post.author)
@@ -100,7 +109,7 @@ function CommunityPage() {
         const query = searchQuery.toLowerCase()
         return post.title.toLowerCase().includes(query) || post.body.toLowerCase().includes(query)
       })
-  }, [feedTab, followedAuthors, posts, searchQuery])
+  }, [feedTab, followedAuthors, hiddenPostIds, posts, searchQuery])
 
   const rankedPosts = useMemo(() => {
     const recencyWeight = rankingTab === 'daily' ? 6 : rankingTab === 'weekly' ? 4 : 2
@@ -136,6 +145,25 @@ function CommunityPage() {
             : '최근 본 콘텐츠와 관심사가 유사한 사용자',
       }))
   }, [followedAuthors, goal, posts])
+
+  function startEditing(post) {
+    setEditingPostId(post.id)
+    setEditTitle(post.title)
+    setEditBody(post.body)
+  }
+
+  function submitEdit(postId) {
+    if (!editTitle.trim() || !editBody.trim()) {
+      return
+    }
+    updatePost(postId, {
+      title: editTitle.trim(),
+      body: editBody.trim(),
+    })
+    setEditingPostId(null)
+    setEditTitle('')
+    setEditBody('')
+  }
 
   return (
     <section className="page-section">
@@ -248,8 +276,10 @@ function CommunityPage() {
             {filteredPosts.map((post, index) => {
               const postComments = commentsByPost[post.id] || []
               const isSaved = savedPostIds.includes(post.id)
+              const isLiked = likedPostIds.includes(post.id)
               const isReported = reportedPostIds.includes(post.id)
               const isFollowing = followedAuthors.includes(post.author)
+              const isMine = post.author === 'You'
 
               return (
                 <article className="content-card post-card" key={post.id}>
@@ -268,7 +298,28 @@ function CommunityPage() {
                     <span className="pill-tag">{post.goalTag || post.category}</span>
                   </div>
 
-                  <p>{post.body}</p>
+                  {editingPostId === post.id ? (
+                    <div className="stack-form">
+                      <label className="field-label">
+                        제목
+                        <input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} />
+                      </label>
+                      <label className="field-label">
+                        내용
+                        <textarea rows="3" value={editBody} onChange={(event) => setEditBody(event.target.value)} />
+                      </label>
+                      <div className="program-chip-list">
+                        <button className="inline-action primary-dark" type="button" onClick={() => submitEdit(post.id)}>
+                          저장
+                        </button>
+                        <button className="inline-action" type="button" onClick={() => setEditingPostId(null)}>
+                          취소
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p>{post.body}</p>
+                  )}
 
                   <div className="post-attachments">
                     {post.photoCount ? <span className="mini-panel">📷 {post.photoCount}장</span> : null}
@@ -285,7 +336,11 @@ function CommunityPage() {
                   </div>
 
                   <div className="post-actions">
-                    <button className="inline-action" type="button" onClick={() => likePost(post.id)}>
+                    <button
+                      className={isLiked ? 'inline-action active-soft' : 'inline-action'}
+                      type="button"
+                      onClick={() => likePost(post.id)}
+                    >
                       ❤️ {post.likes}
                     </button>
                     <button
@@ -312,6 +367,19 @@ function CommunityPage() {
                     >
                       🚨
                     </button>
+                    {isMine ? (
+                      <>
+                        <button className="inline-action" type="button" onClick={() => startEditing(post)}>
+                          ✏️
+                        </button>
+                        <button className="inline-action" type="button" onClick={() => toggleHidePost(post.id)}>
+                          🙈
+                        </button>
+                        <button className="inline-action" type="button" onClick={() => deletePost(post.id)}>
+                          🗑️
+                        </button>
+                      </>
+                    ) : null}
                   </div>
 
                   {openCommentPostId === post.id ? (

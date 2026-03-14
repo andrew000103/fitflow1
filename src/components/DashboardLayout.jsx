@@ -44,7 +44,6 @@ const navigation = [
   { to: '/history', label: 'History', icon: '🕘' },
   { to: '/train', label: 'Train', icon: '🏋️' },
   { to: '/nutrition', label: 'Nutrition', icon: '🍽️' },
-  { to: '/analytics', label: 'Analytics', icon: '📈' },
   { to: '/profile', label: 'Profile', icon: '🙂' },
 ]
 
@@ -156,6 +155,8 @@ function DashboardLayout() {
   )
   const [sessions, setSessions] = useState(persistedState.sessions || initialSessions)
   const [savedPostIds, setSavedPostIds] = useState(persistedState.savedPostIds || [])
+  const [likedPostIds, setLikedPostIds] = useState(persistedState.likedPostIds || [])
+  const [hiddenPostIds, setHiddenPostIds] = useState(persistedState.hiddenPostIds || [])
   const [reportedPostIds, setReportedPostIds] = useState(persistedState.reportedPostIds || [])
   const [followedAuthors, setFollowedAuthors] = useState(persistedState.followedAuthors || ['Mina'])
   const [commentsByPost, setCommentsByPost] = useState(
@@ -180,6 +181,8 @@ function DashboardLayout() {
       exerciseDatabase,
       sessions,
       savedPostIds,
+      likedPostIds,
+      hiddenPostIds,
       reportedPostIds,
       followedAuthors,
       commentsByPost,
@@ -192,9 +195,11 @@ function DashboardLayout() {
     followedAuthors,
     goal,
     lastWorkoutSummary,
+    likedPostIds,
     meals,
     posts,
     programs,
+    hiddenPostIds,
     reportedPostIds,
     savedPostIds,
     sessions,
@@ -846,6 +851,31 @@ function DashboardLayout() {
     )
   }
 
+  function toggleHidePost(postId) {
+    setHiddenPostIds((current) =>
+      current.includes(postId) ? current.filter((id) => id !== postId) : [...current, postId],
+    )
+  }
+
+  function updatePost(postId, payload) {
+    setPosts((current) =>
+      current.map((post) => (post.id === postId ? { ...post, ...payload } : post)),
+    )
+  }
+
+  function deletePost(postId) {
+    setPosts((current) => current.filter((post) => post.id !== postId))
+    setSavedPostIds((current) => current.filter((id) => id !== postId))
+    setLikedPostIds((current) => current.filter((id) => id !== postId))
+    setHiddenPostIds((current) => current.filter((id) => id !== postId))
+    setReportedPostIds((current) => current.filter((id) => id !== postId))
+    setCommentsByPost((current) => {
+      const next = { ...current }
+      delete next[postId]
+      return next
+    })
+  }
+
   function reportPost(postId) {
     setReportedPostIds((current) => (current.includes(postId) ? current : [...current, postId]))
   }
@@ -926,8 +956,16 @@ function DashboardLayout() {
   }
 
   function likePost(postId) {
+    const isLiked = likedPostIds.includes(postId)
+    setLikedPostIds((current) =>
+      isLiked ? current.filter((id) => id !== postId) : [...current, postId],
+    )
     setPosts((current) =>
-      current.map((post) => (post.id === postId ? { ...post, likes: post.likes + 1 } : post)),
+      current.map((post) =>
+        post.id === postId
+          ? { ...post, likes: Math.max(0, post.likes + (isLiked ? -1 : 1)) }
+          : post,
+      ),
     )
   }
 
@@ -942,6 +980,8 @@ function DashboardLayout() {
     setExerciseDatabase(exerciseDatabaseSeed)
     setSessions(initialSessions)
     setSavedPostIds([])
+    setLikedPostIds([])
+    setHiddenPostIds([])
     setReportedPostIds([])
     setFollowedAuthors(['Mina'])
     setCommentsByPost(defaultCommentsByPost)
@@ -961,6 +1001,8 @@ function DashboardLayout() {
     meals,
     posts,
     savedPostIds,
+    likedPostIds,
+    hiddenPostIds,
     reportedPostIds,
     followedAuthors,
     commentsByPost,
@@ -996,6 +1038,9 @@ function DashboardLayout() {
     quickAddSuggestedMeal,
     addPost,
     toggleSavePost,
+    toggleHidePost,
+    updatePost,
+    deletePost,
     reportPost,
     toggleFollowAuthor,
     addComment,

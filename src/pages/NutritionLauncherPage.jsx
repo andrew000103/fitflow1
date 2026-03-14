@@ -59,7 +59,7 @@ function NutritionLauncherPage() {
         <Link className="pill-tag" to="/nutrition/diary">
           Recent foods
         </Link>
-        <Link className="pill-tag" to="/analytics/nutrition">
+        <Link className="pill-tag" to="/profile/me">
           Nutrition summary
         </Link>
       </div>
