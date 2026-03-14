@@ -29,6 +29,7 @@ export interface DashboardStatePayload {
   foodMergeCandidates?: unknown[]
   appLanguage?: string
   foodNameLanguage?: string
+  colorTheme?: string
 }
 
 export function loadDashboardState(): DashboardStatePayload {

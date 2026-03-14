@@ -96,31 +96,13 @@ function TrainTemplatesPage() {
               <span className="pill-tag">{program.visibility}</span>
             </div>
             <p>{program.description}</p>
-            <div className="summary-grid tight">
-              <div>
-                <span>{tx(appLanguage, '기간', 'Duration')}</span>
-                <strong>{program.durationWeeks} {tx(appLanguage, '주', 'weeks')}</strong>
-              </div>
-              <div>
-                <span>{tx(appLanguage, '빈도', 'Frequency')}</span>
-                <strong>{program.sessionsPerWeek}/week</strong>
-              </div>
-              <div>
-                <span>{tx(appLanguage, '작성자', 'Creator')}</span>
-                <strong>{program.authorName}</strong>
-              </div>
-              <div>
-                <span>{tx(appLanguage, '평점', 'Rating')}</span>
-                <strong>{program.averageRating || 0} / 5</strong>
-              </div>
-              <div>
-                <span>{tx(appLanguage, '좋아요', 'Likes')}</span>
-                <strong>{program.likes || 0}</strong>
-              </div>
-              <div>
-                <span>{tx(appLanguage, '후기', 'Reviews')}</span>
-                <strong>{program.reviewCount || 0}</strong>
-              </div>
+            <div className="program-chip-list">
+              <span className="pill-tag">
+                {tx(appLanguage, '별점', 'Rating')} {program.averageRating || 0} / 5
+              </span>
+              <span className="pill-tag">
+                {tx(appLanguage, '좋아요', 'Likes')} {program.likes || 0}
+              </span>
             </div>
             <div className="program-chip-list">
               {(program.tags || []).map((tag) => (

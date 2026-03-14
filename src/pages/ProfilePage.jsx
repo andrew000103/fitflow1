@@ -15,6 +15,8 @@ import {
 function ProfilePage() {
   const {
     appLanguage,
+    colorTheme,
+    setColorTheme,
     userProfile,
     updateUserProfile,
     healthConnection,
@@ -149,8 +151,14 @@ function ProfilePage() {
           </div>
         </div>
         <div className="profile-hero-meta">
-          <span className="pill-tag accent">{goalText}</span>
-          <span className={healthConnection.status === 'connected' ? 'pill-tag accent' : 'pill-tag'}>
+          <span className="pill-tag profile-accent-chip">{goalText}</span>
+          <span
+            className={
+              healthConnection.status === 'connected'
+                ? 'pill-tag profile-accent-chip'
+                : 'pill-tag profile-muted-chip'
+            }
+          >
             {healthBadgeLabel}
           </span>
         </div>
@@ -170,7 +178,7 @@ function ProfilePage() {
               </p>
             </div>
             <button
-              className="inline-action primary-dark"
+              className="inline-action primary-dark profile-primary-action"
               type="button"
               onClick={() => recordWeightCheckIn(profileForm.weightKg || userProfile.weightKg, { source: 'reminder' })}
             >
@@ -184,7 +192,9 @@ function ProfilePage() {
         <article className="content-card">
           <div className="feed-head">
             <h2>{tx(appLanguage, 'Daily Energy', 'Daily Energy')}</h2>
-            <span className="pill-tag">{recommendedCalories} kcal {tx(appLanguage, '목표', 'target')}</span>
+            <span className="pill-tag profile-accent-chip">
+              {recommendedCalories} kcal {tx(appLanguage, '목표', 'target')}
+            </span>
           </div>
           <div className="summary-grid tight">
             <div>
@@ -257,13 +267,14 @@ function ProfilePage() {
         </article>
       </div>
 
-      <article className="content-card">
-        <div className="feed-head">
+      <details className="content-card profile-accordion">
+        <summary className="profile-accordion-summary">
           <div>
             <h2>{tx(appLanguage, 'Edit Profile', 'Edit Profile')}</h2>
             <p>{tx(appLanguage, '나이, 키, 몸무게, 목표 정보를 직접 수정하고 저장합니다.', 'Update your age, height, weight, and goals here.')}</p>
           </div>
-        </div>
+          <span className="profile-accordion-arrow" aria-hidden="true">⌄</span>
+        </summary>
         <div className="stack-form">
           <div className="compact-grid">
             <label className="field-label">
@@ -357,23 +368,26 @@ function ProfilePage() {
           </div>
         </div>
         <div className="program-chip-list">
-          <button className="inline-action primary-dark" type="button" onClick={handleSaveProfile}>
+          <button className="inline-action primary-dark profile-primary-action" type="button" onClick={handleSaveProfile}>
             {tx(appLanguage, '저장', 'Save')}
           </button>
           <button className="inline-action" type="button" onClick={handleResetProfileForm}>
             {tx(appLanguage, '되돌리기', 'Reset')}
           </button>
         </div>
-      </article>
+      </details>
 
-      <article className="content-card">
-        <div className="feed-head">
+      <details className="content-card profile-accordion">
+        <summary className="profile-accordion-summary">
           <div>
             <h2>{tx(appLanguage, 'Weight History', 'Weight History')}</h2>
             <p>{tx(appLanguage, '한 달에 한 번 이상 체중 변화를 기록해 주세요.', 'Record your body weight at least once a month.')}</p>
           </div>
-          <span className="pill-tag">{tx(appLanguage, `다음 체크 ${nextWeightCheckInDate}`, `Next check ${nextWeightCheckInDate}`)}</span>
-        </div>
+          <div className="profile-accordion-meta">
+            <span className="pill-tag">{tx(appLanguage, `다음 체크 ${nextWeightCheckInDate}`, `Next check ${nextWeightCheckInDate}`)}</span>
+            <span className="profile-accordion-arrow" aria-hidden="true">⌄</span>
+          </div>
+        </summary>
         <div className="simple-list">
           {recentWeightEntries.map((entry) => (
             <div className="simple-row compact" key={entry.id}>
@@ -383,15 +397,21 @@ function ProfilePage() {
             </div>
           ))}
         </div>
-      </article>
+      </details>
 
-      <details className="content-card profile-accordion" open>
+      <details className="content-card profile-accordion">
         <summary className="profile-accordion-summary">
           <div>
             <h2>{tx(appLanguage, 'Connected Health', 'Connected Health')}</h2>
           </div>
           <div className="profile-accordion-meta">
-            <span className={healthConnection.status === 'connected' ? 'pill-tag accent' : 'pill-tag'}>
+            <span
+              className={
+                healthConnection.status === 'connected'
+                  ? 'pill-tag profile-accent-chip'
+                  : 'pill-tag profile-muted-chip'
+              }
+            >
               {healthStatusLabel(appLanguage, healthConnection.status)}
             </span>
             <span className="profile-accordion-arrow" aria-hidden="true">⌄</span>
@@ -461,6 +481,18 @@ function ProfilePage() {
                 <option value="high">{activityLevelLabel(appLanguage, 'high')}</option>
               </select>
             </label>
+            <label className="field-label">
+              {tx(appLanguage, '테마', 'Theme')}
+              <select
+                value={colorTheme}
+                onChange={(event) => setColorTheme(event.target.value)}
+              >
+                <option value="light">{tx(appLanguage, '라이트', 'Light')}</option>
+                <option value="dark">{tx(appLanguage, '다크', 'Dark')}</option>
+              </select>
+            </label>
+          </div>
+          <div className="compact-grid">
             <label className="field-label">
               {tx(appLanguage, '단위 체계', 'Unit System')}
               <select

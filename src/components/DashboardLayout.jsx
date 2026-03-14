@@ -381,6 +381,7 @@ function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [goal, setGoal] = useState(persistedState.goal || 'maintain')
   const [appLanguage, setAppLanguage] = useState(persistedState.appLanguage || persistedState.foodNameLanguage || 'en')
+  const [colorTheme, setColorTheme] = useState(persistedState.colorTheme || 'light')
   const foodNameLanguage = appLanguage
   const setFoodNameLanguage = setAppLanguage
   const [steps, setSteps] = useState(persistedState.steps || 11284)
@@ -515,6 +516,13 @@ function DashboardLayout() {
   }, [steps])
 
   useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.dataset.theme = colorTheme
+      document.body.dataset.theme = colorTheme
+    }
+  }, [colorTheme])
+
+  useEffect(() => {
     saveDashboardState({
       goal,
       userProfile,
@@ -523,6 +531,7 @@ function DashboardLayout() {
       lastWeightCheckInDate,
       appLanguage,
       foodNameLanguage,
+      colorTheme,
       steps,
       sets,
       meals,
@@ -547,6 +556,7 @@ function DashboardLayout() {
     })
   }, [
     commentsByPost,
+    colorTheme,
     customFoods,
     appLanguage,
     exerciseDatabase,
@@ -1778,6 +1788,8 @@ function DashboardLayout() {
     setGoal,
     appLanguage,
     setAppLanguage,
+    colorTheme,
+    setColorTheme,
     userProfile,
     updateUserProfile,
     healthConnection,
@@ -1943,6 +1955,14 @@ function DashboardLayout() {
             onClick={() => setAppLanguage((current) => (current === 'ko' ? 'en' : 'ko'))}
           >
             {appLanguage === 'ko' ? 'KR' : 'EN'}
+          </button>
+          <button
+            type="button"
+            className="sidebar-language-button single"
+            aria-label={tx(appLanguage, '테마 전환', 'Toggle theme')}
+            onClick={() => setColorTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+          >
+            {colorTheme === 'dark' ? 'D' : 'L'}
           </button>
         </div>
       </aside>

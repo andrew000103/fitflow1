@@ -13,6 +13,13 @@ function TrainPage() {
   const lastSessionMeta = lastWorkoutSummary
     ? `${lastWorkoutSummary.durationMinutes} ${tx(appLanguage, '분', 'min')} · ${lastWorkoutSummary.completedSets} ${tx(appLanguage, '세트', 'sets')}`
     : tx(appLanguage, '최근 완료한 세션 없음', 'No recent completed session')
+  const workoutSummary = currentProgramDay?.exercises?.length
+    ? currentProgramDay.exercises
+        .slice(0, 4)
+        .map((exercise) => `${exercise.exerciseName} · ${exercise.sets}${tx(appLanguage, '세트', ' sets')}`)
+        .join('  /  ')
+    : tx(appLanguage, '오늘 할 운동이 아직 없습니다.', 'No workout is scheduled for today.')
+  const quickWorkoutLabel = tx(appLanguage, '바로 운동 시작', 'Quick Workout')
 
   return (
     <section className="page-section">
@@ -24,22 +31,25 @@ function TrainPage() {
 
       {hasActiveProgram ? (
         <article className="content-card train-home-hero">
-          <div className="train-home-hero-copy">
-            <span className="card-kicker">{tx(appLanguage, '진행 중 프로그램', 'Active Program')}</span>
-            <h2>{tx(appLanguage, '프로그램 이어서 하기', 'Continue Program')}</h2>
-            <p>
-              {currentProgram.title} · {tx(appLanguage, '주차', 'Week')} {activeProgram.currentWeek} · {tx(appLanguage, '요일', 'Day')} {activeProgram.currentDay}
-            </p>
-            <strong>{currentProgramDay.title}</strong>
-            <div className="train-home-meta">
-              <span className="pill-tag accent">{currentProgram.category}</span>
-              <span className="pill-tag">{currentProgram.durationWeeks} {tx(appLanguage, '주', 'weeks')}</span>
-              <span className="pill-tag">{streakDays} {tx(appLanguage, '일 연속', 'day streak')}</span>
-              <span className="pill-tag">{tx(appLanguage, '최근 세션', 'Last session')} {lastSessionMeta}</span>
+          <div className="train-home-hero-main">
+            <div className="train-home-hero-copy">
+              <span className="card-kicker">{tx(appLanguage, '진행 중 프로그램', 'Active Program')}</span>
+              <h2 className="train-home-program-title">{currentProgram.title}</h2>
+              <p>
+                {tx(appLanguage, '주차', 'Week')} {activeProgram.currentWeek} · {tx(appLanguage, '요일', 'Day')} {activeProgram.currentDay}
+              </p>
+              <strong>{currentProgramDay.title}</strong>
+              <p className="train-home-day-summary">{workoutSummary}</p>
+              <div className="train-home-meta">
+                <span className="pill-tag accent">{currentProgram.category}</span>
+                <span className="pill-tag">{currentProgram.durationWeeks} {tx(appLanguage, '주', 'weeks')}</span>
+                <span className="pill-tag">{streakDays} {tx(appLanguage, '일 연속', 'day streak')}</span>
+              </div>
+              <span className="train-home-supporting-copy">
+                {tx(appLanguage, '최근 세션', 'Last session')} · {lastSessionMeta}
+              </span>
             </div>
-          </div>
 
-          <div className="train-home-hero-actions">
             <button
               className="inline-action primary-dark train-home-primary"
               type="button"
@@ -47,6 +57,9 @@ function TrainPage() {
             >
               {tx(appLanguage, '프로그램 이어서 하기', 'Continue Program')}
             </button>
+          </div>
+
+          <div className="train-home-side-actions">
             <button
               className="train-home-secondary-cta"
               type="button"
@@ -55,27 +68,29 @@ function TrainPage() {
                 navigate('/train/workout')
               }}
             >
-              <strong>{tx(appLanguage, '빈 운동 시작', 'Start Empty Workout')}</strong>
-              <span>{tx(appLanguage, '프로그램과 무관하게 지금 바로 기록을 시작합니다.', 'Start logging right now without a program.')}</span>
+              <strong>{quickWorkoutLabel}</strong>
+              <span>{tx(appLanguage, '프로그램과 무관하게 바로 기록을 시작합니다.', 'Start a workout right away without a program.')}</span>
             </button>
-            <Link className="inline-action" to="/train/programs">
-              {tx(appLanguage, '프로그램 둘러보기', 'Browse Programs')}
+            <Link className="train-home-secondary-cta train-home-secondary-link train-home-browse-link" to="/train/programs">
+              <strong>{tx(appLanguage, '프로그램 둘러보기', 'Browse Programs')}</strong>
             </Link>
           </div>
         </article>
       ) : (
         <article className="content-card train-home-hero">
-          <div className="train-home-hero-copy">
-            <span className="card-kicker">{tx(appLanguage, '진행 중 프로그램 없음', 'No Active Program')}</span>
-            <h2>{tx(appLanguage, '빈 운동 시작', 'Start Empty Workout')}</h2>
-            <p>{tx(appLanguage, '진행 중인 프로그램이 없으면 빈 운동으로 바로 기록하거나, Program을 탐색해서 시작할 수 있습니다.', 'If you do not have an active program, start an empty workout or browse a program.')}</p>
-            <div className="train-home-meta">
-              <span className="pill-tag accent">{tx(appLanguage, '프로그램 선택 사항', 'Program optional')}</span>
-              <span className="pill-tag">{tx(appLanguage, '공개 프로그램 둘러보기', 'Browse public programs')}</span>
+          <div className="train-home-hero-main">
+            <div className="train-home-hero-copy">
+              <span className="card-kicker">{tx(appLanguage, '진행 중 프로그램 없음', 'No Active Program')}</span>
+              <h2 className="train-home-program-title">{tx(appLanguage, '오늘 바로 운동을 시작할 수 있습니다.', 'You can start a workout right away today.')}</h2>
+              <p>{tx(appLanguage, '진행 중인 프로그램이 없으면 바로 운동을 기록하거나, Program을 탐색해서 시작할 수 있습니다.', 'If you do not have an active program, start a quick workout or browse a program.')}</p>
+              <div className="train-home-meta">
+                <span className="pill-tag accent">{tx(appLanguage, '프로그램 선택 사항', 'Program optional')}</span>
+                <span className="pill-tag">{tx(appLanguage, '공개 프로그램 둘러보기', 'Browse public programs')}</span>
+              </div>
             </div>
           </div>
 
-          <div className="train-home-hero-actions">
+          <div className="train-home-side-actions">
             <button
               className="inline-action primary-dark train-home-primary"
               type="button"
@@ -84,11 +99,10 @@ function TrainPage() {
                 navigate('/train/workout')
               }}
             >
-              {tx(appLanguage, '빈 운동 시작', 'Start Empty Workout')}
+              {quickWorkoutLabel}
             </button>
-            <Link className="train-home-secondary-cta" to="/train/programs">
+            <Link className="train-home-secondary-cta train-home-secondary-link train-home-browse-link" to="/train/programs">
               <strong>{tx(appLanguage, '프로그램 둘러보기', 'Browse Programs')}</strong>
-              <span>{tx(appLanguage, '공개 프로그램을 탐색하고 진행할 프로그램을 선택합니다.', 'Browse public programs and choose one to follow.')}</span>
             </Link>
           </div>
         </article>

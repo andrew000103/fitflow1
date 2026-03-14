@@ -1,9 +1,6 @@
 import { useMemo } from 'react'
 import { Link, useOutletContext } from 'react-router-dom'
 import PageHeader from '../../../components/PageHeader.jsx'
-import BodyMapCard from '../../../components/bodymap/BodyMapCard.jsx'
-import BodyRecoveryMap from '../../../components/bodymap/BodyRecoveryMap.jsx'
-import MuscleLegend from '../../../components/bodymap/MuscleLegend.jsx'
 import { mapLegacyScoresToBodyRecoveryData } from '../../../components/bodymap/bodyRecoveryModel.js'
 import { getMuscleGroupLabel } from '../../../features/recovery/constants.ts'
 import { getRecoveryToneLabel } from '../../../features/recovery/colorScale.ts'
@@ -57,7 +54,6 @@ function InsightsPage() {
   const lowestMuscle = [...groupedRows].reverse()[0] || null
   const shouldRestRows = groupedRows.filter((item) => item.score >= 55).slice(0, 3)
   const trainableRows = [...groupedRows].reverse().filter((item) => item.score <= 35).slice(0, 3)
-  const bodySex = userProfile?.sex === 'female' ? 'female' : 'male'
 
   return (
     <section className="page-section">
@@ -92,33 +88,29 @@ function InsightsPage() {
       <article className="content-card">
         <div className="feed-head">
           <div>
-            <span className="card-kicker">{tx(appLanguage, '바디 피로도 맵', 'Body fatigue map')}</span>
-            <h2>{tx(appLanguage, '앞면 / 뒷면 회복 보기', 'Front / Back recovery view')}</h2>
+            <span className="card-kicker">{tx(appLanguage, '근육 피로도', 'Muscle fatigue')}</span>
+            <h2>{tx(appLanguage, '부위별 피로 수치', 'Recovery scores by region')}</h2>
+            <p>
+              {tx(
+                appLanguage,
+                '바디 맵은 추후 업데이트로 돌아오고, 지금은 부위별 피로도를 수치로 빠르게 확인할 수 있습니다.',
+                'The body map will return in a later update. For now, view fatigue by muscle region as clean numeric scores.',
+              )}
+            </p>
           </div>
           <Link className="inline-action" to="/train/workout">
             {tx(appLanguage, '운동 열기', 'Open workout')}
           </Link>
         </div>
-
-        <div className="bodymap-layout">
-          <BodyMapCard title="Front" subtitle="앞면">
-            <BodyRecoveryMap view="front" sex={bodySex} data={bodyRecoveryData} />
-          </BodyMapCard>
-          <BodyMapCard title="Back" subtitle="뒷면">
-            <BodyRecoveryMap view="back" sex={bodySex} data={bodyRecoveryData} />
-          </BodyMapCard>
-        </div>
-
-        <MuscleLegend appLanguage={appLanguage} />
       </article>
 
       <details className="content-card">
-        <summary>{tx(appLanguage, '부위별 피로 점수 보기', 'View muscle fatigue scores')}</summary>
+        <summary>{tx(appLanguage, '부위별 피로도 보기', 'View muscle fatigue scores')}</summary>
         <div className="muscle-detail-list">
           {groupedRows.map((item) => (
             <div className="muscle-detail-row" key={item.muscle}>
               <strong>{item.label}</strong>
-              <span>{item.score}</span>
+              <span>{item.score}%</span>
               <span>{item.level}</span>
             </div>
           ))}

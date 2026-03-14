@@ -1,229 +1,369 @@
 import { getRecoveryRegionColor } from './bodyRecoveryModel.js'
 
 function BodyRecoveryBack({ data = {}, sex = 'male' }) {
-  const centerX = 120
+  const cx = 120
+  const baseFill = '#f8fafc'
+  const baseStroke = '#cbd5e1'
+  const baseStrokeWidth = 2.5
+
+  const backColor = getRecoveryRegionColor(data, 'back')
+  const armsColor = getRecoveryRegionColor(data, 'triceps')
 
   return (
     <svg
-      viewBox="0 0 240 520"
+      viewBox="0 0 240 360"
       preserveAspectRatio="xMidYMid meet"
-      className="body-recovery-svg"
       role="img"
       aria-label={`${sex} back recovery map`}
+      style={{ width: '100%', height: '100%', display: 'block' }}
     >
-      <g className="body-recovery-layer">
-        {/* Base silhouette */}
-        <circle className="body-recovery-base" cx="120" cy="44" r="20" />
+      {/* head */}
+      <circle
+        cx="120"
+        cy="28"
+        r="15"
+        fill={baseFill}
+        stroke={baseStroke}
+        strokeWidth={baseStrokeWidth}
+      />
 
-        <rect className="body-recovery-base" x="108" y="64" width="24" height="16" rx="10" />
+      {/* neck */}
+      <rect
+        x="109"
+        y="43"
+        width="22"
+        height="11"
+        rx="5.5"
+        fill={baseFill}
+        stroke={baseStroke}
+        strokeWidth={baseStrokeWidth}
+      />
 
-        <path
-          className="body-recovery-base"
-          d="
-            M92 92
-            Q102 76 120 76
-            Q138 76 148 92
-            L164 126
-            Q172 144 172 170
-            L172 222
-            Q172 242 156 258
-            L146 268
-            L142 308
-            Q140 326 128 338
-            L112 338
-            Q100 326 98 308
-            L94 268
-            L84 258
-            Q68 242 68 222
-            L68 170
-            Q68 144 76 126
-            Z
-          "
+      {/* torso */}
+      <path
+        d="
+          M74 68
+          Q92 54 120 54
+          Q148 54 166 68
+          L178 88
+          Q186 100 186 118
+          L186 142
+          Q186 160 172 172
+          L160 182
+          Q152 190 148 204
+          L144 226
+          Q140 248 128 262
+          L112 262
+          Q100 248 96 226
+          L92 204
+          Q88 190 80 182
+          L68 172
+          Q54 160 54 142
+          L54 118
+          Q54 100 62 88
+          Z
+        "
+        fill={baseFill}
+        stroke={baseStroke}
+        strokeWidth={baseStrokeWidth}
+      />
+
+      {/* pelvis */}
+      <path
+        d="
+          M98 262
+          Q120 254 142 262
+          L146 278
+          Q138 292 120 292
+          Q102 292 94 278
+          Z
+        "
+        fill={baseFill}
+        stroke={baseStroke}
+        strokeWidth={baseStrokeWidth}
+      />
+
+      {/* upper arms */}
+      <rect
+        x="36"
+        y="98"
+        width="22"
+        height="80"
+        rx="11"
+        fill={baseFill}
+        stroke={baseStroke}
+        strokeWidth={baseStrokeWidth}
+      />
+      <g transform={`translate(${cx * 2} 0) scale(-1 1)`}>
+        <rect
+          x="36"
+          y="98"
+          width="22"
+          height="80"
+          rx="11"
+          fill={baseFill}
+          stroke={baseStroke}
+          strokeWidth={baseStrokeWidth}
         />
-
-        <path
-          className="body-recovery-base"
-          d="
-            M98 338
-            Q120 328 142 338
-            L148 366
-            Q138 384 120 384
-            Q102 384 92 366
-            Z
-          "
-        />
-
-        <rect className="body-recovery-base" x="48" y="118" width="26" height="122" rx="13" />
-        <g transform={`translate(${centerX * 2} 0) scale(-1 1)`}>
-          <rect className="body-recovery-base" x="48" y="118" width="26" height="122" rx="13" />
-        </g>
-
-        <rect className="body-recovery-base" x="52" y="236" width="22" height="94" rx="11" />
-        <g transform={`translate(${centerX * 2} 0) scale(-1 1)`}>
-          <rect className="body-recovery-base" x="52" y="236" width="22" height="94" rx="11" />
-        </g>
-
-        <rect className="body-recovery-base" x="94" y="384" width="22" height="104" rx="11" />
-        <rect className="body-recovery-base" x="124" y="384" width="22" height="104" rx="11" />
-
-        <rect className="body-recovery-base" x="96" y="482" width="18" height="26" rx="9" />
-        <rect className="body-recovery-base" x="126" y="482" width="18" height="26" rx="9" />
-
-        {/* Regions */}
-        <g className="body-recovery-regions">
-          {/* upper back / traps (legacy key: back) */}
-          <path
-            d="
-              M102 92
-              Q110 84 120 84
-              Q130 84 138 92
-              L136 116
-              Q130 124 120 124
-              Q110 124 104 116
-              Z
-            "
-            fill={getRecoveryRegionColor(data, 'back')}
-          />
-
-          {/* shoulders */}
-          <path
-            d="
-              M88 96
-              Q98 88 110 90
-              L112 112
-              Q104 122 92 124
-              Q84 116 88 96
-              Z
-            "
-            fill={getRecoveryRegionColor(data, 'shoulders')}
-          />
-          <g transform={`translate(${centerX * 2} 0) scale(-1 1)`}>
-            <path
-              d="
-                M88 96
-                Q98 88 110 90
-                L112 112
-                Q104 122 92 124
-                Q84 116 88 96
-                Z
-              "
-              fill={getRecoveryRegionColor(data, 'shoulders')}
-            />
-          </g>
-
-          {/* side back / lats using legacy key: back */}
-          <path
-            d="
-              M92 124
-              Q102 130 106 146
-              L104 210
-              Q96 222 82 222
-              L78 182
-              Q80 144 92 124
-              Z
-            "
-            fill={getRecoveryRegionColor(data, 'back')}
-          />
-          <g transform={`translate(${centerX * 2} 0) scale(-1 1)`}>
-            <path
-              d="
-                M92 124
-                Q102 130 106 146
-                L104 210
-                Q96 222 82 222
-                L78 182
-                Q80 144 92 124
-                Z
-              "
-              fill={getRecoveryRegionColor(data, 'back')}
-            />
-          </g>
-
-          {/* triceps */}
-          <rect
-            x="54"
-            y="136"
-            width="16"
-            height="64"
-            rx="8"
-            fill={getRecoveryRegionColor(data, 'triceps')}
-          />
-          <g transform={`translate(${centerX * 2} 0) scale(-1 1)`}>
-            <rect
-              x="54"
-              y="136"
-              width="16"
-              height="64"
-              rx="8"
-              fill={getRecoveryRegionColor(data, 'triceps')}
-            />
-          </g>
-
-          {/* lower back */}
-          <path
-            d="
-              M108 154
-              Q114 148 120 148
-              Q126 148 132 154
-              L136 228
-              Q130 242 120 248
-              Q110 242 104 228
-              Z
-            "
-            fill={getRecoveryRegionColor(data, 'lowerBack')}
-          />
-
-          {/* glutes */}
-          <path
-            d="
-              M100 338
-              Q110 330 120 330
-              Q130 330 140 338
-              L142 362
-              Q134 372 120 372
-              Q106 372 98 362
-              Z
-            "
-            fill={getRecoveryRegionColor(data, 'glutes')}
-          />
-
-          {/* hamstrings */}
-          <rect
-            x="96"
-            y="392"
-            width="18"
-            height="76"
-            rx="9"
-            fill={getRecoveryRegionColor(data, 'hamstrings')}
-          />
-          <rect
-            x="126"
-            y="392"
-            width="18"
-            height="76"
-            rx="9"
-            fill={getRecoveryRegionColor(data, 'hamstrings')}
-          />
-
-          {/* calves */}
-          <rect
-            x="98"
-            y="470"
-            width="14"
-            height="30"
-            rx="7"
-            fill={getRecoveryRegionColor(data, 'calves')}
-          />
-          <rect
-            x="128"
-            y="470"
-            width="14"
-            height="30"
-            rx="7"
-            fill={getRecoveryRegionColor(data, 'calves')}
-          />
-        </g>
       </g>
+
+      {/* forearms */}
+      <rect
+        x="40"
+        y="174"
+        width="18"
+        height="60"
+        rx="9"
+        fill={baseFill}
+        stroke={baseStroke}
+        strokeWidth={baseStrokeWidth}
+      />
+      <g transform={`translate(${cx * 2} 0) scale(-1 1)`}>
+        <rect
+          x="40"
+          y="174"
+          width="18"
+          height="60"
+          rx="9"
+          fill={baseFill}
+          stroke={baseStroke}
+          strokeWidth={baseStrokeWidth}
+        />
+      </g>
+
+      {/* hamstrings base */}
+      <path
+        d="
+          M100 292
+          L116 292
+          L116 344
+          Q110 350 104 350
+          Q99 346 99 338
+          Z
+        "
+        fill={baseFill}
+        stroke={baseStroke}
+        strokeWidth={baseStrokeWidth}
+      />
+      <path
+        d="
+          M140 292
+          L124 292
+          L124 344
+          Q130 350 136 350
+          Q141 346 141 338
+          Z
+        "
+        fill={baseFill}
+        stroke={baseStroke}
+        strokeWidth={baseStrokeWidth}
+      />
+
+      {/* calves base */}
+      <rect
+        x="103"
+        y="342"
+        width="10"
+        height="14"
+        rx="5"
+        fill={baseFill}
+        stroke={baseStroke}
+        strokeWidth={baseStrokeWidth}
+      />
+      <rect
+        x="127"
+        y="342"
+        width="10"
+        height="14"
+        rx="5"
+        fill={baseFill}
+        stroke={baseStroke}
+        strokeWidth={baseStrokeWidth}
+      />
+
+      {/* traps */}
+      <path
+        d="
+          M103 66
+          Q111 60 120 60
+          Q129 60 137 66
+          L135 86
+          Q129 96 120 96
+          Q111 96 105 86
+          Z
+        "
+        fill={backColor}
+        stroke="#ffffff"
+        strokeWidth="2"
+      />
+
+      {/* shoulders */}
+      <path
+        d="
+          M78 68
+          Q90 60 106 60
+          L108 86
+          Q100 96 88 98
+          Q78 92 78 68
+          Z
+        "
+        fill={getRecoveryRegionColor(data, 'shoulders')}
+        stroke="#ffffff"
+        strokeWidth="2"
+      />
+      <g transform={`translate(${cx * 2} 0) scale(-1 1)`}>
+        <path
+          d="
+            M78 68
+            Q90 60 106 60
+            L108 86
+            Q100 96 88 98
+            Q78 92 78 68
+            Z
+          "
+          fill={getRecoveryRegionColor(data, 'shoulders')}
+          stroke="#ffffff"
+          strokeWidth="2"
+        />
+      </g>
+
+      {/* lats */}
+      <path
+        d="
+          M90 96
+          Q101 106 106 122
+          L105 186
+          Q98 198 88 198
+          L84 162
+          Q84 114 90 96
+          Z
+        "
+        fill={backColor}
+        stroke="#ffffff"
+        strokeWidth="2"
+      />
+      <g transform={`translate(${cx * 2} 0) scale(-1 1)`}>
+        <path
+          d="
+            M90 96
+            Q101 106 106 122
+            L105 186
+            Q98 198 88 198
+            L84 162
+            Q84 114 90 96
+            Z
+          "
+          fill={backColor}
+          stroke="#ffffff"
+          strokeWidth="2"
+        />
+      </g>
+
+      {/* arms */}
+      <rect
+        x="41"
+        y="112"
+        width="12"
+        height="76"
+        rx="6"
+        fill={armsColor}
+        stroke="#ffffff"
+        strokeWidth="2"
+      />
+      <g transform={`translate(${cx * 2} 0) scale(-1 1)`}>
+        <rect
+          x="41"
+          y="112"
+          width="12"
+          height="76"
+          rx="6"
+          fill={armsColor}
+          stroke="#ffffff"
+          strokeWidth="2"
+        />
+      </g>
+
+      {/* lower back */}
+      <path
+        d="
+          M109 124
+          Q114 120 120 120
+          Q126 120 131 124
+          L134 186
+          Q130 196 120 204
+          Q110 196 106 186
+          Z
+        "
+        fill={getRecoveryRegionColor(data, 'lowerBack')}
+        stroke="#ffffff"
+        strokeWidth="2"
+      />
+
+      {/* glutes */}
+      <path
+        d="
+          M102 262
+          Q110 256 120 256
+          Q130 256 138 262
+          L140 282
+          Q132 290 120 290
+          Q108 290 100 282
+          Z
+        "
+        fill={getRecoveryRegionColor(data, 'glutes')}
+        stroke="#ffffff"
+        strokeWidth="2"
+      />
+
+      {/* hamstrings */}
+      <path
+        d="
+          M101 290
+          L116 290
+          L116 340
+          Q110 346 104 346
+          Q100 342 100 334
+          Z
+        "
+        fill={getRecoveryRegionColor(data, 'hamstrings')}
+        stroke="#ffffff"
+        strokeWidth="2"
+      />
+      <path
+        d="
+          M139 290
+          L124 290
+          L124 340
+          Q130 346 136 346
+          Q140 342 140 334
+          Z
+        "
+        fill={getRecoveryRegionColor(data, 'hamstrings')}
+        stroke="#ffffff"
+        strokeWidth="2"
+      />
+
+      {/* calves */}
+      <rect
+        x="103"
+        y="342"
+        width="10"
+        height="12"
+        rx="5"
+        fill={getRecoveryRegionColor(data, 'calves')}
+        stroke="#ffffff"
+        strokeWidth="2"
+      />
+      <rect
+        x="127"
+        y="342"
+        width="10"
+        height="12"
+        rx="5"
+        fill={getRecoveryRegionColor(data, 'calves')}
+        stroke="#ffffff"
+        strokeWidth="2"
+      />
     </svg>
   )
 }
