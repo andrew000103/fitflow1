@@ -89,11 +89,11 @@ function ProfilePage() {
         <article className="content-card">
           <span className="card-kicker">My menus</span>
           <div className="profile-menu-grid">
-            <Link className="template-chip" to="/history">
+            <Link className="template-chip" to="/history/calendar">
               <strong>🏋️ 내 운동 기록</strong>
               <span>{sessions.length}개 세션을 회고합니다.</span>
             </Link>
-            <Link className="template-chip" to="/nutrition">
+            <Link className="template-chip" to="/nutrition/diary">
               <strong>🍽️ 내 식단 기록</strong>
               <span>{meals.length}개 식단 기록을 관리합니다.</span>
             </Link>
@@ -101,7 +101,7 @@ function ProfilePage() {
               <strong>📚 내 프로그램</strong>
               <span>{programs.length}개 프로그램을 관리합니다.</span>
             </Link>
-            <Link className="template-chip" to="/community">
+            <Link className="template-chip" to="/community/feed">
               <strong>🔖 저장한 게시물</strong>
               <span>커뮤니티 피드에서 저장 콘텐츠를 모아봅니다.</span>
             </Link>

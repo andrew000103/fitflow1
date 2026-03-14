@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import {
   categoryLabels,
@@ -47,6 +47,32 @@ const navigation = [
   { to: '/analytics', label: 'Analytics', icon: '📈' },
   { to: '/profile', label: 'Profile', icon: '🙂' },
 ]
+
+function getSectionMeta(pathname) {
+  if (pathname.startsWith('/train/workout')) {
+    return { title: 'Active workout', subtitle: '기록을 멈추지 않고 바로 이어갑니다.' }
+  }
+  if (pathname.startsWith('/train')) {
+    return { title: 'Train', subtitle: '오늘 운동을 가장 빠르게 시작합니다.' }
+  }
+  if (pathname.startsWith('/nutrition')) {
+    return { title: 'Nutrition', subtitle: '반복 입력을 줄이고 빠르게 기록합니다.' }
+  }
+  if (pathname.startsWith('/history')) {
+    return { title: 'History', subtitle: '날짜를 고르고 필요한 기록만 다시 봅니다.' }
+  }
+  if (pathname.startsWith('/analytics')) {
+    return { title: 'Analytics', subtitle: '요약부터 보고 필요한 리포트로 내려갑니다.' }
+  }
+  if (pathname.startsWith('/community')) {
+    return { title: 'Community', subtitle: '피드와 반응은 필요한 화면에서 확인합니다.' }
+  }
+  if (pathname.startsWith('/profile')) {
+    return { title: 'Profile', subtitle: '내 정보와 관리 메뉴를 모아둔 공간입니다.' }
+  }
+
+  return { title: 'FitFlow', subtitle: '운동, 식단, 분석을 한 흐름으로 연결합니다.' }
+}
 
 function formatLocalDate(date = new Date()) {
   const year = date.getFullYear()
@@ -113,6 +139,8 @@ const defaultCommentsByPost = {
 }
 
 function DashboardLayout() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [persistedState] = useState(() => loadDashboardState())
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -993,6 +1021,11 @@ function DashboardLayout() {
     weeklyData,
   }
 
+  const currentSection = getSectionMeta(location.pathname)
+  const activeWorkoutMinutes = activeWorkout
+    ? Math.max(1, Math.floor((nowTick - activeWorkout.startedAt) / 60000))
+    : 0
+
   return (
     <div className="dashboard-shell">
       <aside className={sidebarOpen ? `sidebar is-open${sidebarCollapsed ? ' is-collapsed' : ''}` : `sidebar${sidebarCollapsed ? ' is-collapsed' : ''}`}>
@@ -1050,9 +1083,20 @@ function DashboardLayout() {
           </button>
 
           <div className="topbar-copy">
-            <strong>FitFlow MVP IA</strong>
-            <span>Community / History / Train / Nutrition / Analytics / Profile</span>
+            <strong>{currentSection.title}</strong>
+            <span>{currentSection.subtitle}</span>
           </div>
+
+          {activeWorkout ? (
+            <button
+              type="button"
+              className="topbar-workout-pill"
+              onClick={() => navigate('/train/workout')}
+            >
+              <span>🏋️ {activeWorkout.title}</span>
+              <strong>{activeWorkoutMinutes}m</strong>
+            </button>
+          ) : null}
         </header>
 
         <main className="content-main">

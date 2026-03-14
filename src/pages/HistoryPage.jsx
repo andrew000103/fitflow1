@@ -188,8 +188,8 @@ function HistoryPage() {
                     <strong>{session.title}</strong>
                     <span className="pill-tag">{session.prCount} PR</span>
                   </div>
-                  <span>{session.date} · {session.durationMinutes} min</span>
-                  <span>총 볼륨 {session.totalVolume.toLocaleString()} kg · 칼로리 {session.calories} kcal</span>
+                  <span>{session.durationMinutes} min · 총 볼륨 {session.totalVolume.toLocaleString()} kg</span>
+                  <span>칼로리 {session.calories} kcal · 컨디션 {session.condition}</span>
                   <div className="history-preview-list">
                     {session.exercises.slice(0, 3).map((exercise) => (
                       <span key={exercise.name}>
@@ -265,8 +265,11 @@ function HistoryPage() {
       )}
 
       {selectedSession && (
-        <article className="content-card">
-          <span className="card-kicker">⏱️ Full workout timeline</span>
+        <details className="content-card history-deep-dive">
+          <summary>
+            <span>⏱️ Full workout timeline</span>
+            <span>세트별 기록과 변화량 보기</span>
+          </summary>
           <div className="session-exercise-stack">
             {selectedSession.exercises.map((exercise) => (
               <div className="session-exercise-card" key={exercise.name}>
@@ -308,8 +311,17 @@ function HistoryPage() {
               </div>
             ))}
           </div>
-        </article>
+        </details>
       )}
+
+      <div className="sticky-cta-bar">
+        <Link className="inline-action" to="/analytics/overview">
+          Open analytics
+        </Link>
+        <Link className="inline-action primary-dark" to="/nutrition/diary">
+          Review nutrition
+        </Link>
+      </div>
     </section>
   )
 }

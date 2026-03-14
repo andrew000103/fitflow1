@@ -233,37 +233,10 @@ function NutritionHubPage({ entry }) {
         <article className="content-card">
           <div className="feed-head">
             <div>
-              <span className="card-kicker">⚡ Record methods</span>
-              <h2>빠른 입력</h2>
+              <span className="card-kicker">⚡ Quick add</span>
+              <h2>가장 자주 하는 기록부터</h2>
             </div>
-            <div className="program-chip-list">
-              <button className="inline-action" type="button" onClick={() => setSearchPanelOpen((current) => !current)}>
-                {searchPanelOpen ? '검색 닫기' : '음식 검색'}
-              </button>
-              <button className="inline-action" type="button" onClick={() => setManualEntryOpen((current) => !current)}>
-                {manualEntryOpen ? '직접입력 닫기' : '직접 입력'}
-              </button>
-            </div>
-          </div>
-          <div className="program-chip-list">
-            <button className="template-chip" type="button" onClick={() => setSearchTab('recent')}>
-              <strong>🕘 최근 먹은 음식</strong>
-              <span>반복 입력 최소화</span>
-            </button>
-            <button className="template-chip" type="button" onClick={() => setSelectedFood(favoriteFoods[0] || foodSuggestions[0])}>
-              <strong>⭐ 즐겨찾기</strong>
-              <span>자주 먹는 음식 우선</span>
-            </button>
-          </div>
-          <div className="mini-panel">📷 바코드 스캔 / 🤳 사진 인식 AI는 확장 예정입니다.</div>
-        </article>
-      </div>
-
-      <article className="content-card">
-        <div className="feed-head">
-          <div>
-            <span className="card-kicker">🍱 Meal sections</span>
-            <h2>식사 구간별 기록</h2>
+            <span className="mini-panel">현재 식사: {mealSections.find((section) => section.key === activeMealType)?.label}</span>
           </div>
           <div className="program-chip-list">
             {mealSections.map((section) => (
@@ -277,82 +250,100 @@ function NutritionHubPage({ entry }) {
               </button>
             ))}
           </div>
+          <div className="quick-add-grid">
+            {recentFoods.slice(0, 4).map((item) => (
+              <button
+                key={`${item.name}-quick`}
+                type="button"
+                className="quick-add-card"
+                onClick={() => {
+                  setSelectedFood(item)
+                  addMeal({
+                    name: item.name,
+                    calories: item.calories,
+                    protein: item.protein,
+                    carbs: item.carbs || 0,
+                    fat: item.fat || 0,
+                    mealType: activeMealType,
+                    favorite: item.favorite,
+                    serving: 1,
+                    loggedDate: todayIso,
+                  })
+                }}
+              >
+                <strong>{item.name}</strong>
+                <span>{item.calories} kcal · 빠른 추가</span>
+              </button>
+            ))}
+            {favoriteFoods.slice(0, 2).map((item) => (
+              <button
+                key={`${item.name}-fav`}
+                type="button"
+                className="quick-add-card"
+                onClick={() => {
+                  setSelectedFood(item)
+                  addMeal({
+                    name: item.name,
+                    calories: item.calories,
+                    protein: item.protein,
+                    carbs: item.carbs || 0,
+                    fat: item.fat || 0,
+                    mealType: activeMealType,
+                    favorite: item.favorite,
+                    serving: 1,
+                    loggedDate: todayIso,
+                  })
+                }}
+              >
+                <strong>⭐ {item.name}</strong>
+                <span>{item.calories} kcal · 즐겨찾기</span>
+              </button>
+            ))}
+          </div>
+        </article>
+      </div>
+
+      <article className="content-card">
+        <div className="feed-head">
+          <div>
+            <span className="card-kicker">🍱 Meal sections</span>
+            <h2>식사 구간별 기록</h2>
+          </div>
+          <span className="mini-panel">간단한 기록은 위의 Quick Add에서, 세부 기록은 아래에서 이어집니다.</span>
         </div>
         <div className="meal-section-grid">
           {mealGroups.map((section) => (
-            <div className="meal-section-card" key={section.key}>
-              <div className="feed-head">
+            <details className="meal-section-card is-detail" key={section.key} open={activeMealType === section.key}>
+              <summary className="meal-section-summary">
                 <strong>{section.icon} {section.label}</strong>
                 <span>{section.items.reduce((sum, item) => sum + item.calories, 0)} kcal</span>
+              </summary>
+              <div className="meal-section-body">
+                <div className="program-chip-list">
+                  <button className="inline-action" type="button" onClick={() => setActiveMealType(section.key)}>
+                    Add here
+                  </button>
+                </div>
+                <div className="simple-list">
+                  {section.items.length > 0 ? (
+                    section.items.map((meal) => (
+                      <div className="simple-row compact" key={meal.id}>
+                        <strong>{meal.name}</strong>
+                        <span>{meal.calories} kcal · C {meal.carbs} / P {meal.protein} / F {meal.fat}</span>
+                        <span>{meal.createdAt}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="mini-panel">아직 기록이 없습니다.</div>
+                  )}
+                </div>
               </div>
-              <div className="simple-list">
-                {section.items.length > 0 ? (
-                  section.items.map((meal) => (
-                    <div className="simple-row" key={meal.id}>
-                      <strong>{meal.name}</strong>
-                      <span>{meal.calories} kcal · C {meal.carbs} / P {meal.protein} / F {meal.fat}</span>
-                      <span>{meal.createdAt}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="mini-panel">아직 기록이 없습니다.</div>
-                )}
-              </div>
-            </div>
+            </details>
           ))}
         </div>
       </article>
 
       <div className="card-grid split">
-        {searchPanelOpen ? (
-        <article className="content-card">
-          <span className="card-kicker">🔎 Food search</span>
-          <label className="field-label">
-            Search
-            <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="예: poke, chicken, shake" />
-          </label>
-          <div className="program-chip-list">
-            {searchTabs.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                className={searchTab === tab.key ? 'inline-action active-soft' : 'inline-action'}
-                onClick={() => setSearchTab(tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <div className="bullet-stack">
-            <strong>최근 검색</strong>
-            <div className="program-chip-list">
-              {recentSearches.map((item) => (
-                <button key={item} type="button" className="pill-tag" onClick={() => setSearchQuery(item)}>
-                  🔍 {item}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="database-list">
-            {searchableFoods.map((item) => (
-              <button key={item.name} type="button" className="database-row" onClick={() => handleFoodSelect(item)}>
-                <span className="database-icon">🍴</span>
-                <div className="database-copy">
-                  <strong>{item.name}</strong>
-                  <span>{item.calories} kcal · C {item.carbs || 0} / P {item.protein} / F {item.fat || 0}</span>
-                </div>
-                <span className="pill-tag">{item.mealType || 'meal'}</span>
-              </button>
-            ))}
-          </div>
-        </article>
-        ) : (
-          <article className="content-card">
-            <span className="card-kicker">🔎 Food search</span>
-            <div className="mini-panel">음식 검색은 필요할 때만 펼쳐서 사용할 수 있게 정리했습니다.</div>
-          </article>
-        )}
-
         <article className="content-card">
           <span className="card-kicker">➕ Add selected food</span>
           {selectedFood ? (
@@ -389,58 +380,109 @@ function NutritionHubPage({ entry }) {
           ) : (
             <div className="mini-panel">왼쪽에서 음식을 선택하세요.</div>
           )}
+        </article>
 
-          {manualEntryOpen ? (
-            <form className="stack-form" onSubmit={handleManualSubmit}>
-              <span className="card-kicker">✍️ Direct entry</span>
+        <article className="content-card">
+          <details open={searchPanelOpen} className="drawer-card">
+            <summary onClick={() => setSearchPanelOpen((current) => !current)}>
+              <span>🔎 Food search</span>
+              <span>{searchPanelOpen ? 'Hide' : 'Open'}</span>
+            </summary>
+            <div className="drawer-card-body">
               <label className="field-label">
-                Food name
-                <input
-                  value={manualForm.name}
-                  onChange={(event) => setManualForm((current) => ({ ...current, name: event.target.value }))}
-                />
+                Search
+                <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="예: poke, chicken, shake" />
               </label>
-              <div className="compact-grid">
-                <label className="field-label">
-                  Calories
-                  <input
-                    value={manualForm.calories}
-                    inputMode="numeric"
-                    onChange={(event) => setManualForm((current) => ({ ...current, calories: event.target.value }))}
-                  />
-                </label>
-                <label className="field-label">
-                  Protein
-                  <input
-                    value={manualForm.protein}
-                    inputMode="numeric"
-                    onChange={(event) => setManualForm((current) => ({ ...current, protein: event.target.value }))}
-                  />
-                </label>
-                <label className="field-label">
-                  Carbs
-                  <input
-                    value={manualForm.carbs}
-                    inputMode="numeric"
-                    onChange={(event) => setManualForm((current) => ({ ...current, carbs: event.target.value }))}
-                  />
-                </label>
-                <label className="field-label">
-                  Fat
-                  <input
-                    value={manualForm.fat}
-                    inputMode="numeric"
-                    onChange={(event) => setManualForm((current) => ({ ...current, fat: event.target.value }))}
-                  />
-                </label>
+              <div className="program-chip-list">
+                {searchTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    className={searchTab === tab.key ? 'inline-action active-soft' : 'inline-action'}
+                    onClick={() => setSearchTab(tab.key)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
-              <button className="inline-action" type="submit">
-                직접 추가
-              </button>
-            </form>
-          ) : (
-            <div className="mini-panel">직접 입력은 필요할 때만 펼쳐서 사용합니다.</div>
-          )}
+              <div className="program-chip-list">
+                {recentSearches.map((item) => (
+                  <button key={item} type="button" className="pill-tag" onClick={() => setSearchQuery(item)}>
+                    🔍 {item}
+                  </button>
+                ))}
+              </div>
+              <div className="database-list">
+                {searchableFoods.map((item) => (
+                  <button key={item.name} type="button" className="database-row" onClick={() => handleFoodSelect(item)}>
+                    <span className="database-icon">🍴</span>
+                    <div className="database-copy">
+                      <strong>{item.name}</strong>
+                      <span>{item.calories} kcal · C {item.carbs || 0} / P {item.protein} / F {item.fat || 0}</span>
+                    </div>
+                    <span className="pill-tag">{item.mealType || 'meal'}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </details>
+
+          <details open={manualEntryOpen} className="drawer-card">
+            <summary onClick={() => setManualEntryOpen((current) => !current)}>
+              <span>✍️ Direct entry</span>
+              <span>{manualEntryOpen ? 'Hide' : 'Open'}</span>
+            </summary>
+            <div className="drawer-card-body">
+              <form className="stack-form" onSubmit={handleManualSubmit}>
+                <label className="field-label">
+                  Food name
+                  <input
+                    value={manualForm.name}
+                    onChange={(event) => setManualForm((current) => ({ ...current, name: event.target.value }))}
+                  />
+                </label>
+                <div className="compact-grid">
+                  <label className="field-label">
+                    Calories
+                    <input
+                      value={manualForm.calories}
+                      inputMode="numeric"
+                      onChange={(event) => setManualForm((current) => ({ ...current, calories: event.target.value }))}
+                    />
+                  </label>
+                  <label className="field-label">
+                    Protein
+                    <input
+                      value={manualForm.protein}
+                      inputMode="numeric"
+                      onChange={(event) => setManualForm((current) => ({ ...current, protein: event.target.value }))}
+                    />
+                  </label>
+                  <label className="field-label">
+                    Carbs
+                    <input
+                      value={manualForm.carbs}
+                      inputMode="numeric"
+                      onChange={(event) => setManualForm((current) => ({ ...current, carbs: event.target.value }))}
+                    />
+                  </label>
+                  <label className="field-label">
+                    Fat
+                    <input
+                      value={manualForm.fat}
+                      inputMode="numeric"
+                      onChange={(event) => setManualForm((current) => ({ ...current, fat: event.target.value }))}
+                    />
+                  </label>
+                </div>
+                <button className="inline-action" type="submit">
+                  직접 추가
+                </button>
+              </form>
+            </div>
+          </details>
+
+          <div className="mini-panel">📷 바코드 스캔 / 🤳 사진 인식 AI는 확장 예정입니다.</div>
         </article>
       </div>
 
@@ -455,6 +497,16 @@ function NutritionHubPage({ entry }) {
           이전 탭으로 돌아가기
         </Link>
       </article>
+
+      <div className="sticky-cta-bar">
+        <div>
+          <strong>{mealSections.find((section) => section.key === activeMealType)?.label}</strong>
+          <span className="mini-caption">선택된 음식 또는 직접 입력으로 바로 추가합니다.</span>
+        </div>
+        <button className="inline-action primary-dark" type="button" onClick={handleAddSelectedFood}>
+          Add meal
+        </button>
+      </div>
     </section>
   )
 }
