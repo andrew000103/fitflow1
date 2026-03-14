@@ -974,7 +974,7 @@ body[data-theme='dark'] .connect-modal-backdrop {
 
 .train-launch-primary strong {
   color: #ffffff;
-  font-size: clamp(1.38rem, 2vw, 1.72rem);
+  font-size: clamp(1.56rem, 2.3vw, 1.96rem);
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1.08;
