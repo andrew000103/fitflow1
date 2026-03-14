@@ -64,7 +64,7 @@ function AnalyticsPerformancePage() {
 
       <div className="sticky-cta-bar">
         <span>다음으로 회복 상태와 AI 추천을 확인합니다.</span>
-        <Link className="inline-action" to="/analytics/recovery">
+        <Link className="inline-action" to="/profile/me">
           Recovery & AI
         </Link>
       </div>

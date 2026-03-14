@@ -1,7 +1,17 @@
+import { useMemo } from 'react'
 import AppIcon from '../components/AppIcon.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import { Link, useOutletContext } from 'react-router-dom'
 import buildAnalyticsViewModel from '../components/analytics/buildAnalyticsViewModel.js'
+import BodyMapBack from '../components/bodymap/BodyMapBack.jsx'
+import BodyMapCard from '../components/bodymap/BodyMapCard.jsx'
+import BodyMapFront from '../components/bodymap/BodyMapFront.jsx'
+import MuscleLegend from '../components/bodymap/MuscleLegend.jsx'
+import {
+  calculateMuscleFatigue,
+  getRecoveryRecommendation,
+  normalizeMuscleScores,
+} from '../utils/muscleFatigue.js'
 
 function ProfilePage() {
   const context = useOutletContext()
@@ -21,6 +31,14 @@ function ProfilePage() {
     sessions,
   } = context
   const analytics = buildAnalyticsViewModel(context)
+  const normalizedMuscleScores = useMemo(
+    () => normalizeMuscleScores(calculateMuscleFatigue(sessions)),
+    [sessions],
+  )
+  const recoveryRecommendation = useMemo(
+    () => getRecoveryRecommendation(normalizedMuscleScores),
+    [normalizedMuscleScores],
+  )
 
   const currentWeight = 77.7
   const targetWeight = goal === 'diet' ? 74 : goal === 'bulk' ? 82 : 78
@@ -96,7 +114,7 @@ function ProfilePage() {
         <article className="content-card">
           <span className="card-kicker">My menus</span>
           <div className="profile-menu-grid">
-            <Link className="template-chip" to="/history/calendar">
+            <Link className="template-chip" to="/train/history">
               <strong>내 운동 기록</strong>
               <span>{sessions.length}개 세션을 회고합니다.</span>
             </Link>
@@ -169,8 +187,8 @@ function ProfilePage() {
               <div className="mini-panel">아직 작성한 게시물이 없습니다.</div>
             )}
           </div>
-          <Link className="inline-action" to="/community/feed">
-            Community로 이동
+          <Link className="inline-action" to="/connect/feed">
+            Connect로 이동
           </Link>
         </article>
 
@@ -233,12 +251,58 @@ function ProfilePage() {
           </div>
         </div>
         <div className="program-chip-list">
-          <Link className="inline-action" to="/history/calendar">
-            History 보기
+          <Link className="inline-action" to="/train/history">
+            Workout history 보기
           </Link>
           <Link className="inline-action" to="/nutrition/diary">
             Nutrition 보기
           </Link>
+        </div>
+      </article>
+
+      <article className="content-card">
+        <div className="feed-head">
+          <div>
+            <span className="card-kicker">Body fatigue map</span>
+            <h2>근육 피로도 시각화</h2>
+          </div>
+          <span className="pill-tag accent">7 days</span>
+        </div>
+
+        <div className="card-grid three-up">
+          <div className="mini-panel">
+            <strong>회복이 필요한 부위</strong>
+            <p>{recoveryRecommendation.shouldRest.map((item) => item.label).join(', ') || '없음'}</p>
+          </div>
+          <div className="mini-panel">
+            <strong>운동 가능한 부위</strong>
+            <p>{recoveryRecommendation.trainable.map((item) => item.label).join(', ') || '없음'}</p>
+          </div>
+          <div className="mini-panel">
+            <strong>최근 주요 사용 부위</strong>
+            <p>{recoveryRecommendation.primaryUsage.map((item) => item.label).join(', ') || '없음'}</p>
+          </div>
+        </div>
+
+        <div className="bodymap-layout">
+          <BodyMapCard title="Front" subtitle="앞면">
+            <BodyMapFront scores={normalizedMuscleScores} />
+          </BodyMapCard>
+          <BodyMapCard title="Back" subtitle="뒷면">
+            <BodyMapBack scores={normalizedMuscleScores} />
+          </BodyMapCard>
+        </div>
+
+        <MuscleLegend />
+
+        <div className="muscle-detail-list">
+          {recoveryRecommendation.rows.map((item) => (
+            <div className="muscle-detail-row" key={item.muscle}>
+              <strong>{item.label}</strong>
+              <span>{item.score}</span>
+              <span>{item.level}</span>
+            </div>
+          ))}
         </div>
       </article>
     </section>

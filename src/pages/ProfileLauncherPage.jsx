@@ -35,7 +35,7 @@ function ProfileLauncherPage() {
         <TrainActionCard
           to="/profile/me"
           title="My Profile"
-          subtitle="프로필, 내 글, 좋아요한 글, 분석 요약을 확인합니다."
+          subtitle="프로필, 내 글, 좋아요한 글, 인사이트를 확인합니다."
           icon="profile"
           cta="Open"
         />

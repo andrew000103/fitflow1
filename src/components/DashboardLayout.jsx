@@ -41,10 +41,9 @@ import {
 } from '../api/fitflowApi.ts'
 
 const navigation = [
-  { to: '/community', label: 'Community', icon: 'community' },
-  { to: '/history', label: 'History', icon: 'history' },
   { to: '/train', label: 'Train', icon: 'train' },
   { to: '/nutrition', label: 'Nutrition', icon: 'nutrition' },
+  { to: '/connect', label: 'Connect', icon: 'connect' },
   { to: '/shop', label: 'Shop', icon: 'shop' },
   { to: '/profile', label: 'Profile', icon: 'profile' },
 ]
@@ -53,23 +52,23 @@ function getSectionMeta(pathname) {
   if (pathname.startsWith('/train/workout')) {
     return { title: 'Active workout', subtitle: '기록을 멈추지 않고 바로 이어갑니다.' }
   }
+  if (pathname.startsWith('/train/history')) {
+    return { title: 'Train history', subtitle: '운동 기록과 세션 회고를 Train 안에서 바로 봅니다.' }
+  }
+  if (pathname.startsWith('/train/insights')) {
+    return { title: 'Train insights', subtitle: '성장 흐름과 회복 상태를 Train 흐름 안에서 확인합니다.' }
+  }
   if (pathname.startsWith('/train')) {
     return { title: 'Train', subtitle: '오늘 운동을 가장 빠르게 시작합니다.' }
   }
   if (pathname.startsWith('/nutrition')) {
     return { title: 'Nutrition', subtitle: '반복 입력을 줄이고 빠르게 기록합니다.' }
   }
+  if (pathname.startsWith('/connect')) {
+    return { title: 'Connect', subtitle: '피드와 반응은 필요한 화면에서 확인합니다.' }
+  }
   if (pathname.startsWith('/shop')) {
     return { title: 'Shop', subtitle: '프로그램 마켓과 구매 흐름이 들어올 공간입니다.' }
-  }
-  if (pathname.startsWith('/history')) {
-    return { title: 'History', subtitle: '날짜를 고르고 필요한 기록만 다시 봅니다.' }
-  }
-  if (pathname.startsWith('/analytics')) {
-    return { title: 'Analytics', subtitle: '요약부터 보고 필요한 리포트로 내려갑니다.' }
-  }
-  if (pathname.startsWith('/community')) {
-    return { title: 'Community', subtitle: '피드와 반응은 필요한 화면에서 확인합니다.' }
   }
   if (pathname.startsWith('/profile')) {
     return { title: 'Profile', subtitle: '내 정보와 관리 메뉴를 모아둔 공간입니다.' }
@@ -1083,7 +1082,7 @@ function DashboardLayout() {
           <span className="sidebar-mark">FF</span>
           <div className="sidebar-brand-copy">
             <strong>FitFlow</strong>
-            <p>Community, Train, Nutrition, AI</p>
+            <p>Connect, Train, Nutrition, AI</p>
           </div>
           <button
             type="button"

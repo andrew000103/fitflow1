@@ -1,6 +1,6 @@
 import './style.css'
-import javascriptLogo from './assets/javascript.svg'
-import viteLogo from './assets/vite.svg'
+import javascriptLogo from './assets/javascript-logo.svg'
+import viteLogo from './assets/vite-logo.svg'
 import heroImg from './assets/hero.png'
 import { setupCounter } from './counter.js'
 

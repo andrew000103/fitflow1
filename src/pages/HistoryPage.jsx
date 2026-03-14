@@ -103,7 +103,7 @@ function HistoryPage() {
   return (
     <section className="page-section">
       <PageHeader
-        eyebrow="History"
+        eyebrow="Train / History"
         title="캘린더와 세션 디테일로 운동 기록을 다시 보고 싶게 만드는 화면"
         description="월간 캘린더에서 운동한 날을 확인하고, 날짜별 세션 카드와 세트 타임라인으로 변화량까지 따라갈 수 있습니다."
       />

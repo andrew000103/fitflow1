@@ -1,0 +1,16 @@
+export const MUSCLE_RECOVERY_RATES = {
+  chest: 0.78,
+  frontDelts: 0.76,
+  middleDelts: 0.74,
+  rearDelts: 0.76,
+  biceps: 0.72,
+  triceps: 0.72,
+  abs: 0.7,
+  lats: 0.8,
+  upperBack: 0.8,
+  lowerBack: 0.84,
+  glutes: 0.8,
+  quadriceps: 0.82,
+  hamstrings: 0.82,
+  calves: 0.76,
+}

@@ -8,8 +8,8 @@ function CommunityLauncherPage() {
   return (
     <section className="page-section">
       <PageHeader
-        eyebrow="Community"
-        title="Community"
+        eyebrow="Connect"
+        title="Connect"
         description="피드를 탐색하거나 인기글과 추천 사용자를 필요한 화면에서 확인합니다."
       />
 
@@ -28,14 +28,14 @@ function CommunityLauncherPage() {
 
       <div className="train-action-grid">
         <TrainActionCard
-          to="/community/feed"
+          to="/connect/feed"
           title="Open Feed"
           subtitle="For You와 Following 피드를 보고 반응합니다."
           icon="feed"
           cta="Browse"
         />
         <TrainActionCard
-          to="/community/feed"
+          to="/connect/feed"
           title="Hot Posts"
           subtitle="일간, 주간, 월간 인기글을 확인합니다."
           icon="hot"

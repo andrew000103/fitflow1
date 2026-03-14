@@ -1005,6 +1005,45 @@
   gap: 12px;
 }
 
+.image-result-grid,
+.image-result-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.image-result-card {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.image-result-preview {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #f3f4f6;
+}
+
+.image-result-copy span,
+.image-result-copy small {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+
+.image-error-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(220, 38, 38, 0.12);
+  border-radius: 14px;
+  background: rgba(254, 242, 242, 0.92);
+  color: #991b1b;
+}
+
 .composer-card,
 .post-card,
 .side-card {
@@ -1430,6 +1469,95 @@
   background: var(--accent);
 }
 
+.bodymap-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.bodymap-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.84);
+  align-content: start;
+  min-height: 400px;
+}
+
+.bodymap-frame {
+  min-height: 336px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  justify-items: center;
+  padding: 10px 4px 0;
+}
+
+.bodymap-svg {
+  width: min(100%, 292px);
+  height: auto;
+  max-width: 292px;
+  margin: 0 auto;
+  display: block;
+  flex: none;
+}
+
+.bodymap-layer {
+  isolation: isolate;
+}
+
+.bodymap-outline {
+  fill: rgba(255, 255, 255, 0.94);
+  stroke: #cfd5df;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.bodymap-muscles path {
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.muscle-legend,
+.muscle-detail-list {
+  display: grid;
+  gap: 10px;
+}
+
+.muscle-legend-bar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.muscle-legend-bar span {
+  height: 10px;
+  border-radius: 999px;
+}
+
+.muscle-legend-labels {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+
+.muscle-detail-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.5fr 0.5fr;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
 @media (max-width: 960px) {
   .card-grid.four-up,
   .card-grid.three-up,
@@ -1443,6 +1571,7 @@
   .exercise-stats,
   .exercise-stats.compact,
   .summary-grid,
+  .bodymap-layout,
   .calendar-grid,
   .method-grid,
   .meal-section-grid,
@@ -1453,6 +1582,11 @@
   .profile-menu-grid,
   .community-layout {
     grid-template-columns: 1fr;
+  }
+
+  .bodymap-svg {
+    width: min(100%, 248px);
+    max-width: 248px;
   }
 }
 

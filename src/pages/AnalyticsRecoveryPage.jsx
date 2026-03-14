@@ -72,7 +72,7 @@ function AnalyticsRecoveryPage() {
 
       <div className="sticky-cta-bar">
         <span>섭취 기록과 순칼로리를 함께 확인하면 해석이 더 정확해집니다.</span>
-        <Link className="inline-action" to="/analytics/nutrition">
+        <Link className="inline-action" to="/profile/nutrition">
           Nutrition Summary
         </Link>
       </div>

@@ -88,10 +88,10 @@ function AnalyticsPage() {
       <div className="sticky-cta-bar">
         <span>더 자세한 성장 흐름과 회복 분석은 세부 리포트에서 확인합니다.</span>
         <div className="program-chip-list">
-          <Link className="inline-action" to="/analytics/performance">
+          <Link className="inline-action" to="/profile/me">
             Performance Trends
           </Link>
-          <Link className="inline-action" to="/analytics/recovery">
+          <Link className="inline-action" to="/profile/me">
             Recovery & AI
           </Link>
         </div>

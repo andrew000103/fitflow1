@@ -60,7 +60,7 @@ function NutritionLauncherPage() {
           Recent foods
         </Link>
         <Link className="pill-tag" to="/profile/me">
-          Nutrition summary
+          Profile insights
         </Link>
       </div>
     </section>

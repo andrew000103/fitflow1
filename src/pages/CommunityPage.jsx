@@ -1,6 +1,7 @@
 import PageHeader from '../components/PageHeader.jsx'
 import { useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import ImageStudioCard from '../components/images/ImageStudioCard.jsx'
 
 const feedTabs = ['for-you', 'following']
 const rankingTabs = ['daily', 'weekly', 'monthly']
@@ -168,7 +169,7 @@ function CommunityPage() {
   return (
     <section className="page-section">
       <PageHeader
-        eyebrow="Community"
+        eyebrow="Connect"
         title="기록과 동기부여가 자연스럽게 이어지는 피드"
         description="핵심 액션은 빠르게 접근하고, 나머지 정보는 정돈해서 보이도록 커뮤니티 화면을 다시 구성했습니다."
       />
@@ -445,7 +446,9 @@ function CommunityPage() {
         </div>
 
         <aside className="community-side">
-                  <article className="content-card side-card">
+          <ImageStudioCard />
+
+          <article className="content-card side-card">
             <span className="card-kicker">AI picks</span>
             <div className="mini-panel">{aiCoach.communityTitle}</div>
             <div className="mini-panel">{aiCoach.community}</div>
