@@ -1,14 +1,12 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import AppIcon from './AppIcon.jsx'
+import { useAuth } from '../features/auth/useAuth.js'
 import {
   categoryLabels,
   exerciseDatabaseSeed,
   foodSuggestions,
-  initialMeals,
   initialPosts,
-  initialSessions,
-  initialSets,
   programs as initialPrograms,
   quickTemplates,
   weeklyData,
@@ -47,10 +45,11 @@ import {
 import { findFoodMergeCandidate } from '../utils/foodDeduplication.js'
 import { getFoodAllNames } from '../utils/foodNaming.js'
 import { tx } from '../utils/appLanguage.js'
+import { buildMacroTargets } from '../utils/macroTargets.js'
 
 function getNavigation(language) {
   return [
-    { to: '/train', label: tx(language, '운동', 'Train'), icon: 'train' },
+    { to: '/train', label: tx(language, '운동', 'Workout'), icon: 'train' },
     { to: '/nutrition', label: tx(language, '식단', 'Nutrition'), icon: 'nutrition' },
     { to: '/connect', label: tx(language, '커넥트', 'Connect'), icon: 'connect' },
     { to: '/shop', label: tx(language, '스토어', 'Shop'), icon: 'shop' },
@@ -67,8 +66,8 @@ function getSectionMeta(pathname, language) {
   }
   if (pathname.startsWith('/train/history')) {
     return {
-      title: tx(language, '운동 기록', 'Train History'),
-      subtitle: tx(language, '운동 기록과 세션 회고를 Train 안에서 바로 봅니다.', 'Review sessions and workout history inside Train.'),
+      title: tx(language, '운동 기록', 'Workout History'),
+      subtitle: tx(language, '운동 기록과 세션 회고를 Workout 안에서 바로 봅니다.', 'Review sessions and workout history inside Workout.'),
     }
   }
   if (pathname.startsWith('/train/insights')) {
@@ -85,7 +84,7 @@ function getSectionMeta(pathname, language) {
   }
   if (pathname.startsWith('/train')) {
     return {
-      title: tx(language, '운동', 'Train'),
+      title: tx(language, '운동', 'Workout'),
       subtitle: tx(language, '오늘 운동을 가장 빠르게 시작합니다.', 'Start today workout as fast as possible.'),
     }
   }
@@ -116,8 +115,17 @@ function getSectionMeta(pathname, language) {
 
   return {
     title: 'FitFlow',
-    subtitle: tx(language, '운동, 식단, 분석을 한 흐름으로 연결합니다.', 'Train, nutrition, and analytics in one flow.'),
+    subtitle: tx(language, '운동, 식단, 분석을 한 흐름으로 연결합니다.', 'Workout, nutrition, and analytics in one flow.'),
   }
+}
+
+function getStoredLanguage() {
+  if (typeof window === 'undefined') {
+    return 'ko'
+  }
+
+  const storedLanguage = window.localStorage.getItem('fitflow_language')
+  return storedLanguage === 'en' ? 'en' : 'ko'
 }
 
 function isPrimaryTabRoute(pathname) {
@@ -324,7 +332,7 @@ function buildSessionMetrics(session) {
 function createDefaultUserProfile(goal = 'maintain') {
   return {
     name: 'Donghyun An',
-    bio: 'Train, Nutrition, FF Trainer에서 쓰는 개인 설정을 관리합니다.',
+    bio: 'Workout, Nutrition, FF Trainer에서 쓰는 개인 설정을 관리합니다.',
     sex: 'male',
     age: 29,
     heightCm: 178,
@@ -336,17 +344,18 @@ function createDefaultUserProfile(goal = 'maintain') {
     notificationsEnabled: true,
     monthlyWeightReminderEnabled: true,
     nutritionPreference: 'balanced',
+    macroRatioPreset: 'balanced',
   }
 }
 
 function createDefaultHealthConnection(steps = 0) {
   return {
-    source: 'Apple Health',
-    status: 'connected',
+    source: 'Manual',
+    status: 'disconnected',
     latestSteps: steps,
     latestDistanceKm: Number((steps * 0.00072).toFixed(1)),
     latestActiveCalories: Math.round(steps * 0.04),
-    lastSyncedAt: 'Today 08:42',
+    lastSyncedAt: '-',
   }
 }
 
@@ -370,9 +379,10 @@ const defaultCommentsByPost = {
 }
 
 function DashboardLayout() {
+  const { user } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
-  const [persistedState] = useState(() => loadDashboardState())
+  const [persistedState] = useState(() => loadDashboardState(user?.id))
   const initialProgramState = useMemo(
     () => normalizePrograms(persistedState.programs, initialPrograms),
     [persistedState.programs],
@@ -380,11 +390,11 @@ function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [goal, setGoal] = useState(persistedState.goal || 'maintain')
-  const [appLanguage, setAppLanguage] = useState(persistedState.appLanguage || persistedState.foodNameLanguage || 'en')
+  const [appLanguage, setAppLanguage] = useState(persistedState.appLanguage || persistedState.foodNameLanguage || getStoredLanguage())
   const [colorTheme, setColorTheme] = useState(persistedState.colorTheme || 'light')
   const foodNameLanguage = appLanguage
   const setFoodNameLanguage = setAppLanguage
-  const [steps, setSteps] = useState(persistedState.steps || 11284)
+  const [steps, setSteps] = useState(persistedState.steps || 0)
   const [userProfile, setUserProfile] = useState(
     persistedState.userProfile && typeof persistedState.userProfile === 'object'
       ? { ...createDefaultUserProfile(persistedState.goal || 'maintain'), ...persistedState.userProfile }
@@ -392,8 +402,8 @@ function DashboardLayout() {
   )
   const [healthConnection, setHealthConnection] = useState(
     persistedState.healthConnection && typeof persistedState.healthConnection === 'object'
-      ? { ...createDefaultHealthConnection(persistedState.steps || 11284), ...persistedState.healthConnection }
-      : createDefaultHealthConnection(persistedState.steps || 11284),
+      ? { ...createDefaultHealthConnection(persistedState.steps || 0), ...persistedState.healthConnection }
+      : createDefaultHealthConnection(persistedState.steps || 0),
   )
   const [weightHistory, setWeightHistory] = useState(
     Array.isArray(persistedState.weightHistory) && persistedState.weightHistory.length > 0
@@ -413,21 +423,12 @@ function DashboardLayout() {
   const [lastWeightCheckInDate, setLastWeightCheckInDate] = useState(
     persistedState.lastWeightCheckInDate || weightHistory?.[0]?.date || formatLocalDate(new Date()),
   )
-  const [sets, setSets] = useState(Array.isArray(persistedState.sets) ? persistedState.sets : initialSets)
-  const [meals, setMeals] = useState(Array.isArray(persistedState.meals) ? persistedState.meals : initialMeals)
+  const [sets, setSets] = useState(Array.isArray(persistedState.sets) ? persistedState.sets : [])
+  const [meals, setMeals] = useState(Array.isArray(persistedState.meals) ? persistedState.meals : [])
   const [posts, setPosts] = useState(Array.isArray(persistedState.posts) ? persistedState.posts : initialPosts)
   const [programs, setPrograms] = useState(initialProgramState)
   const [activeProgram, setActiveProgram] = useState(
-    persistedState.activeProgram && typeof persistedState.activeProgram === 'object' ? persistedState.activeProgram : {
-      userId: 'me',
-      programId: initialProgramState[0]?.id || null,
-      currentWeek: 1,
-      currentDay: 1,
-      startedAt: formatLocalDate(new Date()),
-      lastCompletedAt: null,
-      streakDays: 6,
-      completedSessionIds: [],
-    },
+    persistedState.activeProgram && typeof persistedState.activeProgram === 'object' ? persistedState.activeProgram : null,
   )
   const [programLikes, setProgramLikes] = useState(Array.isArray(persistedState.programLikes) ? persistedState.programLikes : [])
   const [programReviews, setProgramReviews] = useState(
@@ -460,7 +461,7 @@ function DashboardLayout() {
   const [foodMergeCandidates, setFoodMergeCandidates] = useState(
     Array.isArray(persistedState.foodMergeCandidates) ? persistedState.foodMergeCandidates : [],
   )
-  const [sessions, setSessions] = useState(Array.isArray(persistedState.sessions) ? persistedState.sessions : initialSessions)
+  const [sessions, setSessions] = useState(Array.isArray(persistedState.sessions) ? persistedState.sessions : [])
   const [savedPostIds, setSavedPostIds] = useState(Array.isArray(persistedState.savedPostIds) ? persistedState.savedPostIds : [])
   const [likedPostIds, setLikedPostIds] = useState(Array.isArray(persistedState.likedPostIds) ? persistedState.likedPostIds : [])
   const [hiddenPostIds, setHiddenPostIds] = useState(Array.isArray(persistedState.hiddenPostIds) ? persistedState.hiddenPostIds : [])
@@ -488,17 +489,12 @@ function DashboardLayout() {
       return
     }
 
-    if (!activeProgram?.programId || !programs.some((program) => program.id === activeProgram.programId)) {
-      setActiveProgram({
-        userId: 'me',
-        programId: programs[0].id,
-        currentWeek: 1,
-        currentDay: 1,
-        startedAt: formatLocalDate(new Date()),
-        lastCompletedAt: null,
-        streakDays: 0,
-        completedSessionIds: [],
-      })
+    if (!activeProgram?.programId) {
+      return
+    }
+
+    if (!programs.some((program) => program.id === activeProgram.programId)) {
+      setActiveProgram(null)
     }
   }, [activeProgram?.programId, programs])
 
@@ -521,6 +517,12 @@ function DashboardLayout() {
       document.body.dataset.theme = colorTheme
     }
   }, [colorTheme])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('fitflow_language', appLanguage)
+    }
+  }, [appLanguage])
 
   useEffect(() => {
     saveDashboardState({
@@ -553,7 +555,7 @@ function DashboardLayout() {
       commentsByPost,
       shareEvents,
       lastWorkoutSummary,
-    })
+    }, user?.id)
   }, [
     commentsByPost,
     colorTheme,
@@ -584,6 +586,7 @@ function DashboardLayout() {
     sets,
     shareEvents,
     steps,
+    user?.id,
   ])
 
   useEffect(() => {
@@ -682,9 +685,9 @@ function DashboardLayout() {
   })
   const mealRecommendation = recommendMeal({
     remainingCalories: recommendedCalories - todayMealTotals.calories,
-    remainingCarbs: Math.max(0, 220 - todayMealTotals.carbs),
-    remainingProtein: Math.max(0, 150 - todayMealTotals.protein),
-    remainingFat: Math.max(0, 60 - todayMealTotals.fat),
+    remainingCarbs: Math.max(0, buildMacroTargets(recommendedCalories, userProfile.macroRatioPreset).carbs - todayMealTotals.carbs),
+    remainingProtein: Math.max(0, buildMacroTargets(recommendedCalories, userProfile.macroRatioPreset).protein - todayMealTotals.protein),
+    remainingFat: Math.max(0, buildMacroTargets(recommendedCalories, userProfile.macroRatioPreset).fat - todayMealTotals.fat),
     goalType: goal === 'diet' ? 'cut' : goal,
     timeOfDay: todayMealTotals.calories < 400 ? 'lunch' : 'dinner',
   })
@@ -1029,6 +1032,65 @@ function DashboardLayout() {
     })
   }
 
+  function moveWorkoutSet(exerciseId, setId, direction) {
+    setActiveWorkout((current) => {
+      if (!current) {
+        return current
+      }
+
+      return {
+        ...current,
+        exercises: current.exercises.map((exercise) => {
+          if (exercise.id !== exerciseId) {
+            return exercise
+          }
+
+          const index = exercise.sets.findIndex((setItem) => setItem.id === setId)
+          const targetIndex = direction === 'up' ? index - 1 : index + 1
+
+          if (index < 0 || targetIndex < 0 || targetIndex >= exercise.sets.length) {
+            return exercise
+          }
+
+          const nextSets = [...exercise.sets]
+          const [movedSet] = nextSets.splice(index, 1)
+          nextSets.splice(targetIndex, 0, movedSet)
+
+          return {
+            ...exercise,
+            sets: nextSets,
+          }
+        }),
+      }
+    })
+  }
+
+  function removeWorkoutSet(exerciseId, setId) {
+    setActiveWorkout((current) => {
+      if (!current) {
+        return current
+      }
+
+      return {
+        ...current,
+        exercises: current.exercises.map((exercise) => {
+          if (exercise.id !== exerciseId) {
+            return exercise
+          }
+
+          if (exercise.sets.length <= 1) {
+            return exercise
+          }
+
+          return {
+            ...exercise,
+            sets: exercise.sets.filter((setItem) => setItem.id !== setId),
+          }
+        }),
+      }
+    })
+  }
+
   function toggleSuperset(exerciseId) {
     setActiveWorkout((current) => {
       if (!current) {
@@ -1125,7 +1187,7 @@ function DashboardLayout() {
 
   function finishWorkout() {
     if (!activeWorkout) {
-      return
+      return null
     }
     const finishedWorkout = activeWorkout
     const sessionId = `session-${Date.now()}`
@@ -1179,7 +1241,7 @@ function DashboardLayout() {
       acc[item.category] = (acc[item.category] || 0) + item.volume
       return acc
     }, {})
-    setLastWorkoutSummary({
+    const workoutSummary = {
       date: completedDate,
       title: finishedWorkout.title,
       durationMinutes,
@@ -1190,7 +1252,8 @@ function DashboardLayout() {
       fatigueDelta: Math.min(24, Math.round(sessionVolume / 120)),
       muscleLoad,
       completedSets: completedSets.length,
-    })
+    }
+    setLastWorkoutSummary(workoutSummary)
     setSessions((current) => [
       {
         id: sessionId,
@@ -1260,6 +1323,58 @@ function DashboardLayout() {
     }
     setActiveWorkout(null)
     stopRest()
+    return {
+      summary: workoutSummary,
+      finishedWorkout,
+      sessionId,
+    }
+  }
+
+  function saveWorkoutTemplate(payload) {
+    if (!payload?.exercises?.length) {
+      return null
+    }
+
+    const exerciseNames = Array.from(
+      new Set(
+        payload.exercises
+          .map((exercise) => exercise.name)
+          .filter(Boolean),
+      ),
+    )
+
+    if (!exerciseNames.length) {
+      return null
+    }
+
+    return createProgram(
+      {
+        title: payload.title || `${formatWorkoutTitleDate(new Date())} 템플릿`,
+        description: payload.description || '즉시 운동 기록을 바탕으로 저장한 템플릿입니다.',
+        category: inferProgramCategoryFromExercises(exerciseNames),
+        difficulty: 'Beginner',
+        durationWeeks: 1,
+        sessionsPerWeek: 1,
+        goal: 'Workout template',
+        visibility: 'private',
+        tags: ['template', 'saved'],
+        weeks: [
+          {
+            weekIndex: 1,
+            title: 'Week 1',
+            days: [
+              {
+                dayIndex: 1,
+                title: payload.dayTitle || 'Saved Workout',
+                focus: inferProgramCategoryFromExercises(exerciseNames),
+                exercises: exerciseNames,
+              },
+            ],
+          },
+        ],
+      },
+      { activate: false },
+    )
   }
 
   function addMeal({
@@ -1601,7 +1716,8 @@ function DashboardLayout() {
     )
   }
 
-  function createProgram(payload) {
+  function createProgram(payload, options = {}) {
+    const { activate = true } = options
     const programId = `program-${Date.now()}`
     const normalizedWeeks = payload.weeks.map((week, weekIndex) => ({
       id: `${programId}-week-${weekIndex + 1}`,
@@ -1645,16 +1761,20 @@ function DashboardLayout() {
     }
 
     setPrograms((current) => [nextProgram, ...current])
-    setActiveProgram({
-      userId: 'me',
-      programId,
-      currentWeek: 1,
-      currentDay: 1,
-      startedAt: formatLocalDate(new Date()),
-      lastCompletedAt: null,
-      streakDays: 0,
-      completedSessionIds: [],
-    })
+    if (activate) {
+      setActiveProgram({
+        userId: 'me',
+        programId,
+        currentWeek: 1,
+        currentDay: 1,
+        startedAt: formatLocalDate(new Date()),
+        lastCompletedAt: null,
+        streakDays: 0,
+        completedSessionIds: [],
+      })
+    }
+
+    return nextProgram
   }
 
   function createCustomExercise(payload) {
@@ -1738,9 +1858,9 @@ function DashboardLayout() {
   function resetAllData() {
     setGoal('maintain')
     setAppLanguage('en')
-    setSteps(11284)
+    setSteps(0)
     setUserProfile(createDefaultUserProfile('maintain'))
-    setHealthConnection(createDefaultHealthConnection(11284))
+    setHealthConnection(createDefaultHealthConnection(0))
     setWeightHistory([
       {
         id: `weight-${Date.now()}`,
@@ -1750,27 +1870,18 @@ function DashboardLayout() {
       },
     ])
     setLastWeightCheckInDate(formatLocalDate(new Date()))
-    setSets(initialSets)
-    setMeals(initialMeals)
+    setSets([])
+    setMeals([])
     setPosts(initialPosts)
     setPrograms(initialPrograms)
-    setActiveProgram({
-      userId: 'me',
-      programId: initialPrograms[0]?.id || null,
-      currentWeek: 1,
-      currentDay: 1,
-      startedAt: formatLocalDate(new Date()),
-      lastCompletedAt: null,
-      streakDays: 6,
-      completedSessionIds: [],
-    })
+    setActiveProgram(null)
     setProgramLikes([])
     setProgramReviews([])
     setExerciseDatabase(exerciseDatabaseSeed)
     setFoods(foodSeed)
     setCustomFoods([])
     setFoodMergeCandidates([])
-    setSessions(initialSessions)
+    setSessions([])
     setSavedPostIds([])
     setLikedPostIds([])
     setHiddenPostIds([])
@@ -1781,7 +1892,7 @@ function DashboardLayout() {
     setActiveWorkout(null)
     setRestStartedAt(null)
     setLastWorkoutSummary(null)
-    clearDashboardState()
+    clearDashboardState(user?.id)
   }
 
   const outletContext = {
@@ -1847,6 +1958,8 @@ function DashboardLayout() {
     swapWorkoutExercise,
     updateWorkoutSet,
     addWorkoutSet,
+    moveWorkoutSet,
+    removeWorkoutSet,
     toggleSuperset,
     toggleWorkoutSetComplete,
     removeWorkoutExercise,
@@ -1870,6 +1983,7 @@ function DashboardLayout() {
     addReply,
     sharePost,
     createProgram,
+    saveWorkoutTemplate,
     createCustomExercise,
     likePost,
     updateSession,
@@ -1928,7 +2042,7 @@ function DashboardLayout() {
           </button>
           <div className="sidebar-brand-copy">
             <strong>FitFlow</strong>
-            <p>{tx(appLanguage, '커넥트, 운동, 식단, AI', 'Connect, Train, Nutrition, AI')}</p>
+            <p>{tx(appLanguage, '커넥트, 운동, 식단, AI', 'Connect, Workout, Nutrition, AI')}</p>
           </div>
         </div>
 
@@ -1996,7 +2110,9 @@ function DashboardLayout() {
             aria-label={tx(appLanguage, '메뉴 열기', 'Toggle sidebar')}
             onClick={() => setSidebarOpen((current) => !current)}
           >
-            <AppIcon name="menu" size="sm" />
+            <span className="menu-toggle-mark" aria-hidden="true">
+              FF
+            </span>
           </button>
 
           <div className="topbar-copy">

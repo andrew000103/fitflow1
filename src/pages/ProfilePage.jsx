@@ -1,636 +1,324 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation, useOutletContext } from 'react-router-dom'
 import PageHeader from '../components/PageHeader.jsx'
-import { useOutletContext } from 'react-router-dom'
-import {
-  activityLevelLabel,
-  goalLabel,
-  healthSourceLabel,
-  healthStatusLabel,
-  nutritionPreferenceLabel,
-  sexLabel,
-  tx,
-  unitSystemLabel,
-} from '../utils/appLanguage.js'
+import BrandLoader from '../components/BrandLoader.jsx'
+import { useAuth } from '../features/auth/useAuth.js'
+import { loadProfileBundle } from '../features/profile/profileData.js'
+import { activityLevelLabel, macroRatioPresetLabel, sexLabel, tx } from '../utils/appLanguage.js'
+import '../styles/personalization.css'
+
+function goalTypeLabel(language, goalType) {
+  if (goalType === 'bulk') {
+    return tx(language, '벌크업', 'Bulk')
+  }
+  if (goalType === 'maintain') {
+    return tx(language, '유지', 'Maintain')
+  }
+  return tx(language, '커팅', 'Cut')
+}
+
+function numberText(value, suffix = '') {
+  if (value === null || value === undefined || value === '') {
+    return '-'
+  }
+
+  return `${value}${suffix}`
+}
 
 function ProfilePage() {
-  const {
-    appLanguage,
-    colorTheme,
-    setColorTheme,
-    userProfile,
-    sessions,
-    updateUserProfile,
-    healthConnection,
-    updateHealthConnection,
-    weightHistory,
-    lastWeightCheckInDate,
-    nextWeightCheckInDate,
-    weightReminderDue,
-    recordWeightCheckIn,
-    consumedCalories,
-    totalBurn,
-    netCalories,
-    recommendedCalories,
-    recommendedCaloriesRange,
-    totalWorkoutCalories,
-    activityCalories,
-    stepCalories,
-    baseMetabolism,
-    resetAllData,
-  } = useOutletContext()
-  const [profileForm, setProfileForm] = useState(() => ({
-    name: userProfile.name,
-    bio: userProfile.bio,
-    sex: userProfile.sex,
-    age: userProfile.age,
-    heightCm: userProfile.heightCm,
-    weightKg: userProfile.weightKg,
-    targetWeightKg: userProfile.targetWeightKg,
-    activityLevel: userProfile.activityLevel,
-    goal: userProfile.goal,
-    unitSystem: userProfile.unitSystem,
-    nutritionPreference: userProfile.nutritionPreference,
-    notificationsEnabled: userProfile.notificationsEnabled,
-    monthlyWeightReminderEnabled: userProfile.monthlyWeightReminderEnabled !== false,
-  }))
+  const { appLanguage, userProfile } = useOutletContext()
+  const { user } = useAuth()
+  const location = useLocation()
+  const avatarInputRef = useRef(null)
+  const [profile, setProfile] = useState(null)
+  const [targets, setTargets] = useState(null)
+  const [status, setStatus] = useState('loading')
+  const [error, setError] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState('')
+
+  const avatarStorageKey = user?.id ? `fitflow_profile_avatar_${user.id}` : ''
 
   useEffect(() => {
-    setProfileForm({
-      name: userProfile.name,
-      bio: userProfile.bio,
-      sex: userProfile.sex,
-      age: userProfile.age,
-      heightCm: userProfile.heightCm,
-      weightKg: userProfile.weightKg,
-      targetWeightKg: userProfile.targetWeightKg,
-      activityLevel: userProfile.activityLevel,
-      goal: userProfile.goal,
-      unitSystem: userProfile.unitSystem,
-      nutritionPreference: userProfile.nutritionPreference,
-      notificationsEnabled: userProfile.notificationsEnabled,
-      monthlyWeightReminderEnabled: userProfile.monthlyWeightReminderEnabled !== false,
-    })
-  }, [userProfile])
+    let active = true
 
-  const recentWeightEntries = useMemo(() => weightHistory.slice(0, 4), [weightHistory])
-  const big3Summary = useMemo(() => {
-    const bests = {
-      bench: 0,
-      squat: 0,
-      deadlift: 0,
+    async function loadProfileData() {
+      if (!user?.id) {
+        if (active) {
+          setStatus('error')
+          setError(tx(appLanguage, '로그인 정보를 찾을 수 없어요.', 'We could not find your login session.'))
+        }
+        return
+      }
+
+      setStatus('loading')
+      setError('')
+
+      try {
+        const { profile: nextProfile, targets: nextTargets } = await loadProfileBundle(user.id)
+
+        if (!active) {
+          return
+        }
+
+        setProfile(nextProfile)
+        setTargets(nextTargets)
+        setStatus('ready')
+      } catch (loadError) {
+        if (!active) {
+          return
+        }
+        setStatus('error')
+        setError(loadError.message || tx(appLanguage, '프로필을 불러오지 못했어요.', 'Could not load your profile.'))
+      }
     }
 
-    sessions.forEach((session) => {
-      session.exercises.forEach((exercise) => {
-        const name = String(exercise.name || '').toLowerCase()
-        const maxWeight = Number(exercise.maxWeight || 0)
+    loadProfileData()
 
-        if (name === 'bench press') {
-          bests.bench = Math.max(bests.bench, maxWeight)
-        }
-
-        if (name === 'back squat' || name === 'squat') {
-          bests.squat = Math.max(bests.squat, maxWeight)
-        }
-
-        if (name === 'deadlift' || name === 'conventional deadlift' || name === 'trap bar deadlift') {
-          bests.deadlift = Math.max(bests.deadlift, maxWeight)
-        }
-      })
-    })
-
-    return {
-      ...bests,
-      total: bests.bench + bests.squat + bests.deadlift,
+    return () => {
+      active = false
     }
-  }, [sessions])
+  }, [appLanguage, user?.id])
 
-  const goalText = goalLabel(appLanguage, userProfile.goal)
-  const profileBio =
-    userProfile.bio === 'Train, Nutrition, FF Trainer에서 쓰는 개인 설정을 관리합니다.' ||
-    userProfile.bio === 'Manage the personal settings used in Train, Nutrition, and FF Trainer.'
-      ? tx(
-          appLanguage,
-          'Train, Nutrition, FF Trainer에서 쓰는 개인 설정을 관리합니다.',
-          'Manage the personal settings used in Train, Nutrition, and FF Trainer.',
-        )
-      : userProfile.bio
-  const healthBadgeLabel =
-    healthConnection.status === 'connected'
-      ? tx(appLanguage, `${healthSourceLabel(appLanguage, healthConnection.source)} 연결됨`, `${healthSourceLabel(appLanguage, healthConnection.source)} connected`)
-      : tx(appLanguage, '건강 데이터 연결 안 됨', 'Health not connected')
-  const energyStatus =
-    netCalories > recommendedCaloriesRange.max - totalBurn
-      ? tx(appLanguage, '오늘은 권장 섭취보다 높은 상태입니다.', 'You are above your recommended intake today.')
-      : netCalories < recommendedCaloriesRange.min - totalBurn
-        ? tx(appLanguage, '오늘은 권장 섭취보다 낮은 상태입니다.', 'You are below your recommended intake today.')
-        : tx(appLanguage, '오늘은 목표 범위 안에 있습니다.', 'You are within your target range today.')
+  useEffect(() => {
+    if (!avatarStorageKey || typeof window === 'undefined') {
+      return
+    }
 
-  function updateProfileForm(field, value) {
-    setProfileForm((current) => ({
-      ...current,
-      [field]: value,
-    }))
+    const savedAvatar = window.localStorage.getItem(avatarStorageKey) || ''
+    setAvatarUrl(savedAvatar)
+  }, [avatarStorageKey])
+
+  const summaryItems = useMemo(() => {
+    return [
+      {
+        label: tx(appLanguage, '나이', 'Age'),
+        value: numberText(profile?.age, tx(appLanguage, '세', 'y')),
+      },
+      {
+        label: tx(appLanguage, '키', 'Height'),
+        value: numberText(profile?.height_cm, ' cm'),
+      },
+      {
+        label: tx(appLanguage, '몸무게', 'Weight'),
+        value: numberText(profile?.weight_kg, ' kg'),
+      },
+      {
+        label: tx(appLanguage, '성별', 'Gender'),
+        value: profile?.gender ? sexLabel(appLanguage, profile.gender) : '-',
+      },
+      {
+        label: tx(appLanguage, '평균 활동량', 'Activity level'),
+        value: profile?.activity_level ? activityLevelLabel(appLanguage, profile.activity_level) : '-',
+      },
+      {
+        label: tx(appLanguage, '목표 타입', 'Goal type'),
+        value: profile?.goal_type ? goalTypeLabel(appLanguage, profile.goal_type) : '-',
+      },
+      {
+        label: tx(appLanguage, '목표 칼로리', 'Target calories'),
+        value: numberText(targets?.target_calories, ' kcal'),
+      },
+      {
+        label: tx(appLanguage, '목표 단백질', 'Target protein'),
+        value: numberText(targets?.target_protein_g, ' g'),
+      },
+      {
+        label: tx(appLanguage, '목표 걸음수', 'Target steps'),
+        value:
+          targets?.target_steps || targets?.target_steps === 0
+            ? `${Number(targets.target_steps).toLocaleString()} ${tx(appLanguage, '보', 'steps')}`
+            : '-',
+      },
+      {
+        label: tx(appLanguage, '주간 운동 횟수', 'Weekly workouts'),
+        value:
+          targets?.target_workouts_per_week || targets?.target_workouts_per_week === 0
+            ? tx(appLanguage, `주 ${targets.target_workouts_per_week}회`, `${targets.target_workouts_per_week} / week`)
+            : '-',
+      },
+      {
+        label: tx(appLanguage, '탄단지 비율', 'Macro ratio'),
+        value: macroRatioPresetLabel(appLanguage, userProfile?.macroRatioPreset || 'balanced'),
+      },
+    ]
+  }, [appLanguage, profile, targets, userProfile?.macroRatioPreset])
+
+  function openAvatarPicker() {
+    avatarInputRef.current?.click()
   }
 
-  function handleSaveProfile() {
-    const nextWeight = Number(profileForm.weightKg) || userProfile.weightKg
-    updateUserProfile({
-      ...profileForm,
-      age: Number(profileForm.age) || 0,
-      heightCm: Number(profileForm.heightCm) || 0,
-      weightKg: nextWeight,
-      targetWeightKg: Number(profileForm.targetWeightKg) || 0,
-    })
-    recordWeightCheckIn(nextWeight, { source: 'profile' })
+  function handleAvatarChange(event) {
+    const file = event.target.files?.[0]
+    if (!file || !avatarStorageKey) {
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const nextAvatar = typeof reader.result === 'string' ? reader.result : ''
+      setAvatarUrl(nextAvatar)
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(avatarStorageKey, nextAvatar)
+      }
+    }
+    reader.readAsDataURL(file)
+    event.target.value = ''
   }
 
-  function handleResetProfileForm() {
-    setProfileForm({
-      name: userProfile.name,
-      bio: userProfile.bio,
-      sex: userProfile.sex,
-      age: userProfile.age,
-      heightCm: userProfile.heightCm,
-      weightKg: userProfile.weightKg,
-      targetWeightKg: userProfile.targetWeightKg,
-      activityLevel: userProfile.activityLevel,
-      goal: userProfile.goal,
-      unitSystem: userProfile.unitSystem,
-      nutritionPreference: userProfile.nutritionPreference,
-      notificationsEnabled: userProfile.notificationsEnabled,
-      monthlyWeightReminderEnabled: userProfile.monthlyWeightReminderEnabled !== false,
-    })
+  function handleAvatarReset() {
+    setAvatarUrl('')
+    if (avatarStorageKey && typeof window !== 'undefined') {
+      window.localStorage.removeItem(avatarStorageKey)
+    }
+  }
+
+  if (status === 'loading') {
+    return (
+      <section className="profile-loading-screen" aria-label={tx(appLanguage, '프로필 로딩 중', 'Loading profile')}>
+        <BrandLoader />
+        <div className="profile-loading-copy">
+          <strong>{tx(appLanguage, '내 프로필을 준비하고 있어요', 'Preparing your profile')}</strong>
+          <p>{tx(appLanguage, '기준 정보와 목표를 깔끔하게 정리해서 보여줄게요.', 'We are arranging your baseline and targets into one clean view.')}</p>
+        </div>
+      </section>
+    )
+  }
+
+  if (status === 'error') {
+    return (
+      <section className="page-section">
+        <PageHeader
+          eyebrow={tx(appLanguage, '프로필', 'Profile')}
+          title={tx(appLanguage, '내 기준 다시 확인하기', 'Review your baseline')}
+          description={tx(
+            appLanguage,
+            '온보딩 데이터를 기반으로 지금의 목표를 관리하는 공간입니다.',
+            'This is where your onboarding baseline powers the rest of the app.',
+          )}
+        />
+        <article className="content-card profile-empty-state">
+          <strong>{tx(appLanguage, '프로필을 불러오지 못했어요.', 'We could not load your profile.')}</strong>
+          <p>{error}</p>
+        </article>
+      </section>
+    )
   }
 
   return (
-    <section className="page-section">
+    <section className="page-section profile-page-shell">
       <PageHeader
-        title={tx(appLanguage, '개인 프로필', 'Personal Profile')}
+        eyebrow={tx(appLanguage, '프로필', 'Profile')}
+        title={tx(appLanguage, '관리 보고서', 'Personal report')}
         description={tx(
           appLanguage,
-          '목표, 몸 정보, 에너지 상태, 핵심 설정을 한곳에서 관리합니다.',
-          'Manage your goals, body data, energy, and core settings in one place.',
+          '신체 정보와 목표에 맞춘 개인맞춤 플랫폼이에요.',
+          'A personalized platform shaped around your body data and goals.',
         )}
       />
 
       <article className="content-card profile-energy-hero">
         <div className="profile-head">
-          <div className="profile-avatar">FF</div>
+          <div className={avatarUrl ? 'profile-avatar has-image' : 'profile-avatar'}>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={tx(appLanguage, '프로필 사진', 'Profile avatar')} />
+            ) : (
+              <div className="profile-avatar-fallback" aria-hidden="true">
+                <span className="profile-avatar-head" />
+                <span className="profile-avatar-body" />
+              </div>
+            )}
+          </div>
           <div>
-            <h2>{userProfile.name}</h2>
-            <p>{profileBio}</p>
+            <h2>{tx(appLanguage, '내 몸 정보와 목표를 한 번에 보는 공간', 'A clean view of your body data and goals')}</h2>
+            <p>
+              {tx(
+                appLanguage,
+                '프로필 사진부터 목표 수치까지, 지금 나에게 맞는 기준을 간단하게 관리할 수 있어요.',
+                'From your avatar to your target numbers, this is where your personal baseline stays in sync.',
+              )}
+            </p>
+            <div className="profile-avatar-actions">
+              <input
+                ref={avatarInputRef}
+                className="profile-avatar-input"
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+              />
+              <button className="inline-action" type="button" onClick={openAvatarPicker}>
+                {tx(appLanguage, '프로필 사진 수정', 'Edit photo')}
+              </button>
+              {avatarUrl ? (
+                <button className="inline-action" type="button" onClick={handleAvatarReset}>
+                  {tx(appLanguage, '기본 사진으로', 'Use default')}
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
         <div className="profile-hero-meta">
-          <span className="pill-tag profile-accent-chip">{goalText}</span>
-          <span
-            className={
-              healthConnection.status === 'connected'
-                ? 'pill-tag profile-accent-chip'
-                : 'pill-tag profile-muted-chip'
-            }
-          >
-            {healthBadgeLabel}
-          </span>
+          <span className="pill-tag profile-accent-chip">{goalTypeLabel(appLanguage, profile?.goal_type)}</span>
+          <span className="pill-tag profile-muted-chip">{activityLevelLabel(appLanguage, profile?.activity_level)}</span>
         </div>
       </article>
 
-      {weightReminderDue ? (
-        <article className="content-card profile-reminder-card">
-          <div className="feed-head">
-            <div>
-              <h2>{tx(appLanguage, '이번 달 체중 체크가 필요해요', 'Monthly weight check-in is due')}</h2>
-              <p>
-                {tx(
-                  appLanguage,
-                  `${nextWeightCheckInDate} 전에 새 체중을 기록해 변화를 이어가세요.`,
-                  `Log your latest weight and keep your body trend up to date. Next target date: ${nextWeightCheckInDate}.`,
-                )}
-              </p>
-            </div>
-            <button
-              className="inline-action primary-dark profile-primary-action"
-              type="button"
-              onClick={() => recordWeightCheckIn(profileForm.weightKg || userProfile.weightKg, { source: 'reminder' })}
-            >
-              {tx(appLanguage, '지금 기록', 'Log now')}
-            </button>
-          </div>
+      {location.state?.saved ? (
+        <article className="content-card profile-feedback-card success">
+          <strong>{tx(appLanguage, '프로필이 업데이트됐어요.', 'Your profile has been updated.')}</strong>
+          <p>{tx(appLanguage, '새 기준이 운동과 식단 추천에도 바로 반영됩니다.', 'Your new baseline is already reflected across workout and nutrition recommendations.')}</p>
         </article>
       ) : null}
 
+      <article className="content-card profile-reminder-card">
+        <div className="feed-head">
+          <div>
+            <span className="profile-section-kicker">{tx(appLanguage, 'edit', 'edit')}</span>
+            <h2>{tx(appLanguage, '프로필 수정', 'Edit profile')}</h2>
+            <p>{tx(appLanguage, '수정 페이지에서 신체정보와 목표를 바꾸면 추천 목표가 같이 다시 계산돼요.', 'On the edit page, updating your profile recalculates your recommended targets at the same time.')}</p>
+          </div>
+          <Link className="inline-action profile-primary-action" to="/profile/edit" state={{ from: location.pathname }}>
+            {tx(appLanguage, '프로필 수정', 'Edit profile')}
+          </Link>
+        </div>
+      </article>
+
       <div className="card-grid split">
-        <article className="content-card">
+        <article className="content-card profile-summary-card">
           <div className="feed-head">
-            <h2>{tx(appLanguage, 'Daily Energy', 'Daily Energy')}</h2>
-            <span className="pill-tag profile-accent-chip">
-              {recommendedCalories} kcal {tx(appLanguage, '목표', 'target')}
-            </span>
+            <div>
+              <span className="profile-section-kicker">{tx(appLanguage, 'body baseline', 'body baseline')}</span>
+              <h2>{tx(appLanguage, '현재 저장된 신체 정보', 'Saved body details')}</h2>
+              <p>{tx(appLanguage, '지금 앱이 기준으로 삼는 내 몸 정보예요.', 'These are the body details the app is currently using as your baseline.')}</p>
+            </div>
           </div>
           <div className="summary-grid tight">
-            <div>
-              <span>{tx(appLanguage, '목표 칼로리', 'Target Calories')}</span>
-              <strong>{recommendedCalories} kcal</strong>
-            </div>
-            <div>
-              <span>{tx(appLanguage, '섭취', 'Intake')}</span>
-              <strong>{consumedCalories} kcal</strong>
-            </div>
-            <div>
-              <span>{tx(appLanguage, '총소모', 'Total Burn')}</span>
-              <strong>{Math.round(totalBurn)} kcal</strong>
-            </div>
-            <div>
-              <span>Net Calories</span>
-              <strong>{Math.round(netCalories)} kcal</strong>
-            </div>
+            {summaryItems.slice(0, 6).map((item) => (
+              <div key={item.label}>
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+              </div>
+            ))}
           </div>
-          <div className="mini-panel">
-            {tx(appLanguage, '권장 범위', 'Recommended range')} {recommendedCaloriesRange.min} - {recommendedCaloriesRange.max} kcal
-          </div>
-          <div className="mini-panel">
-            BMR {Math.round(baseMetabolism)} · {tx(appLanguage, '생활 활동', 'Lifestyle')} {activityCalories} · {tx(appLanguage, '걸음', 'Steps')} {stepCalories} · {tx(appLanguage, '운동', 'Workout')} {Math.round(totalWorkoutCalories)}
-          </div>
-          <div className="mini-panel">{energyStatus}</div>
         </article>
 
-        <article className="content-card">
+        <article className="content-card profile-summary-card">
           <div className="feed-head">
-            <h2>{tx(appLanguage, 'Body & Goal', 'Body & Goal')}</h2>
-            <span className="pill-tag">
-              {tx(appLanguage, `최근 체크 ${lastWeightCheckInDate}`, `Last check-in ${lastWeightCheckInDate}`)}
-            </span>
+            <div>
+              <span className="profile-section-kicker">{tx(appLanguage, 'target baseline', 'target baseline')}</span>
+              <h2>{tx(appLanguage, '현재 저장된 목표 정보', 'Saved target details')}</h2>
+              <p>{tx(appLanguage, '운동과 식단 첫 화면에 연결되는 핵심 목표입니다.', 'These are the core targets connected to your workout and nutrition home screens.')}</p>
+            </div>
           </div>
           <div className="summary-grid tight">
-            <div>
-              <span>{tx(appLanguage, '성별', 'Sex')}</span>
-              <strong>{sexLabel(appLanguage, userProfile.sex)}</strong>
-            </div>
-            <div>
-              <span>{tx(appLanguage, '나이', 'Age')}</span>
-              <strong>{userProfile.age}</strong>
-            </div>
-            <div>
-              <span>{tx(appLanguage, '키', 'Height')}</span>
-              <strong>{userProfile.heightCm} cm</strong>
-            </div>
-            <div>
-              <span>{tx(appLanguage, '현재 체중', 'Current Weight')}</span>
-              <strong>{userProfile.weightKg} kg</strong>
-            </div>
-            <div>
-              <span>{tx(appLanguage, '목표 체중', 'Target Weight')}</span>
-              <strong>{userProfile.targetWeightKg} kg</strong>
-            </div>
-            <div>
-              <span>{tx(appLanguage, '활동 수준', 'Activity Level')}</span>
-              <strong>{activityLevelLabel(appLanguage, userProfile.activityLevel)}</strong>
-            </div>
-            <div>
-              <span>{tx(appLanguage, '목표', 'Goal')}</span>
-              <strong>{goalText}</strong>
-            </div>
-            <div>
-              <span>{tx(appLanguage, '단위', 'Units')}</span>
-              <strong>{unitSystemLabel(appLanguage, userProfile.unitSystem)}</strong>
-            </div>
-          </div>
-          <div className="mini-panel profile-big3-panel">
-            <span>{tx(appLanguage, '3대 PR', 'Big 3 PR')}</span>
-            <strong>{big3Summary.total} kg</strong>
-            <div className="profile-big3-breakdown">
-              <span>Bench {big3Summary.bench} kg</span>
-              <span>Squat {big3Summary.squat} kg</span>
-              <span>Deadlift {big3Summary.deadlift} kg</span>
-            </div>
+            {summaryItems.slice(6).map((item) => (
+              <div key={item.label}>
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+              </div>
+            ))}
           </div>
         </article>
       </div>
-
-      <details className="content-card profile-accordion">
-        <summary className="profile-accordion-summary">
-          <div>
-            <h2>{tx(appLanguage, 'Edit Profile', 'Edit Profile')}</h2>
-            <p>{tx(appLanguage, '나이, 키, 몸무게, 목표 정보를 직접 수정하고 저장합니다.', 'Update your age, height, weight, and goals here.')}</p>
-          </div>
-          <span className="profile-accordion-arrow" aria-hidden="true">⌄</span>
-        </summary>
-        <div className="stack-form">
-          <div className="compact-grid">
-            <label className="field-label">
-              {tx(appLanguage, '이름', 'Name')}
-              <input value={profileForm.name} onChange={(event) => updateProfileForm('name', event.target.value)} />
-            </label>
-            <label className="field-label">
-              {tx(appLanguage, '성별', 'Sex')}
-              <select value={profileForm.sex} onChange={(event) => updateProfileForm('sex', event.target.value)}>
-                <option value="male">{sexLabel(appLanguage, 'male')}</option>
-                <option value="female">{sexLabel(appLanguage, 'female')}</option>
-                <option value="other">{sexLabel(appLanguage, 'other')}</option>
-              </select>
-            </label>
-          </div>
-          <label className="field-label">
-            {tx(appLanguage, '한 줄 소개', 'Bio')}
-            <input value={profileForm.bio} onChange={(event) => updateProfileForm('bio', event.target.value)} />
-          </label>
-          <div className="compact-grid profile-edit-grid">
-            <label className="field-label">
-              {tx(appLanguage, '나이', 'Age')}
-              <input value={profileForm.age} inputMode="numeric" onChange={(event) => updateProfileForm('age', event.target.value)} />
-            </label>
-            <label className="field-label">
-              {tx(appLanguage, '키', 'Height')}
-              <input value={profileForm.heightCm} inputMode="decimal" onChange={(event) => updateProfileForm('heightCm', event.target.value)} />
-            </label>
-            <label className="field-label">
-              {tx(appLanguage, '현재 체중', 'Current Weight')}
-              <input value={profileForm.weightKg} inputMode="decimal" onChange={(event) => updateProfileForm('weightKg', event.target.value)} />
-            </label>
-            <label className="field-label">
-              {tx(appLanguage, '목표 체중', 'Target Weight')}
-              <input value={profileForm.targetWeightKg} inputMode="decimal" onChange={(event) => updateProfileForm('targetWeightKg', event.target.value)} />
-            </label>
-          </div>
-          <div className="compact-grid">
-            <label className="field-label">
-              {tx(appLanguage, '목표 상태', 'Goal Status')}
-              <select value={profileForm.goal} onChange={(event) => updateProfileForm('goal', event.target.value)}>
-                <option value="diet">{tx(appLanguage, '감량', 'Cut')}</option>
-                <option value="maintain">{tx(appLanguage, '유지', 'Maintain')}</option>
-                <option value="bulk">{tx(appLanguage, '벌크업', 'Bulk')}</option>
-              </select>
-            </label>
-            <label className="field-label">
-              {tx(appLanguage, '활동 수준', 'Activity Level')}
-              <select value={profileForm.activityLevel} onChange={(event) => updateProfileForm('activityLevel', event.target.value)}>
-                <option value="sedentary">{activityLevelLabel(appLanguage, 'sedentary')}</option>
-                <option value="light">{activityLevelLabel(appLanguage, 'light')}</option>
-                <option value="moderate">{activityLevelLabel(appLanguage, 'moderate')}</option>
-                <option value="high">{activityLevelLabel(appLanguage, 'high')}</option>
-              </select>
-            </label>
-          </div>
-          <div className="compact-grid">
-            <label className="field-label">
-              {tx(appLanguage, '단위 체계', 'Unit System')}
-              <select value={profileForm.unitSystem} onChange={(event) => updateProfileForm('unitSystem', event.target.value)}>
-                <option value="metric">{unitSystemLabel(appLanguage, 'metric')}</option>
-                <option value="imperial">{unitSystemLabel(appLanguage, 'imperial')}</option>
-              </select>
-            </label>
-            <label className="field-label">
-              {tx(appLanguage, '영양 기본값', 'Nutrition Preference')}
-              <select value={profileForm.nutritionPreference} onChange={(event) => updateProfileForm('nutritionPreference', event.target.value)}>
-                <option value="balanced">{nutritionPreferenceLabel(appLanguage, 'balanced')}</option>
-                <option value="high-protein">{nutritionPreferenceLabel(appLanguage, 'high-protein')}</option>
-                <option value="low-carb">{nutritionPreferenceLabel(appLanguage, 'low-carb')}</option>
-              </select>
-            </label>
-          </div>
-          <div className="compact-grid">
-            <label className="check-wrap">
-              <input
-                type="checkbox"
-                checked={Boolean(profileForm.notificationsEnabled)}
-                onChange={(event) => updateProfileForm('notificationsEnabled', event.target.checked)}
-              />
-              <span>{tx(appLanguage, '일반 알림 사용', 'Enable notifications')}</span>
-            </label>
-            <label className="check-wrap">
-              <input
-                type="checkbox"
-                checked={Boolean(profileForm.monthlyWeightReminderEnabled)}
-                onChange={(event) => updateProfileForm('monthlyWeightReminderEnabled', event.target.checked)}
-              />
-              <span>{tx(appLanguage, '월간 체중 체크 리마인더', 'Monthly weight reminder')}</span>
-            </label>
-          </div>
-        </div>
-        <div className="program-chip-list">
-          <button className="inline-action primary-dark profile-primary-action" type="button" onClick={handleSaveProfile}>
-            {tx(appLanguage, '저장', 'Save')}
-          </button>
-          <button className="inline-action" type="button" onClick={handleResetProfileForm}>
-            {tx(appLanguage, '되돌리기', 'Reset')}
-          </button>
-        </div>
-      </details>
-
-      <details className="content-card profile-accordion">
-        <summary className="profile-accordion-summary">
-          <div>
-            <h2>{tx(appLanguage, 'Weight History', 'Weight History')}</h2>
-            <p>{tx(appLanguage, '한 달에 한 번 이상 체중 변화를 기록해 주세요.', 'Record your body weight at least once a month.')}</p>
-          </div>
-          <div className="profile-accordion-meta">
-            <span className="pill-tag">{tx(appLanguage, `다음 체크 ${nextWeightCheckInDate}`, `Next check ${nextWeightCheckInDate}`)}</span>
-            <span className="profile-accordion-arrow" aria-hidden="true">⌄</span>
-          </div>
-        </summary>
-        <div className="simple-list">
-          {recentWeightEntries.map((entry) => (
-            <div className="simple-row compact" key={entry.id}>
-              <strong>{entry.weightKg} kg</strong>
-              <span>{entry.date}</span>
-              <span>{entry.source === 'reminder' ? tx(appLanguage, '리마인더 기록', 'Reminder log') : tx(appLanguage, '프로필 업데이트', 'Profile update')}</span>
-            </div>
-          ))}
-        </div>
-      </details>
-
-      <details className="content-card profile-accordion">
-        <summary className="profile-accordion-summary">
-          <div>
-            <h2>{tx(appLanguage, 'Connected Health', 'Connected Health')}</h2>
-          </div>
-          <div className="profile-accordion-meta">
-            <span
-              className={
-                healthConnection.status === 'connected'
-                  ? 'pill-tag profile-accent-chip'
-                  : 'pill-tag profile-muted-chip'
-              }
-            >
-              {healthStatusLabel(appLanguage, healthConnection.status)}
-            </span>
-            <span className="profile-accordion-arrow" aria-hidden="true">⌄</span>
-          </div>
-        </summary>
-        <div className="summary-grid tight">
-          <div>
-            <span>{tx(appLanguage, '연동 소스', 'Source')}</span>
-            <strong>{healthSourceLabel(appLanguage, healthConnection.source)}</strong>
-          </div>
-          <div>
-            <span>{tx(appLanguage, '걸음 수', 'Steps')}</span>
-            <strong>{healthConnection.latestSteps.toLocaleString()}</strong>
-          </div>
-          <div>
-            <span>{tx(appLanguage, '거리', 'Distance')}</span>
-            <strong>{healthConnection.latestDistanceKm} km</strong>
-          </div>
-          <div>
-            <span>{tx(appLanguage, '활동 칼로리', 'Active Calories')}</span>
-            <strong>{healthConnection.latestActiveCalories} kcal</strong>
-          </div>
-          <div>
-            <span>{tx(appLanguage, '최근 동기화', 'Last Synced')}</span>
-            <strong>{healthConnection.lastSyncedAt}</strong>
-          </div>
-        </div>
-      </details>
-
-      <details className="content-card profile-accordion">
-        <summary className="profile-accordion-summary">
-          <div>
-            <h2>{tx(appLanguage, 'App Settings', 'App Settings')}</h2>
-          </div>
-          <span className="profile-accordion-arrow" aria-hidden="true">⌄</span>
-        </summary>
-        <div className="stack-form">
-          <div className="compact-grid">
-            <label className="field-label">
-              {tx(appLanguage, '목표 상태', 'Goal Status')}
-              <select
-                value={userProfile.goal}
-                onChange={(event) =>
-                  updateUserProfile({
-                    goal: event.target.value,
-                    targetWeightKg:
-                      event.target.value === 'diet' ? 74 : event.target.value === 'bulk' ? 82 : 78,
-                  })
-                }
-              >
-                <option value="diet">{tx(appLanguage, '감량', 'Cut')}</option>
-                <option value="maintain">{tx(appLanguage, '유지', 'Maintain')}</option>
-                <option value="bulk">{tx(appLanguage, '벌크업', 'Bulk')}</option>
-              </select>
-            </label>
-          </div>
-          <div className="compact-grid">
-            <label className="field-label">
-              {tx(appLanguage, '활동 수준', 'Activity Level')}
-              <select
-                value={userProfile.activityLevel}
-                onChange={(event) => updateUserProfile({ activityLevel: event.target.value })}
-              >
-                <option value="sedentary">{activityLevelLabel(appLanguage, 'sedentary')}</option>
-                <option value="light">{activityLevelLabel(appLanguage, 'light')}</option>
-                <option value="moderate">{activityLevelLabel(appLanguage, 'moderate')}</option>
-                <option value="high">{activityLevelLabel(appLanguage, 'high')}</option>
-              </select>
-            </label>
-            <label className="field-label">
-              {tx(appLanguage, '테마', 'Theme')}
-              <select
-                value={colorTheme}
-                onChange={(event) => setColorTheme(event.target.value)}
-              >
-                <option value="light">{tx(appLanguage, '라이트', 'Light')}</option>
-                <option value="dark">{tx(appLanguage, '다크', 'Dark')}</option>
-              </select>
-            </label>
-          </div>
-          <div className="compact-grid">
-            <label className="field-label">
-              {tx(appLanguage, '단위 체계', 'Unit System')}
-              <select
-                value={userProfile.unitSystem}
-                onChange={(event) => updateUserProfile({ unitSystem: event.target.value })}
-              >
-                <option value="metric">{unitSystemLabel(appLanguage, 'metric')}</option>
-                <option value="imperial">{unitSystemLabel(appLanguage, 'imperial')}</option>
-              </select>
-            </label>
-          </div>
-          <div className="compact-grid">
-            <label className="check-wrap">
-              <input
-                type="checkbox"
-                checked={Boolean(userProfile.monthlyWeightReminderEnabled)}
-                onChange={(event) => updateUserProfile({ monthlyWeightReminderEnabled: event.target.checked })}
-              />
-              <span>{tx(appLanguage, '월간 체중 체크 리마인더', 'Monthly weight reminder')}</span>
-            </label>
-          </div>
-          <div className="compact-grid">
-            <label className="field-label">
-              {tx(appLanguage, '현재 체중', 'Current Weight')}
-              <input
-                value={userProfile.weightKg}
-                onChange={(event) => updateUserProfile({ weightKg: Number(event.target.value) || 0 })}
-                inputMode="decimal"
-              />
-            </label>
-            <label className="field-label">
-              {tx(appLanguage, '목표 체중', 'Target Weight')}
-              <input
-                value={userProfile.targetWeightKg}
-                onChange={(event) => updateUserProfile({ targetWeightKg: Number(event.target.value) || 0 })}
-                inputMode="decimal"
-              />
-            </label>
-          </div>
-          <div className="compact-grid">
-            <label className="field-label">
-              {tx(appLanguage, '영양 기본값', 'Nutrition Preference')}
-              <select
-                value={userProfile.nutritionPreference}
-                onChange={(event) => updateUserProfile({ nutritionPreference: event.target.value })}
-              >
-                <option value="balanced">{nutritionPreferenceLabel(appLanguage, 'balanced')}</option>
-                <option value="high-protein">{nutritionPreferenceLabel(appLanguage, 'high-protein')}</option>
-                <option value="low-carb">{nutritionPreferenceLabel(appLanguage, 'low-carb')}</option>
-              </select>
-            </label>
-            <label className="field-label">
-              {tx(appLanguage, '동기화된 걸음 수', 'Synced Steps')}
-              <input
-                value={healthConnection.latestSteps}
-                onChange={(event) =>
-                  updateHealthConnection({
-                    latestSteps: Number(event.target.value) || 0,
-                    lastSyncedAt: tx(appLanguage, '방금 전', 'Just now'),
-                  })
-                }
-                inputMode="numeric"
-              />
-            </label>
-          </div>
-          <div className="compact-grid">
-            <label className="field-label">
-              {tx(appLanguage, '건강 데이터 소스', 'Health Source')}
-              <select
-                value={healthConnection.source}
-                onChange={(event) => updateHealthConnection({ source: event.target.value })}
-              >
-                <option value="Apple Health">{healthSourceLabel(appLanguage, 'Apple Health')}</option>
-                <option value="Health Connect">{healthSourceLabel(appLanguage, 'Health Connect')}</option>
-                <option value="Manual">{healthSourceLabel(appLanguage, 'Manual')}</option>
-              </select>
-            </label>
-          </div>
-        </div>
-        <div className="program-chip-list">
-          <button
-            className="inline-action"
-            type="button"
-            onClick={() =>
-              updateHealthConnection({
-                status: healthConnection.status === 'connected' ? 'disconnected' : 'connected',
-                lastSyncedAt: tx(appLanguage, '방금 전', 'Just now'),
-              })
-            }
-          >
-            {tx(appLanguage, '건강 연결 상태 토글', 'Toggle Health Connection')}
-          </button>
-          <button className="inline-action" type="button" onClick={resetAllData}>
-            {tx(appLanguage, '로컬 데이터 초기화', 'Reset Local Data')}
-          </button>
-        </div>
-      </details>
     </section>
   )
 }

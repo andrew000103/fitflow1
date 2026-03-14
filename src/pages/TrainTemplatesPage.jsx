@@ -6,6 +6,20 @@ import { tx } from '../utils/appLanguage.js'
 const categoryOptions = ['All', 'Bodybuilding', 'Powerbuilding', 'Athletic', 'Diet / Cutting', 'General Strength', 'Beginner', 'Home Training']
 const sortOptions = ['Popular', 'Highest Rated', 'Most Used', 'Newest']
 
+function getSortOptionLabel(language, option) {
+  if (option === 'Highest Rated') {
+    return tx(language, '평점 높은 순', 'Highest Rated')
+  }
+  if (option === 'Most Used') {
+    return tx(language, '사용 많은 순', 'Most Used')
+  }
+  if (option === 'Newest') {
+    return tx(language, '최신순', 'Newest')
+  }
+
+  return tx(language, '인기순', 'Popular')
+}
+
 function TrainTemplatesPage() {
   const { appLanguage, programs, useProgram, activeProgram } = useOutletContext()
   const [query, setQuery] = useState('')
@@ -43,7 +57,7 @@ function TrainTemplatesPage() {
   return (
     <section className="page-section">
       <PageHeader
-        eyebrow={tx(appLanguage, '운동 / 프로그램', 'Train / Programs')}
+        eyebrow={tx(appLanguage, '운동 / 프로그램', 'Workout / Programs')}
         title={tx(appLanguage, '프로그램 둘러보기', 'Browse Programs')}
         description={tx(appLanguage, '몇 주짜리 훈련 계획을 탐색하고, 현재 진행할 프로그램을 선택합니다.', 'Browse multi-week programs and choose your current plan.')}
       />
@@ -78,7 +92,7 @@ function TrainTemplatesPage() {
                 className={selectedSort === item ? 'inline-action active-soft' : 'inline-action'}
                 onClick={() => setSelectedSort(item)}
               >
-                {item}
+                {getSortOptionLabel(appLanguage, item)}
               </button>
             ))}
           </div>

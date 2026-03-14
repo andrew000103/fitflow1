@@ -1,14 +1,33 @@
-import { Link, useOutletContext } from 'react-router-dom'
 import { useMemo, useState } from 'react'
 import PageHeader from '../components/PageHeader.jsx'
+import QuickAddExerciseBar from '../components/workout/QuickAddExerciseBar.jsx'
+import ExercisePickerSheet from '../components/workout/ExercisePickerSheet.jsx'
+import WorkoutExerciseCard from '../components/workout/WorkoutExerciseCard.jsx'
+import BottomActionBar from '../components/workout/BottomActionBar.jsx'
+import WorkoutHeader from '../components/workout/WorkoutHeader.jsx'
+import { useOutletContext } from 'react-router-dom'
 import { equipmentOptions, exerciseDetails, muscleGroupOptions } from '../data/fitnessData.js'
-import { calculateEstimated1RM, calculateExerciseVolume, detectExercisePRs, summarizeExercisePerformance } from '../utils/fitnessMetrics.ts'
+import { tx } from '../utils/appLanguage.js'
+import { detectExercisePRs, detectSetPRs } from '../utils/fitnessMetrics.ts'
+
+function uniqueByName(items) {
+  const seen = new Set()
+
+  return items.filter((item) => {
+    if (!item?.name || seen.has(item.name)) {
+      return false
+    }
+    seen.add(item.name)
+    return true
+  })
+}
 
 function TrainWorkoutPage() {
   const {
+    appLanguage,
     activeWorkout,
+    activeProgram,
     programs,
-    categoryLabels,
     workoutCatalog,
     exerciseDatabase,
     sessions,
@@ -19,32 +38,38 @@ function TrainWorkoutPage() {
     startWorkout,
     addExerciseToWorkout,
     moveWorkoutExercise,
-    updateWorkoutMeta,
     updateExerciseMeta,
     updateExerciseName,
     swapWorkoutExercise,
     updateWorkoutSet,
     addWorkoutSet,
+    moveWorkoutSet,
+    removeWorkoutSet,
     toggleSuperset,
     toggleWorkoutSetComplete,
     removeWorkoutExercise,
     stopRest,
     finishWorkout,
+    saveWorkoutTemplate,
   } = useOutletContext()
 
-  const [metaOpen, setMetaOpen] = useState(false)
   const [exercisePickerOpen, setExercisePickerOpen] = useState(false)
+  const [pickerTab, setPickerTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState('All')
   const [selectedEquipment, setSelectedEquipment] = useState('All')
-  const [targetWeight, setTargetWeight] = useState('100')
-  const [barWeight, setBarWeight] = useState('20')
+  const [finishConfirmOpen, setFinishConfirmOpen] = useState(false)
+  const [workoutSummaryOpen, setWorkoutSummaryOpen] = useState(false)
+  const [templatePromptOpen, setTemplatePromptOpen] = useState(false)
+  const [completedWorkoutSnapshot, setCompletedWorkoutSnapshot] = useState(null)
+  const [completedWorkoutSummary, setCompletedWorkoutSummary] = useState(null)
 
   const restClock = `${String(Math.floor(currentRestElapsed / 60)).padStart(2, '0')}:${String(currentRestElapsed % 60).padStart(2, '0')}`
   const elapsedSeconds = activeWorkout ? Math.max(0, Math.floor((nowTick - activeWorkout.startedAt) / 1000)) : 0
   const elapsedClock = `${String(Math.floor(elapsedSeconds / 3600)).padStart(2, '0')}:${String(
     Math.floor((elapsedSeconds % 3600) / 60),
   ).padStart(2, '0')}:${String(elapsedSeconds % 60).padStart(2, '0')}`
+
   const usageMap = useMemo(
     () =>
       sets.reduce((acc, item) => {
@@ -53,10 +78,59 @@ function TrainWorkoutPage() {
       }, {}),
     [sets],
   )
+
   const recentExercises = useMemo(
-    () => Array.from(new Map(sets.map((item) => [item.exercise, item])).values()).slice(0, 4),
+    () => Array.from(new Map(sets.map((item) => [item.exercise, item])).values()).slice(0, 5),
     [sets],
   )
+
+  const recentItems = useMemo(
+    () =>
+      uniqueByName(
+        recentExercises
+          .map((item) => exerciseDatabase.find((exercise) => exercise.name === item.exercise))
+          .filter(Boolean),
+      ),
+    [exerciseDatabase, recentExercises],
+  )
+
+  const frequentItems = useMemo(
+    () =>
+      exerciseDatabase
+        .filter((exercise) => usageMap[exercise.name] > 0)
+        .sort((left, right) => {
+          const usageDelta = (usageMap[right.name] || 0) - (usageMap[left.name] || 0)
+          return usageDelta !== 0 ? usageDelta : left.name.localeCompare(right.name)
+        })
+        .slice(0, 6),
+    [exerciseDatabase, usageMap],
+  )
+
+  const currentProgramDay = useMemo(() => {
+    if (!activeWorkout?.programId) {
+      return null
+    }
+
+    const activeProgramSource = programs.find((program) => program.id === activeWorkout.programId)
+    const week = activeProgramSource?.weeks?.find((item) => item.weekIndex === (activeWorkout.currentWeek || activeProgram?.currentWeek || 1))
+
+    return week?.days?.find((item) => item.dayIndex === (activeWorkout.currentDay || activeProgram?.currentDay || 1)) || null
+  }, [activeProgram, activeWorkout, programs])
+
+  const recommendedItems = useMemo(() => {
+    // TODO: Replace this with persisted personalization once workout recommendations move to a shared store.
+    const programItems = (currentProgramDay?.exercises || [])
+      .map((item) => item.exerciseName || item.name)
+      .map((name) => exerciseDatabase.find((exercise) => exercise.name === name))
+      .filter(Boolean)
+
+    if (programItems.length > 0) {
+      return uniqueByName(programItems).slice(0, 8)
+    }
+
+    return uniqueByName([...frequentItems, ...recentItems, ...exerciseDatabase]).slice(0, 8)
+  }, [currentProgramDay, exerciseDatabase, frequentItems, recentItems])
+
   const filteredExercises = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase()
 
@@ -76,65 +150,104 @@ function TrainWorkoutPage() {
 
         return matchesSearch && matchesMuscle && matchesEquipment
       })
-      .sort((left, right) => {
-        const usageDelta = (usageMap[right.name] || 0) - (usageMap[left.name] || 0)
-        return usageDelta !== 0 ? usageDelta : left.name.localeCompare(right.name)
-      })
-  }, [exerciseDatabase, searchQuery, selectedEquipment, selectedMuscleGroup, usageMap])
+      .sort((left, right) => left.name.localeCompare(right.name))
+  }, [exerciseDatabase, searchQuery, selectedEquipment, selectedMuscleGroup])
 
-  const plateResult = useMemo(() => {
-    const target = Number(targetWeight)
-    const bar = Number(barWeight)
-    const perSide = (target - bar) / 2
-    if (!Number.isFinite(target) || !Number.isFinite(bar) || target <= bar) {
-      return { valid: false, message: '목표 중량은 바 무게보다 커야 합니다.' }
-    }
-    const plates = [25, 20, 15, 10, 5, 2.5, 1.25]
-    let remaining = Math.round(perSide * 100) / 100
-    const breakdown = []
-    plates.forEach((plate) => {
-      const count = Math.floor((remaining + 1e-9) / plate)
-      if (count > 0) {
-        breakdown.push({ plate, count })
-        remaining = Math.round((remaining - count * plate) * 100) / 100
-      }
-    })
-    return {
-      valid: remaining === 0,
-      perSide,
-      breakdown,
-      message: remaining === 0 ? null : `${remaining}kg per side를 현재 플레이트 조합으로 맞출 수 없습니다.`,
-    }
-  }, [barWeight, targetWeight])
+  const workoutExerciseNames = useMemo(
+    () => new Set((activeWorkout?.exercises || []).map((exercise) => exercise.name)),
+    [activeWorkout],
+  )
+
+  const canAddProgramDay = Boolean(
+    currentProgramDay?.exercises?.some((item) => !workoutExerciseNames.has(item.exerciseName || item.name)),
+  )
 
   function handleAddExercise(exerciseName) {
     addExerciseToWorkout(exerciseName)
     setExercisePickerOpen(false)
+    setSearchQuery('')
+  }
+
+  function handleProgramDayAdd() {
+    if (!currentProgramDay?.exercises?.length) {
+      return
+    }
+
+    currentProgramDay.exercises.forEach((item) => {
+      const exerciseName = item.exerciseName || item.name
+      if (!workoutExerciseNames.has(exerciseName)) {
+        addExerciseToWorkout(exerciseName)
+      }
+    })
+
+    setExercisePickerOpen(false)
+    setSearchQuery('')
   }
 
   function clearExerciseFilters() {
     setSearchQuery('')
     setSelectedMuscleGroup('All')
     setSelectedEquipment('All')
+    setPickerTab('all')
   }
 
-  if (!activeWorkout) {
+  function openExercisePicker(nextTab = 'all') {
+    setPickerTab(nextTab)
+    setExercisePickerOpen(true)
+  }
+
+  function closeSummaryFlow() {
+    if (completedWorkoutSnapshot?.source === 'empty') {
+      setTemplatePromptOpen(true)
+      return
+    }
+
+    setWorkoutSummaryOpen(false)
+    setCompletedWorkoutSnapshot(null)
+    setCompletedWorkoutSummary(null)
+  }
+
+  function finishSummaryFlow() {
+    setWorkoutSummaryOpen(false)
+    setTemplatePromptOpen(false)
+    setCompletedWorkoutSnapshot(null)
+    setCompletedWorkoutSummary(null)
+  }
+
+  function handleSaveTemplate() {
+    if (completedWorkoutSnapshot) {
+      saveWorkoutTemplate({
+        title: `${completedWorkoutSnapshot.title} 템플릿`,
+        description: '즉시 운동 기록에서 저장한 템플릿입니다.',
+        dayTitle: completedWorkoutSnapshot.title,
+        exercises: completedWorkoutSnapshot.exercises,
+      })
+    }
+
+    finishSummaryFlow()
+  }
+
+  if (!activeWorkout && !workoutSummaryOpen) {
     return (
       <section className="page-section">
         <PageHeader
-          eyebrow="Train / Workout"
-          title="Start Workout"
-          description="빈 운동을 바로 시작하거나, 현재 사용할 Program을 선택해서 진입할 수 있습니다."
+          eyebrow="Workout / Workout"
+          title={tx(appLanguage, '운동 시작', 'Start Workout')}
+          description={tx(
+            appLanguage,
+            '바로 운동을 시작하거나 프로그램 운동으로 들어갈 수 있습니다.',
+            'Start a workout right away or jump into your current program.',
+          )}
         />
 
         <div className="train-action-grid">
           <button type="button" className="train-action-card" onClick={() => startWorkout('empty')}>
-            <span className="train-action-icon">➕</span>
+            <span className="train-action-icon">+</span>
             <div className="train-action-copy">
-              <strong>Start Empty Workout</strong>
-              <span>가볍게 시작하고 운동을 추가합니다.</span>
+              <strong>{tx(appLanguage, '바로 운동 시작', 'Quick Workout')}</strong>
+              <span>{tx(appLanguage, '빈 운동을 시작하고 바로 종목을 추가합니다.', 'Start empty and add exercises on the fly.')}</span>
             </div>
-            <span className="train-action-cta">Start</span>
+            <span className="train-action-cta">{tx(appLanguage, '시작', 'Start')}</span>
           </button>
           {programs.slice(0, 2).map((program) => (
             <button
@@ -143,12 +256,12 @@ function TrainWorkoutPage() {
               className="train-action-card"
               onClick={() => startWorkout('program', program)}
             >
-              <span className="train-action-icon">📚</span>
+              <span className="train-action-icon">+</span>
               <div className="train-action-copy">
                 <strong>{program.title}</strong>
                 <span>{program.category} · {program.durationWeeks} weeks</span>
               </div>
-              <span className="train-action-cta">Start</span>
+              <span className="train-action-cta">{tx(appLanguage, '시작', 'Start')}</span>
             </button>
           ))}
         </div>
@@ -157,205 +270,57 @@ function TrainWorkoutPage() {
   }
 
   return (
-    <section className="page-section">
-      <div className="train-hero">
-        <div className="train-hero-main">
-          <span className="page-eyebrow">Train / Active workout</span>
-          <h1>{activeWorkout.title}</h1>
-          <div className="train-meta-row">
-            <span className="status-chip active">Elapsed {elapsedClock}</span>
-            <span className={isResting ? 'status-chip active' : 'status-chip'}>
-              Rest {isResting ? restClock : 'Ready'}
-            </span>
-          </div>
-        </div>
-        <div className="train-hero-actions">
-          <button className="icon-chip" type="button" onClick={() => setMetaOpen((current) => !current)}>
-            Details
-          </button>
-          {isResting ? (
-            <button className="icon-chip" type="button" onClick={stopRest}>
-              End Rest
-            </button>
-          ) : null}
-          <button className="inline-action primary-dark" type="button" onClick={finishWorkout}>
-            Finish
-          </button>
-        </div>
-      </div>
+    <section className="page-section active-workout-page">
+      {activeWorkout ? (
+        <>
+          <WorkoutHeader
+            title={activeWorkout.title}
+            elapsedClock={elapsedClock}
+            isResting={isResting}
+            restClock={restClock}
+            elapsedLabel={tx(appLanguage, '경과', 'Elapsed')}
+            restReadyLabel={tx(appLanguage, '휴식 대기', 'Rest ready')}
+            restLabel={tx(appLanguage, '휴식', 'Rest')}
+            endRestLabel={tx(appLanguage, '휴식 종료', 'End rest')}
+            finishLabel={tx(appLanguage, '운동 종료', 'Finish')}
+            onEndRest={stopRest}
+            onFinish={() => setFinishConfirmOpen(true)}
+          />
 
-      <article className="content-card workout-focus-card">
-        <div className="feed-head">
-          <div>
-            <span className="card-kicker">Add exercise</span>
-            <h2>전체 목록에서 검색하고 필요할 때만 필터링합니다.</h2>
-          </div>
-          <button className="inline-action" type="button" onClick={() => setExercisePickerOpen((current) => !current)}>
-            {exercisePickerOpen ? 'Close' : 'Browse exercises'}
-          </button>
-        </div>
-        {recentExercises.length > 0 ? (
-          <div className="quick-pills">
-            {recentExercises.map((exercise) => (
-              <button
-                key={exercise.exercise}
-                className="pill-tag"
-                type="button"
-                onClick={() => handleAddExercise(exercise.exercise)}
-              >
-                + {exercise.exercise}
+          <QuickAddExerciseBar
+            title={tx(appLanguage, '운동 추가', 'Add Exercise')}
+            searchPlaceholder={tx(appLanguage, '운동 검색', 'Search exercise')}
+            browseLabel={tx(appLanguage, '더 보기', 'More')}
+            recentLabel={tx(appLanguage, '최근', 'Recent')}
+            frequentLabel={tx(appLanguage, '자주 함', 'Frequent')}
+            routineLabel={tx(appLanguage, '루틴', 'Routine')}
+            routineActionLabel={tx(appLanguage, '오늘 루틴 추가', 'Add routine')}
+            searchQuery={searchQuery}
+            onSearchChange={(value) => {
+              setSearchQuery(value)
+              setExercisePickerOpen(true)
+            }}
+            onOpenSheet={() => openExercisePicker(searchQuery.trim() ? 'recommended' : 'all')}
+            recentExercises={recentExercises}
+            frequentExercises={frequentItems}
+            canAddProgramDay={canAddProgramDay}
+            onAddProgramDay={handleProgramDayAdd}
+            onQuickAdd={handleAddExercise}
+          />
+
+          {activeWorkout.exercises.length === 0 ? (
+            <article className="content-card workout-empty-state">
+              <strong>{tx(appLanguage, '운동을 추가하세요', 'Add an exercise')}</strong>
+              <button className="inline-action" type="button" onClick={() => openExercisePicker('all')}>
+                {tx(appLanguage, '추천 운동', 'Recommended')}
               </button>
-            ))}
-          </div>
-        ) : null}
+            </article>
+          ) : null}
 
-        {exercisePickerOpen ? (
-          <div className="workout-add-sheet">
-            <div className="stack-form">
-              <label className="field-label">
-                Search
-                <input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="운동명 또는 타겟 부위를 검색"
-                />
-              </label>
-              <div className="compact-grid">
-                <label className="field-label">
-                  Muscle Group
-                  <select value={selectedMuscleGroup} onChange={(event) => setSelectedMuscleGroup(event.target.value)}>
-                    {muscleGroupOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field-label">
-                  Equipment
-                  <select value={selectedEquipment} onChange={(event) => setSelectedEquipment(event.target.value)}>
-                    {equipmentOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div className="filter-row">
-                <button className="inline-action" type="button" onClick={clearExerciseFilters}>
-                  Clear filters
-                </button>
-                <Link className="inline-action" to="/train/exercises">
-                  Open DB
-                </Link>
-              </div>
-            </div>
-
-            <div className="database-list">
-              {filteredExercises.length > 0 ? (
-                filteredExercises.map((exercise) => (
-                  <button
-                    className="database-row workout-database-row"
-                    key={exercise.name}
-                    type="button"
-                    onClick={() => handleAddExercise(exercise.name)}
-                  >
-                    <div className="database-icon">{exercise.icon}</div>
-                    <div className="database-copy">
-                      <strong>{exercise.name}</strong>
-                      <span>
-                        {exercise.target} · {exercise.secondary}
-                      </span>
-                      <span>{exercise.equipment} · {usageMap[exercise.name] || 0} times</span>
-                    </div>
-                    <span className="inline-action">Add</span>
-                  </button>
-                ))
-              ) : (
-                <div className="mini-panel">조건에 맞는 운동이 없습니다. 검색어나 필터를 조정해보세요.</div>
-              )}
-            </div>
-          </div>
-        ) : null}
-      </article>
-
-      {metaOpen ? (
-        <article className="content-card">
-          <div className="card-grid split">
-            <div className="stack-form">
-              <span className="card-kicker">Workout details</span>
-              <label className="field-label">
-                Workout name
-                <input value={activeWorkout.title} onChange={(event) => updateWorkoutMeta('title', event.target.value)} />
-              </label>
-              <label className="field-label">
-                Workout note
-                <textarea rows="3" value={activeWorkout.note} onChange={(event) => updateWorkoutMeta('note', event.target.value)} />
-              </label>
-            </div>
-
-            <div className="stack-form">
-              <span className="card-kicker">Plate calculator</span>
-              <div className="compact-grid">
-                <label className="field-label">
-                  Target weight
-                  <input value={targetWeight} onChange={(event) => setTargetWeight(event.target.value)} inputMode="decimal" />
-                </label>
-                <label className="field-label">
-                  Bar weight
-                  <input value={barWeight} onChange={(event) => setBarWeight(event.target.value)} inputMode="decimal" />
-                </label>
-              </div>
-              {plateResult.valid ? (
-                <div className="plate-result">
-                  <strong>{plateResult.perSide}kg per side</strong>
-                  <div className="plate-row">
-                    {plateResult.breakdown.map((item) => (
-                      <span className="pill-tag" key={item.plate}>
-                        {item.plate}kg x {item.count}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p>{plateResult.message}</p>
-              )}
-            </div>
-          </div>
-        </article>
-      ) : null}
-
-      <article className="content-card rest-focus-card">
-        <span className="card-kicker">Rest stopwatch</span>
-        <strong>{isResting ? restClock : 'Rest Ready'}</strong>
-        <p>{isResting ? '현재 쉬는 시간을 누적해서 표시합니다.' : '세트를 완료하면 휴식 스톱워치가 자동으로 시작됩니다.'}</p>
-      </article>
-
-      <div className="exercise-stack">
-        {activeWorkout.exercises.map((exercise) => {
+          <div className="exercise-stack active-workout-stack">
+            {activeWorkout.exercises.map((exercise) => {
           const previousRecord = sets.find((item) => item.exercise === exercise.name)
           const detail = exerciseDetails[exercise.name]
-          const performance = summarizeExercisePerformance({
-            name: exercise.name,
-            sets: exercise.sets.map((setItem) => ({
-              weightKg: Number(setItem.weight || 0),
-              reps: Number(setItem.reps || 0),
-              isCompleted: setItem.completed,
-            })),
-          })
-          const liveEstimated1RM = exercise.sets.reduce((best, setItem) => {
-            const estimate = calculateEstimated1RM(Number(setItem.weight || 0), Number(setItem.reps || 0))
-            return estimate > best ? estimate : best
-          }, 0)
-          const exerciseVolume = calculateExerciseVolume({
-            name: exercise.name,
-            sets: exercise.sets.map((setItem) => ({
-              weightKg: Number(setItem.weight || 0),
-              reps: Number(setItem.reps || 0),
-              isCompleted: setItem.completed,
-            })),
-          })
           const previousBest = sessions
             .flatMap((session) => session.exercises)
             .filter((item) => item.name === exercise.name)
@@ -382,141 +347,236 @@ function TrainWorkoutPage() {
             },
             previousBest,
           )
+          const setPrResults = detectSetPRs(
+            exercise.sets.map((setItem) => ({
+              weightKg: Number(setItem.weight || 0),
+              reps: Number(setItem.reps || 0),
+              isCompleted: setItem.completed,
+            })),
+            previousBest,
+          )
 
           return (
-            <article className="content-card exercise-card" key={exercise.id}>
-              <div className="exercise-card-head">
-                <div>
-                  <span className="card-kicker">{categoryLabels[exercise.category]}</span>
-                  {exercise.supersetId ? <span className="pill-tag accent">Superset</span> : null}
-                  <div className="exercise-name-row">
-                    <select
-                      className="exercise-name-select"
-                      value={exercise.name}
-                      onChange={(event) => updateExerciseName(exercise.id, event.target.value)}
-                    >
-                      {workoutCatalog[exercise.category].map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="mini-caption">
-                      Previous {previousRecord ? `${previousRecord.weight}kg x ${previousRecord.reps}` : '-'}
-                    </span>
-                  </div>
-                </div>
-                <button className="inline-action" type="button" onClick={() => addWorkoutSet(exercise.id)}>
-                  Add set
-                </button>
-              </div>
-
-              <div className="exercise-stats compact">
-                <span>1RM {liveEstimated1RM || '-'} kg</span>
-                <span>Best {performance.maxWeightKg || '-'} kg</span>
-                <span>Set Vol {performance.maxSetVolumeKg || '-'} kg</span>
-                <span>Total {exerciseVolume || '-'} kg</span>
-              </div>
-
-              {prResult.isMaxWeightPR || prResult.isExerciseVolumePR ? (
-                <div className="exercise-pr-row">
-                  {prResult.isMaxWeightPR ? <span className="pill-tag accent">Weight PR</span> : null}
-                  {prResult.isExerciseVolumePR ? <span className="pill-tag accent">Volume PR</span> : null}
-                </div>
-              ) : null}
-
-              <div className="set-list">
-                {exercise.sets.map((setItem, index) => (
-                  <div className="set-row mobile" key={setItem.id}>
-                    <div className="set-row-main">
-                      <div className="set-index-block">
-                        <strong>Set {index + 1}</strong>
-                        <span>{setItem.previous}</span>
-                      </div>
-                      <div className="set-entry-grid">
-                        <label className="set-input">
-                          <span>kg</span>
-                          <input
-                            value={setItem.weight}
-                            inputMode="decimal"
-                            onChange={(event) => updateWorkoutSet(exercise.id, setItem.id, 'weight', event.target.value)}
-                          />
-                        </label>
-                        <label className="set-input">
-                          <span>reps</span>
-                          <input
-                            value={setItem.reps}
-                            inputMode="numeric"
-                            onChange={(event) => updateWorkoutSet(exercise.id, setItem.id, 'reps', event.target.value)}
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    <button
-                      className={setItem.completed ? 'inline-action primary-dark' : 'inline-action'}
-                      type="button"
-                      onClick={() => toggleWorkoutSetComplete(exercise.id, setItem.id)}
-                    >
-                      {setItem.completed ? 'Done' : 'Complete'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <details className="workout-advanced">
-                <summary>Advanced options</summary>
-                <div className="workout-advanced-body">
-                  <div className="exercise-card-tools">
-                    <button className="inline-action" type="button" onClick={() => toggleSuperset(exercise.id)}>
-                      {exercise.supersetId ? 'Unset superset' : 'Make superset'}
-                    </button>
-                    <button className="inline-action" type="button" onClick={() => swapWorkoutExercise(exercise.id)}>
-                      Swap exercise
-                    </button>
-                    <button className="inline-action" type="button" onClick={() => moveWorkoutExercise(exercise.id, 'up')}>
-                      Move up
-                    </button>
-                    <button className="inline-action" type="button" onClick={() => moveWorkoutExercise(exercise.id, 'down')}>
-                      Move down
-                    </button>
-                    <button className="inline-action" type="button" onClick={() => removeWorkoutExercise(exercise.id)}>
-                      Remove
-                    </button>
-                  </div>
-
-                  <label className="field-label">
-                    Exercise note
-                    <textarea
-                      rows="2"
-                      value={exercise.note}
-                      onChange={(event) => updateExerciseMeta(exercise.id, 'note', event.target.value)}
-                      placeholder={detail?.description || '메모를 입력하세요'}
-                    />
-                  </label>
-
-                  <a
-                    className="inline-action"
-                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(`${exercise.name} exercise tutorial`)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    자세 설명 / 유튜브 보기
-                  </a>
-                </div>
-              </details>
-            </article>
+            <WorkoutExerciseCard
+              key={exercise.id}
+              exercise={exercise}
+              displayOrder={activeWorkout.exercises.findIndex((item) => item.id === exercise.id) + 1}
+              previousLabel={tx(appLanguage, '이전', 'Last')}
+              addSetLabel={tx(appLanguage, '세트 추가', 'Add Set')}
+              weightPrLabel={tx(appLanguage, '중량 PR', 'Weight PR')}
+              volumePrLabel={tx(appLanguage, '볼륨 PR', 'Volume PR')}
+              setLabel={tx(appLanguage, '세트', 'Set')}
+              weightLabel="kg"
+              repsLabel={tx(appLanguage, '횟수', 'Reps')}
+              doneLabel={tx(appLanguage, '완료', 'Done')}
+              moreLabel={tx(appLanguage, '더보기', 'More')}
+              unsetSupersetLabel={tx(appLanguage, '슈퍼세트 해제', 'Unset superset')}
+              makeSupersetLabel={tx(appLanguage, '슈퍼세트 지정', 'Make superset')}
+              swapLabel={tx(appLanguage, '운동 교체', 'Swap')}
+              upLabel={tx(appLanguage, '위로', 'Up')}
+              downLabel={tx(appLanguage, '아래로', 'Down')}
+              removeLabel={tx(appLanguage, '삭제', 'Remove')}
+              noteLabel={tx(appLanguage, '메모', 'Note')}
+              notePlaceholder={tx(appLanguage, '메모를 남기세요', 'Add a note')}
+              previousRecord={previousRecord}
+              prResult={prResult}
+              setPrResults={setPrResults}
+              workoutCatalog={workoutCatalog}
+              updateExerciseName={updateExerciseName}
+              addWorkoutSet={addWorkoutSet}
+              moveWorkoutSet={moveWorkoutSet}
+              removeWorkoutSet={removeWorkoutSet}
+              updateWorkoutSet={updateWorkoutSet}
+              toggleWorkoutSetComplete={toggleWorkoutSetComplete}
+              toggleSuperset={toggleSuperset}
+              swapWorkoutExercise={swapWorkoutExercise}
+              moveWorkoutExercise={moveWorkoutExercise}
+              removeWorkoutExercise={removeWorkoutExercise}
+              updateExerciseMeta={updateExerciseMeta}
+              detail={detail}
+            />
           )
-        })}
-      </div>
+            })}
+          </div>
 
-      <div className="sticky-cta-bar">
-        <button className="inline-action" type="button" onClick={() => setExercisePickerOpen(true)}>
-          Add exercise
-        </button>
-        <button className="inline-action primary-dark" type="button" onClick={finishWorkout}>
-          Finish workout
-        </button>
-      </div>
+          <BottomActionBar
+            addLabel={tx(appLanguage, '+ 운동 추가', '+ Add Exercise')}
+            finishLabel={tx(appLanguage, '운동 종료', 'Finish Workout')}
+            onAddExercise={() => openExercisePicker(searchQuery.trim() ? 'recommended' : 'all')}
+            onFinishWorkout={() => setFinishConfirmOpen(true)}
+          />
+
+          <ExercisePickerSheet
+            open={exercisePickerOpen}
+            onClose={() => setExercisePickerOpen(false)}
+            title={tx(appLanguage, '운동 선택', 'Pick an exercise')}
+            searchResultsTitle={tx(appLanguage, '검색 결과', 'Search results')}
+            closeLabel={tx(appLanguage, '닫기', 'Close')}
+            searchPlaceholder={tx(appLanguage, '운동명 또는 부위 검색', 'Search by exercise or muscle')}
+            tabLabels={[
+              ['recent', tx(appLanguage, '최근', 'Recent')],
+              ['frequent', tx(appLanguage, '자주 함', 'Frequent')],
+              ['recommended', tx(appLanguage, '추천', 'Recommended')],
+            ]}
+            filtersLabel={tx(appLanguage, '필터', 'Filters')}
+            clearLabel={tx(appLanguage, '초기화', 'Clear')}
+            openDbLabel={tx(appLanguage, 'DB 열기', 'Open DB')}
+            emptyLabel={tx(appLanguage, '운동 없음', 'No exercises')}
+            addLabel={tx(appLanguage, '추가', 'Add')}
+            muscleGroupLabel={tx(appLanguage, '부위', 'Muscle Group')}
+            equipmentLabel={tx(appLanguage, '장비', 'Equipment')}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            pickerTab={pickerTab}
+            onTabChange={setPickerTab}
+            recentItems={recentItems}
+            frequentItems={frequentItems}
+            recommendedItems={recommendedItems}
+            filteredItems={filteredExercises}
+            selectedMuscleGroup={selectedMuscleGroup}
+            selectedEquipment={selectedEquipment}
+            onMuscleChange={setSelectedMuscleGroup}
+            onEquipmentChange={setSelectedEquipment}
+            onClearFilters={clearExerciseFilters}
+            muscleGroupOptions={muscleGroupOptions}
+            equipmentOptions={equipmentOptions}
+            onSelectExercise={handleAddExercise}
+          />
+        </>
+      ) : null}
+
+      {finishConfirmOpen ? (
+        <>
+          <button
+            className="workout-finish-backdrop"
+            type="button"
+            aria-label={tx(appLanguage, '운동 종료 확인 닫기', 'Close finish confirmation')}
+            onClick={() => setFinishConfirmOpen(false)}
+          />
+          <section className="content-card workout-finish-modal" aria-label={tx(appLanguage, '운동 완료 확인', 'Complete workout confirmation')}>
+            <div className="workout-finish-copy">
+              <h2>{tx(appLanguage, '운동을 완료할까요?', 'Confirm complete?')}</h2>
+              <p>{tx(appLanguage, '완료하면 오늘 기록이 저장되고 요약이 바로 보여요.', 'We will save today workout and show your summary right away.')}</p>
+            </div>
+            <div className="workout-finish-actions">
+              <button className="inline-action" type="button" onClick={() => setFinishConfirmOpen(false)}>
+                {tx(appLanguage, '취소', 'Cancel')}
+              </button>
+              <button
+                className="inline-action primary-dark"
+                type="button"
+                onClick={() => {
+                  setFinishConfirmOpen(false)
+                  const result = finishWorkout()
+                  if (!result) {
+                    return
+                  }
+                  setCompletedWorkoutSnapshot(result.finishedWorkout)
+                  setCompletedWorkoutSummary(result.summary)
+                  setWorkoutSummaryOpen(true)
+                }}
+              >
+                {tx(appLanguage, '완료하기', 'Confirm')}
+              </button>
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      {workoutSummaryOpen && completedWorkoutSummary ? (
+        <>
+          <button
+            className="workout-finish-backdrop"
+            type="button"
+            aria-label={tx(appLanguage, '운동 요약 닫기', 'Close workout summary')}
+            onClick={closeSummaryFlow}
+          />
+          <section className="workout-summary-sheet" aria-label={tx(appLanguage, '운동 요약', 'Workout summary')}>
+            <div className="workout-summary-fanfare" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="workout-summary-head">
+              <span className="card-kicker">{tx(appLanguage, '오늘 운동 완료', 'Workout complete')}</span>
+              <h2>{tx(appLanguage, '잘했어요. 오늘 기록이 깔끔하게 저장됐어요.', 'Nice work. Today workout is saved cleanly.')}</h2>
+              <p>{completedWorkoutSummary.title}</p>
+            </div>
+
+            <div className="workout-summary-stats">
+              <div className="summary-grid-block">
+                <span>{tx(appLanguage, '운동 시간', 'Duration')}</span>
+                <strong>{completedWorkoutSummary.durationMinutes}{tx(appLanguage, '분', ' min')}</strong>
+              </div>
+              <div className="summary-grid-block">
+                <span>{tx(appLanguage, '완료 세트', 'Completed sets')}</span>
+                <strong>{completedWorkoutSummary.completedSets}</strong>
+              </div>
+              <div className="summary-grid-block">
+                <span>{tx(appLanguage, '총 볼륨', 'Total volume')}</span>
+                <strong>{completedWorkoutSummary.sessionVolume.toLocaleString()} kg</strong>
+              </div>
+              <div className="summary-grid-block">
+                <span>{tx(appLanguage, '오늘 PR', 'Today PR')}</span>
+                <strong>{completedWorkoutSummary.prCount}</strong>
+              </div>
+            </div>
+
+            <div className="workout-summary-highlight">
+              <span>{tx(appLanguage, '최고 세트', 'Top set')}</span>
+              <strong>{completedWorkoutSummary.topSet}</strong>
+            </div>
+
+            <div className="workout-summary-exercises">
+              {(completedWorkoutSnapshot?.exercises || []).map((exercise) => {
+                const completedSetCount = exercise.sets.filter((setItem) => setItem.completed).length
+
+                if (completedSetCount === 0) {
+                  return null
+                }
+
+                return (
+                  <div key={exercise.id} className="workout-summary-exercise-row">
+                    <strong>{exercise.name}</strong>
+                    <span>{tx(appLanguage, `${completedSetCount}세트 완료`, `${completedSetCount} sets complete`)}</span>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="workout-summary-actions">
+              <button className="inline-action primary-dark" type="button" onClick={closeSummaryFlow}>
+                {tx(appLanguage, '닫기', 'Close')}
+              </button>
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      {templatePromptOpen ? (
+        <>
+          <button
+            className="workout-finish-backdrop"
+            type="button"
+            aria-label={tx(appLanguage, '템플릿 저장 확인 닫기', 'Close template save prompt')}
+            onClick={finishSummaryFlow}
+          />
+          <section className="content-card workout-finish-modal" aria-label={tx(appLanguage, '템플릿 저장 확인', 'Template save confirmation')}>
+            <div className="workout-finish-copy">
+              <h2>{tx(appLanguage, '오늘 운동을 템플릿으로 저장할까요?', 'Save today workout as a template?')}</h2>
+              <p>{tx(appLanguage, '즉시 운동 기록으로 시작한 루틴을 다음에도 빠르게 꺼내 쓸 수 있어요.', 'You can reuse this instant workout later with one tap.')}</p>
+            </div>
+            <div className="workout-finish-actions">
+              <button className="inline-action" type="button" onClick={finishSummaryFlow}>
+                {tx(appLanguage, '괜찮아요', 'No thanks')}
+              </button>
+              <button className="inline-action primary-dark" type="button" onClick={handleSaveTemplate}>
+                {tx(appLanguage, '템플릿 저장', 'Save template')}
+              </button>
+            </div>
+          </section>
+        </>
+      ) : null}
     </section>
   )
 }

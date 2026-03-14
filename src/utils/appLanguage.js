@@ -42,6 +42,15 @@ export function nutritionPreferenceLabel(language, preference) {
   return labels[preference] || preference
 }
 
+export function macroRatioPresetLabel(language, preset) {
+  const labels = {
+    balanced: tx(language, '기본 4:4:2', 'Default 4:4:2'),
+    lower_carb: tx(language, '변경 5:3:2', 'Alternative 5:3:2'),
+  }
+
+  return labels[preset] || preset
+}
+
 export function sexLabel(language, sex) {
   const labels = {
     male: tx(language, '남성', 'Male'),

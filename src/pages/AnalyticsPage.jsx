@@ -61,7 +61,7 @@ function AnalyticsPage() {
                 </div>
                 <div className="feed-head">
                   <strong>{item.label}</strong>
-                  <span>{item.value}%</span>
+                  <span>{item.value}% · {item.current}g</span>
                 </div>
               </div>
             ))}

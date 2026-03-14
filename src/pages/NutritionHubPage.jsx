@@ -5,6 +5,7 @@ import AppIcon from '../components/AppIcon.jsx'
 import { calculateNetCalories, calculateRecommendedCalories } from '../utils/fitnessMetrics.ts'
 import { getFoodDisplayName, getMealDisplayName } from '../utils/foodNaming.js'
 import { mealTypeLabel, tx } from '../utils/appLanguage.js'
+import { buildMacroTargets } from '../utils/macroTargets.js'
 
 const mealSections = [
   { key: 'breakfast', label: '아침 식사', icon: 'nutrition', empty: '아직 아침 기록이 없습니다.' },
@@ -53,6 +54,7 @@ function NutritionHubPage() {
     aiCoach,
     goal,
     quickAddSuggestedMeal,
+    userProfile,
   } = useOutletContext()
   const [quickAccessTab, setQuickAccessTab] = useState('ff')
   const [ffRefreshIndex, setFfRefreshIndex] = useState(0)
@@ -84,6 +86,10 @@ function NutritionHubPage() {
 
   const recommendedRange = calculateRecommendedCalories(totalBurn, goal === 'diet' ? 'cut' : goal)
   const todayNetCalories = calculateNetCalories(todayConsumedCalories, totalBurn)
+  const macroTargets = useMemo(
+    () => buildMacroTargets(recommendedCalories, userProfile?.macroRatioPreset),
+    [recommendedCalories, userProfile?.macroRatioPreset],
+  )
   const ffRecommendations = useMemo(
     () => foods.slice().sort((a, b) => (b.popularityScore || 0) - (a.popularityScore || 0)).slice(0, 4),
     [foods],
@@ -122,9 +128,9 @@ function NutritionHubPage() {
           </div>
         </div>
         <div className="nutrition-macro-compact">
-          <span>C {macroTotals.carbs}g</span>
-          <span>P {macroTotals.protein}g</span>
-          <span>F {macroTotals.fat}g</span>
+          <span>C {macroTotals.carbs} / {macroTargets.carbs}g</span>
+          <span>P {macroTotals.protein} / {macroTargets.protein}g</span>
+          <span>F {macroTotals.fat} / {macroTargets.fat}g</span>
           <span>{tx(appLanguage, `남음 ${Math.max(0, recommendedCalories - todayConsumedCalories)} kcal`, `Remaining ${Math.max(0, recommendedCalories - todayConsumedCalories)} kcal`)}</span>
         </div>
       </article>

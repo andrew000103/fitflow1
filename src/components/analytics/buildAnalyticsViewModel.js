@@ -1,4 +1,5 @@
 import { calculateDailyBurn, calculateNetCalories } from '../../utils/fitnessMetrics.ts'
+import { getMacroRatioPreset } from '../../utils/macroTargets.js'
 
 const bodyWeightTrend = [
   { day: 'Mon', weight: 78.4 },
@@ -46,6 +47,7 @@ function buildAnalyticsViewModel(context) {
     lastWorkoutSummary,
     totalWorkoutCalories,
     aiCoach,
+    userProfile,
   } = context
 
   const weeklyWorkoutCount = weeklyData.filter((item) => item.workout > 0).length
@@ -84,11 +86,26 @@ function buildAnalyticsViewModel(context) {
     { carbs: 0, protein: 0, fat: 0 },
   )
 
-  const macroTotal = Math.max(1, currentMacros.carbs * 4 + currentMacros.protein * 4 + currentMacros.fat * 9)
+  const macroRatio = getMacroRatioPreset(userProfile?.macroRatioPreset)
   const macroBars = [
-    { label: 'Carbs', value: Math.round(((currentMacros.carbs * 4) / macroTotal) * 100), className: '' },
-    { label: 'Protein', value: Math.round(((currentMacros.protein * 4) / macroTotal) * 100), className: 'protein' },
-    { label: 'Fat', value: Math.round(((currentMacros.fat * 9) / macroTotal) * 100), className: 'fat' },
+    {
+      label: 'Carbs',
+      value: Math.round(macroRatio.carbs * 100),
+      current: currentMacros.carbs,
+      className: '',
+    },
+    {
+      label: 'Protein',
+      value: Math.round(macroRatio.protein * 100),
+      current: currentMacros.protein,
+      className: 'protein',
+    },
+    {
+      label: 'Fat',
+      value: Math.round(macroRatio.fat * 100),
+      current: currentMacros.fat,
+      className: 'fat',
+    },
   ]
 
   const topPRs = [...sessions]

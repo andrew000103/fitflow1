@@ -1,5 +1,9 @@
 export const DASHBOARD_STATE_KEY = 'fitflow-dashboard-state'
 
+function getDashboardStateKey(userId?: string) {
+  return userId ? `${DASHBOARD_STATE_KEY}:${userId}` : DASHBOARD_STATE_KEY
+}
+
 export interface DashboardStatePayload {
   goal?: string
   userProfile?: unknown
@@ -32,12 +36,12 @@ export interface DashboardStatePayload {
   colorTheme?: string
 }
 
-export function loadDashboardState(): DashboardStatePayload {
+export function loadDashboardState(userId?: string): DashboardStatePayload {
   if (typeof window === 'undefined') {
     return {}
   }
 
-  const raw = window.localStorage.getItem(DASHBOARD_STATE_KEY)
+  const raw = window.localStorage.getItem(getDashboardStateKey(userId))
   if (!raw) {
     return {}
   }
@@ -49,20 +53,20 @@ export function loadDashboardState(): DashboardStatePayload {
   }
 }
 
-export function saveDashboardState(payload: DashboardStatePayload) {
+export function saveDashboardState(payload: DashboardStatePayload, userId?: string) {
   if (typeof window === 'undefined') {
     return
   }
 
-  window.localStorage.setItem(DASHBOARD_STATE_KEY, JSON.stringify(payload))
+  window.localStorage.setItem(getDashboardStateKey(userId), JSON.stringify(payload))
 }
 
-export function clearDashboardState() {
+export function clearDashboardState(userId?: string) {
   if (typeof window === 'undefined') {
     return
   }
 
-  window.localStorage.removeItem(DASHBOARD_STATE_KEY)
+  window.localStorage.removeItem(getDashboardStateKey(userId))
 }
 
 export function createPostRecord({

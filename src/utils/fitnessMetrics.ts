@@ -55,6 +55,11 @@ export interface ExercisePRResult {
   nextBests: ExerciseBestSnapshot
 }
 
+export interface SetPRResult {
+  isWeightPR: boolean
+  isVolumePR: boolean
+}
+
 export interface RestTimerInput {
   movementType: RestMovementType
   objective?: RestObjective
@@ -164,6 +169,40 @@ export function detectExercisePRs(
       maxExerciseVolumeKg: Math.max(summary.maxExerciseVolumeKg, previousBests.maxExerciseVolumeKg),
     },
   }
+}
+
+export function detectSetPRs(
+  sets: WorkoutSetInput[],
+  previousBests: ExerciseBestSnapshot,
+): SetPRResult[] {
+  let runningMaxWeight = previousBests.maxWeightKg
+  let runningMaxSetVolume = previousBests.maxSetVolumeKg
+
+  return sets.map((set) => {
+    if (!isCompletedSet(set) || set.weightKg <= 0 || set.reps <= 0) {
+      return {
+        isWeightPR: false,
+        isVolumePR: false,
+      }
+    }
+
+    const setVolume = calculateSetVolume(set)
+    const isWeightPR = set.weightKg > runningMaxWeight
+    const isVolumePR = setVolume > runningMaxSetVolume
+
+    if (isWeightPR) {
+      runningMaxWeight = set.weightKg
+    }
+
+    if (isVolumePR) {
+      runningMaxSetVolume = setVolume
+    }
+
+    return {
+      isWeightPR,
+      isVolumePR,
+    }
+  })
 }
 
 export function resolveRestSeconds({

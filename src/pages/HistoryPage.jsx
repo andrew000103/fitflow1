@@ -181,7 +181,7 @@ function HistoryPage() {
   return (
     <section className="page-section">
       <PageHeader
-        eyebrow="Train / History"
+        eyebrow="Workout / History"
         title="Workout History"
         description="운동 기록만 컴팩트하게 보고, 필요할 때만 세트 상세를 펼쳐봅니다."
       />

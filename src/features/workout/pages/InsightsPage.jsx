@@ -58,7 +58,7 @@ function InsightsPage() {
   return (
     <section className="page-section">
       <PageHeader
-        eyebrow={tx(appLanguage, '운동 / FF Trainer', 'Train / FF Trainer')}
+        eyebrow={tx(appLanguage, '운동 / FF Trainer', 'Workout / FF Trainer')}
         title="FF Trainer"
         description={tx(appLanguage, '오늘 훈련 우선순위와 회복 상태를 먼저 보여주고, 세부 데이터는 필요할 때만 펼쳐봅니다.', 'Show today priorities and recovery first, then reveal details on demand.')}
       />
