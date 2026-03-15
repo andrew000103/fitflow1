@@ -41,7 +41,13 @@ function WorkoutExerciseCard({
 }) {
   const [offset, setOffset] = useState(0)
   const touchStartX = useRef(null)
+  const latestOffsetRef = useRef(0)
   const ACTION_WIDTH = 168
+
+  function updateOffset(nextOffset) {
+    latestOffsetRef.current = nextOffset
+    setOffset(nextOffset)
+  }
 
   function handleTouchStart(event) {
     touchStartX.current = event.touches[0]?.clientX ?? null
@@ -55,11 +61,11 @@ function WorkoutExerciseCard({
     const currentX = event.touches[0]?.clientX ?? touchStartX.current
     const deltaX = currentX - touchStartX.current
     if (deltaX > 18) {
-      setOffset(0)
+      updateOffset(0)
       return
     }
 
-    setOffset(Math.max(-ACTION_WIDTH, deltaX))
+    updateOffset(Math.max(-ACTION_WIDTH, deltaX))
   }
 
   function handleTouchEnd() {
@@ -67,12 +73,12 @@ function WorkoutExerciseCard({
       return
     }
 
-    setOffset(offset <= -84 ? -ACTION_WIDTH : 0)
+    updateOffset(latestOffsetRef.current <= -84 ? -ACTION_WIDTH : 0)
     touchStartX.current = null
   }
 
   function closeActions() {
-    setOffset(0)
+    updateOffset(0)
   }
 
   return (

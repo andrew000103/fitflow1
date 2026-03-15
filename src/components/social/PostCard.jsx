@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import CommentList from './CommentList.jsx'
 import ReactionBar from './ReactionBar.jsx'
+import { resolveHydratedProfileName } from '../../utils/profileHydration.js'
 
 const EDITABLE_POST_TYPES = new Set(['general', 'workout_summary', 'pr', 'routine', 'meal', 'update'])
 
@@ -59,8 +60,9 @@ function isMeaningfullyUpdated(createdAt, updatedAt) {
   return updatedMs - createdMs >= 60000
 }
 
-function PostCard({ item, currentUserId, onUpdate, onDelete }) {
-  const isMine = currentUserId && item.actorUserId === currentUserId
+function PostCard({ item, currentUserId, profileMap = {}, onUpdate, onDelete }) {
+  const targetUserId = item.userId || item.authorId || item.actorUserId || item.user_id
+  const isMine = currentUserId && targetUserId === currentUserId
   const isEditable = EDITABLE_POST_TYPES.has(item.postType || 'general')
   const [showActions, setShowActions] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -81,6 +83,13 @@ function PostCard({ item, currentUserId, onUpdate, onDelete }) {
 
   const timeLabel = useMemo(() => formatRelativeTime(item.createdAt), [item.createdAt])
   const updated = useMemo(() => isMeaningfullyUpdated(item.createdAt, item.updatedAt), [item.createdAt, item.updatedAt])
+  const actorName = useMemo(() => {
+    const resolved = resolveHydratedProfileName(profileMap, targetUserId)
+    if (!targetUserId || resolved === '사용자' || resolved === 'User') {
+      return item.author || item.authorName || resolved
+    }
+    return resolved
+  }, [profileMap, targetUserId, item.author, item.authorName])
 
   async function handleSave() {
     const nextTitle = title.trim()
@@ -162,7 +171,7 @@ function PostCard({ item, currentUserId, onUpdate, onDelete }) {
       <div className="social-feed-card-head">
         <div>
           <span className="social-feed-badge">{getPostBadge(item)}</span>
-          <strong>{item.actorName}</strong>
+          <strong>{actorName}</strong>
           <div className="social-post-meta">
             <span className="social-feed-time">{timeLabel}</span>
             {updated ? <span className="social-post-edited">수정됨</span> : null}
@@ -245,18 +254,28 @@ function PostCard({ item, currentUserId, onUpdate, onDelete }) {
       )}
 
       {isDeleting ? (
-        <div className="social-post-delete-confirm">
-          <strong>게시물을 삭제할까요?</strong>
-          <p>삭제 후에는 되돌릴 수 없어요.</p>
-          <div className="social-post-editor-actions">
-            <button type="button" className="inline-action" onClick={() => setIsDeleting(false)} disabled={saving}>
-              취소
-            </button>
-            <button type="button" className="inline-action social-post-delete-button" onClick={handleDelete} disabled={saving}>
-              {saving ? '삭제 중...' : '확인'}
-            </button>
-          </div>
-        </div>
+        <>
+          <button
+            type="button"
+            className="confirm-backdrop"
+            aria-label="게시물 삭제 확인 닫기"
+            onClick={() => !saving && setIsDeleting(false)}
+          />
+          <section className="content-card confirm-modal" aria-label="게시물 삭제 확인">
+            <div className="confirm-copy">
+              <h2>게시물을 삭제할까요?</h2>
+              <p>삭제 후에는 되돌릴 수 없어요.</p>
+            </div>
+            <div className="confirm-actions">
+              <button type="button" className="inline-action" onClick={() => setIsDeleting(false)} disabled={saving}>
+                취소
+              </button>
+              <button type="button" className="inline-action social-post-delete-button" onClick={handleDelete} disabled={saving}>
+                {saving ? '삭제 중...' : '확인'}
+              </button>
+            </div>
+          </section>
+        </>
       ) : null}
 
       {error ? <div className="social-post-inline-error">{error}</div> : null}
@@ -292,7 +311,7 @@ function PostCard({ item, currentUserId, onUpdate, onDelete }) {
         </div>
       ) : null}
 
-      <CommentList comments={item.comments} />
+      <CommentList comments={item.comments} profileMap={profileMap} />
     </article>
   )
 }

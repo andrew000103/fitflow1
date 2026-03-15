@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import PageHeader from '../components/PageHeader.jsx'
 import QuickAddExerciseBar from '../components/workout/QuickAddExerciseBar.jsx'
 import ExercisePickerSheet from '../components/workout/ExercisePickerSheet.jsx'
@@ -63,6 +63,40 @@ function TrainWorkoutPage() {
   const [templatePromptOpen, setTemplatePromptOpen] = useState(false)
   const [completedWorkoutSnapshot, setCompletedWorkoutSnapshot] = useState(null)
   const [completedWorkoutSummary, setCompletedWorkoutSummary] = useState(null)
+  const exerciseCardRefs = useRef({})
+  const pendingAutoScrollRef = useRef(false)
+  const previousExerciseCountRef = useRef(activeWorkout?.exercises.length || 0)
+
+  useEffect(() => {
+    const currentExerciseCount = activeWorkout?.exercises.length || 0
+    const previousExerciseCount = previousExerciseCountRef.current
+
+    if (!pendingAutoScrollRef.current || currentExerciseCount <= previousExerciseCount) {
+      previousExerciseCountRef.current = currentExerciseCount
+      return
+    }
+
+    const newestExercise = activeWorkout?.exercises?.[currentExerciseCount - 1]
+    const newestExerciseNode = newestExercise ? exerciseCardRefs.current[newestExercise.id] : null
+
+    if (newestExerciseNode) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          newestExerciseNode.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+          })
+        })
+      })
+    }
+
+    pendingAutoScrollRef.current = false
+    previousExerciseCountRef.current = currentExerciseCount
+  }, [activeWorkout])
+
+  function queueExerciseAutoScroll() {
+    pendingAutoScrollRef.current = true
+  }
 
   const restClock = `${String(Math.floor(currentRestElapsed / 60)).padStart(2, '0')}:${String(currentRestElapsed % 60).padStart(2, '0')}`
   const elapsedSeconds = activeWorkout ? Math.max(0, Math.floor((nowTick - activeWorkout.startedAt) / 1000)) : 0
@@ -163,6 +197,7 @@ function TrainWorkoutPage() {
   )
 
   function handleAddExercise(exerciseName) {
+    queueExerciseAutoScroll()
     addExerciseToWorkout(exerciseName)
     setExercisePickerOpen(false)
     setSearchQuery('')
@@ -173,12 +208,19 @@ function TrainWorkoutPage() {
       return
     }
 
+    let hasExerciseToAdd = false
+
     currentProgramDay.exercises.forEach((item) => {
       const exerciseName = item.exerciseName || item.name
       if (!workoutExerciseNames.has(exerciseName)) {
+        hasExerciseToAdd = true
         addExerciseToWorkout(exerciseName)
       }
     })
+
+    if (hasExerciseToAdd) {
+      queueExerciseAutoScroll()
+    }
 
     setExercisePickerOpen(false)
     setSearchQuery('')
@@ -357,44 +399,55 @@ function TrainWorkoutPage() {
           )
 
           return (
-            <WorkoutExerciseCard
+            <div
               key={exercise.id}
-              exercise={exercise}
-              displayOrder={activeWorkout.exercises.findIndex((item) => item.id === exercise.id) + 1}
-              previousLabel={tx(appLanguage, '이전', 'Last')}
-              addSetLabel={tx(appLanguage, '세트 추가', 'Add Set')}
-              weightPrLabel={tx(appLanguage, '중량 PR', 'Weight PR')}
-              volumePrLabel={tx(appLanguage, '볼륨 PR', 'Volume PR')}
-              setLabel={tx(appLanguage, '세트', 'Set')}
-              weightLabel="kg"
-              repsLabel={tx(appLanguage, '횟수', 'Reps')}
-              doneLabel={tx(appLanguage, '완료', 'Done')}
-              moreLabel={tx(appLanguage, '더보기', 'More')}
-              unsetSupersetLabel={tx(appLanguage, '슈퍼세트 해제', 'Unset superset')}
-              makeSupersetLabel={tx(appLanguage, '슈퍼세트 지정', 'Make superset')}
-              swapLabel={tx(appLanguage, '운동 교체', 'Swap')}
-              upLabel={tx(appLanguage, '위로', 'Up')}
-              downLabel={tx(appLanguage, '아래로', 'Down')}
-              removeLabel={tx(appLanguage, '삭제', 'Remove')}
-              noteLabel={tx(appLanguage, '메모', 'Note')}
-              notePlaceholder={tx(appLanguage, '메모를 남기세요', 'Add a note')}
-              previousRecord={previousRecord}
-              prResult={prResult}
-              setPrResults={setPrResults}
-              workoutCatalog={workoutCatalog}
-              updateExerciseName={updateExerciseName}
-              addWorkoutSet={addWorkoutSet}
-              moveWorkoutSet={moveWorkoutSet}
-              removeWorkoutSet={removeWorkoutSet}
-              updateWorkoutSet={updateWorkoutSet}
-              toggleWorkoutSetComplete={toggleWorkoutSetComplete}
-              toggleSuperset={toggleSuperset}
-              swapWorkoutExercise={swapWorkoutExercise}
-              moveWorkoutExercise={moveWorkoutExercise}
-              removeWorkoutExercise={removeWorkoutExercise}
-              updateExerciseMeta={updateExerciseMeta}
-              detail={detail}
-            />
+              ref={(node) => {
+                if (node) {
+                  exerciseCardRefs.current[exercise.id] = node
+                  return
+                }
+
+                delete exerciseCardRefs.current[exercise.id]
+              }}
+            >
+              <WorkoutExerciseCard
+                exercise={exercise}
+                displayOrder={activeWorkout.exercises.findIndex((item) => item.id === exercise.id) + 1}
+                previousLabel={tx(appLanguage, '이전', 'Last')}
+                addSetLabel={tx(appLanguage, '세트 추가', 'Add Set')}
+                weightPrLabel={tx(appLanguage, '중량 PR', 'Weight PR')}
+                volumePrLabel={tx(appLanguage, '볼륨 PR', 'Volume PR')}
+                setLabel={tx(appLanguage, '세트', 'Set')}
+                weightLabel="kg"
+                repsLabel={tx(appLanguage, '횟수', 'Reps')}
+                doneLabel={tx(appLanguage, '완료', 'Done')}
+                moreLabel={tx(appLanguage, '더보기', 'More')}
+                unsetSupersetLabel={tx(appLanguage, '슈퍼세트 해제', 'Unset superset')}
+                makeSupersetLabel={tx(appLanguage, '슈퍼세트 지정', 'Make superset')}
+                swapLabel={tx(appLanguage, '운동 교체', 'Swap')}
+                upLabel={tx(appLanguage, '위로', 'Up')}
+                downLabel={tx(appLanguage, '아래로', 'Down')}
+                removeLabel={tx(appLanguage, '삭제', 'Remove')}
+                noteLabel={tx(appLanguage, '메모', 'Note')}
+                notePlaceholder={tx(appLanguage, '메모를 남기세요', 'Add a note')}
+                previousRecord={previousRecord}
+                prResult={prResult}
+                setPrResults={setPrResults}
+                workoutCatalog={workoutCatalog}
+                updateExerciseName={updateExerciseName}
+                addWorkoutSet={addWorkoutSet}
+                moveWorkoutSet={moveWorkoutSet}
+                removeWorkoutSet={removeWorkoutSet}
+                updateWorkoutSet={updateWorkoutSet}
+                toggleWorkoutSetComplete={toggleWorkoutSetComplete}
+                toggleSuperset={toggleSuperset}
+                swapWorkoutExercise={swapWorkoutExercise}
+                moveWorkoutExercise={moveWorkoutExercise}
+                removeWorkoutExercise={removeWorkoutExercise}
+                updateExerciseMeta={updateExerciseMeta}
+                detail={detail}
+              />
+            </div>
           )
             })}
           </div>
