@@ -53,8 +53,6 @@ function getNavigation(language) {
   return [
     { to: '/train', label: tx(language, '운동', 'Workout'), icon: 'train' },
     { to: '/nutrition', label: tx(language, '식단', 'Nutrition'), icon: 'nutrition' },
-    { to: '/connect', label: tx(language, '커넥트', 'Connect'), icon: 'connect' },
-    { to: '/shop', label: tx(language, '스토어', 'Shop'), icon: 'shop' },
     { to: '/profile', label: tx(language, '프로필', 'Profile'), icon: 'profile' },
   ]
 }
@@ -99,13 +97,13 @@ function getSectionMeta(pathname, language) {
   if (pathname.startsWith('/connect')) {
     return {
       title: tx(language, '커넥트', 'Connect'),
-      subtitle: tx(language, '피드와 반응은 필요한 화면에서 확인합니다.', 'Explore the feed and actions in one place.'),
+      subtitle: tx(language, '서비스 정리 후 다시 제공될 예정입니다.', 'This service will return after cleanup.'),
     }
   }
   if (pathname.startsWith('/shop')) {
     return {
       title: tx(language, '스토어', 'Shop'),
-      subtitle: tx(language, '프로그램 마켓과 구매 흐름이 들어올 공간입니다.', 'Reserved for marketplace and purchase flows.'),
+      subtitle: tx(language, '서비스 정리 후 다시 제공될 예정입니다.', 'This service will return after cleanup.'),
     }
   }
   if (pathname.startsWith('/profile')) {
@@ -131,7 +129,7 @@ function getStoredLanguage() {
 }
 
 function isPrimaryTabRoute(pathname) {
-  return ['/train', '/nutrition', '/connect', '/shop', '/profile'].includes(pathname)
+  return ['/train', '/nutrition', '/profile'].includes(pathname)
 }
 
 function formatLocalDate(date = new Date()) {
@@ -487,6 +485,7 @@ function DashboardLayout() {
     : null
   const {
     notifications,
+    profileMap: notificationProfileMap,
     unreadCount,
     loading: notificationsLoading,
     error: notificationsError,
@@ -2170,6 +2169,7 @@ function DashboardLayout() {
           <NotificationPanel
             userId={user?.id}
             notifications={notifications}
+            profileMap={notificationProfileMap}
             unreadCount={unreadCount}
             loading={notificationsLoading}
             error={notificationsError}

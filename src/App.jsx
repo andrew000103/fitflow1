@@ -156,7 +156,7 @@ function App() {
 
             {/* REDIRECTS */}
             <Route path="/community" element={<Navigate to="/connect" replace />} />
-            <Route path="/community/feed" element={<Navigate to="/connect/feed" replace />} />
+            <Route path="/community/feed" element={<Navigate to="/connect" replace />} />
 
             <Route path="/history" element={<Navigate to="/train/insights" replace />} />
             <Route path="/history/calendar" element={<Navigate to="/train/history" replace />} />

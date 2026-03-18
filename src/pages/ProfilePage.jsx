@@ -4,20 +4,7 @@ import PageHeader from '../components/PageHeader.jsx'
 import BrandLoader from '../components/BrandLoader.jsx'
 import { useAuth } from '../features/auth/useAuth.js'
 import { loadProfileBundle } from '../features/profile/profileData.js'
-import CrewButton from '../features/social/CrewButton.jsx'
-import ProfileSocialDevTools from '../features/social/ProfileSocialDevTools.jsx'
-import ProfileSocialStats from '../features/social/ProfileSocialStats.jsx'
-import SupportButton from '../features/social/SupportButton.jsx'
-import {
-  acceptCrewRequest,
-  cancelCrewRequest,
-  cancelSupport,
-  createSupport,
-  declineCrewRequest,
-  getProfileSocialState,
-  sendCrewRequest,
-  subscribeSocialRelationshipsChanged,
-} from '../features/social/socialApi.ts'
+import { resolveProfileDisplayName } from '../utils/profileDisplay.js'
 import { activityLevelLabel, macroRatioPresetLabel, sexLabel, tx } from '../utils/appLanguage.js'
 import '../styles/personalization.css'
 
@@ -75,23 +62,16 @@ function ProfilePage() {
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
-  const [socialState, setSocialState] = useState({
-    supportStatus: 'not_supported',
-    crewStatus: 'none',
-    stats: {
-      supporterCount: 0,
-      supportingCount: 0,
-      crewCount: 0,
-    },
-  })
-  const [socialPending, setSocialPending] = useState('')
-  const [socialError, setSocialError] = useState('')
   const dailyProfileMessage = getDailyProfileMessage(appLanguage)
 
   const activeProfileUserId = profileUserId || user?.id || ''
   const isOwnProfile = !activeProfileUserId || activeProfileUserId === user?.id
   const avatarStorageKey = activeProfileUserId ? `fitflow_profile_avatar_${activeProfileUserId}` : ''
-  const profileNickname = profile?.nickname || (isOwnProfile ? userProfile?.name : '') || tx(appLanguage, 'FitFlow 사용자', 'FitFlow user')
+  const profileNickname =
+    resolveProfileDisplayName(
+      profile,
+      isOwnProfile ? userProfile?.name || tx(appLanguage, '사용자', 'User') : tx(appLanguage, '사용자', 'User'),
+    ) || tx(appLanguage, '사용자', 'User')
 
   useEffect(() => {
     let active = true
@@ -107,7 +87,6 @@ function ProfilePage() {
 
       setStatus('loading')
       setError('')
-      setSocialError('')
 
       try {
         const { profile: nextProfile, targets: nextTargets } = await loadProfileBundle(activeProfileUserId)
@@ -119,28 +98,6 @@ function ProfilePage() {
         setProfile(nextProfile)
         setTargets(nextTargets)
         setStatus('ready')
-
-        try {
-          const nextSocialState = await getProfileSocialState(user.id, activeProfileUserId)
-          if (!active) {
-            return
-          }
-          setSocialState(nextSocialState)
-        } catch (nextSocialError) {
-          if (!active) {
-            return
-          }
-          setSocialState({
-            supportStatus: 'not_supported',
-            crewStatus: 'none',
-            stats: {
-              supporterCount: 0,
-              supportingCount: 0,
-              crewCount: 0,
-            },
-          })
-          setSocialError(nextSocialError.message || tx(appLanguage, '소셜 정보를 불러오지 못했어요.', 'Could not load social details.'))
-        }
       } catch (loadError) {
         if (!active) {
           return
@@ -156,16 +113,6 @@ function ProfilePage() {
       active = false
     }
   }, [activeProfileUserId, appLanguage, user?.id])
-
-  useEffect(() => {
-    if (!user?.id || !activeProfileUserId) {
-      return
-    }
-
-    return subscribeSocialRelationshipsChanged(() => {
-      refreshSocialState().catch(() => {})
-    })
-  }, [activeProfileUserId, user?.id])
 
   useEffect(() => {
     if (!avatarStorageKey || typeof window === 'undefined') {
@@ -260,67 +207,6 @@ function ProfilePage() {
     }
   }
 
-  async function refreshSocialState() {
-    if (!user?.id || !activeProfileUserId) {
-      return
-    }
-
-    const nextSocialState = await getProfileSocialState(user.id, activeProfileUserId)
-    setSocialState(nextSocialState)
-    setSocialError('')
-  }
-
-  async function handleSupportToggle() {
-    if (!user?.id || !activeProfileUserId) {
-      return
-    }
-
-    setSocialPending('support')
-
-    try {
-      if (socialState.supportStatus === 'supported') {
-        await cancelSupport(user.id, activeProfileUserId)
-      } else {
-        await createSupport(user.id, activeProfileUserId)
-      }
-
-      await refreshSocialState()
-    } catch (actionError) {
-      setSocialError(actionError.message || tx(appLanguage, '소셜 상태를 업데이트하지 못했어요.', 'Could not update social relationship.'))
-    } finally {
-      setSocialPending('')
-    }
-  }
-
-  async function handleCrewAction(action) {
-    if (!user?.id || !activeProfileUserId) {
-      return
-    }
-
-    setSocialPending(action)
-
-    try {
-      if (action === 'send') {
-        await sendCrewRequest(user.id, activeProfileUserId)
-      }
-      if (action === 'cancel') {
-        await cancelCrewRequest(user.id, activeProfileUserId)
-      }
-      if (action === 'accept') {
-        await acceptCrewRequest(user.id, activeProfileUserId)
-      }
-      if (action === 'decline') {
-        await declineCrewRequest(user.id, activeProfileUserId)
-      }
-
-      await refreshSocialState()
-    } catch (actionError) {
-      setSocialError(actionError.message || tx(appLanguage, '크루 상태를 업데이트하지 못했어요.', 'Could not update crew relationship.'))
-    } finally {
-      setSocialPending('')
-    }
-  }
-
   if (status === 'loading') {
     return (
       <section className="profile-loading-screen" aria-label={tx(appLanguage, '프로필 로딩 중', 'Loading profile')}>
@@ -400,33 +286,6 @@ function ProfilePage() {
           <span className="pill-tag profile-accent-chip">{goalTypeLabel(appLanguage, profile?.goal_type)}</span>
           <span className="pill-tag profile-muted-chip">{activityLevelLabel(appLanguage, profile?.activity_level)}</span>
         </div>
-        <ProfileSocialStats
-          supporterCount={socialState.stats.supporterCount}
-          supportingCount={socialState.stats.supportingCount}
-          crewCount={socialState.stats.crewCount}
-        />
-        {!isOwnProfile ? (
-          <div className="profile-social-actions">
-            <SupportButton
-              status={socialState.supportStatus}
-              loading={socialPending === 'support'}
-              onToggle={handleSupportToggle}
-            />
-            <CrewButton
-              status={socialState.crewStatus}
-              loading={socialPending === 'send' || socialPending === 'cancel' || socialPending === 'accept' || socialPending === 'decline'}
-              onSend={() => handleCrewAction('send')}
-              onCancel={() => handleCrewAction('cancel')}
-              onAccept={() => handleCrewAction('accept')}
-              onDecline={() => handleCrewAction('decline')}
-            />
-          </div>
-        ) : null}
-        {socialError ? (
-          <div className="profile-social-inline-error">
-            <span>{socialError}</span>
-          </div>
-        ) : null}
       </article>
 
       {location.state?.saved ? (
@@ -489,7 +348,6 @@ function ProfilePage() {
         </article>
       </div>
 
-      <ProfileSocialDevTools currentUserId={user?.id || ''} activeProfileUserId={activeProfileUserId} />
     </section>
   )
 }

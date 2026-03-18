@@ -9,6 +9,7 @@ import {
 
 export function useNotifications(userId) {
   const [notifications, setNotifications] = useState([])
+  const [profileMap, setProfileMap] = useState({})
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -16,6 +17,7 @@ export function useNotifications(userId) {
   const refresh = useCallback(async () => {
     if (!userId) {
       setNotifications([])
+      setProfileMap({})
       setUnreadCount(0)
       return
     }
@@ -24,12 +26,13 @@ export function useNotifications(userId) {
     setError('')
 
     try {
-      const [items, unread] = await Promise.all([
+      const [{ items, profileMap: nextProfileMap }, unread] = await Promise.all([
         fetchNotifications(userId),
         fetchUnreadNotificationCount(userId),
       ])
 
       setNotifications(items)
+      setProfileMap(nextProfileMap || {})
       setUnreadCount(unread)
     } catch (nextError) {
       setError(nextError.message || '알림을 불러오지 못했어요.')
@@ -65,6 +68,7 @@ export function useNotifications(userId) {
 
   return {
     notifications,
+    profileMap,
     unreadCount,
     loading,
     error,

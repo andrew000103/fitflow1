@@ -67,7 +67,7 @@ export function normalizeProfileForm(profile) {
 async function loadProfileRecord(userId) {
   const profileResult = await supabase
     .from('profiles')
-    .select('nickname, age, height_cm, weight_kg, gender, activity_level, goal_type, onboarding_completed')
+    .select('nickname, username, display_name, avatar_url, age, height_cm, weight_kg, gender, activity_level, goal_type, onboarding_completed')
     .eq('user_id', userId)
     .maybeSingle()
 
@@ -81,7 +81,7 @@ async function loadProfileRecord(userId) {
 
   const fallbackResult = await supabase
     .from('profiles')
-    .select('age, height_cm, weight_kg, gender, activity_level, goal_type, onboarding_completed')
+    .select('username, display_name, avatar_url, age, height_cm, weight_kg, gender, activity_level, goal_type, onboarding_completed')
     .eq('user_id', userId)
     .maybeSingle()
 
