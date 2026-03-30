@@ -77,6 +77,53 @@ export interface AIPlan {
   generatedAt: string;
 }
 
+type LegacyDayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+type LegacyWorkoutDay = Omit<WorkoutDay, 'dayLabel'> & {
+  dayLabel?: WorkoutDay['dayLabel'];
+  dayOfWeek?: LegacyDayOfWeek;
+};
+
+type LegacyAIPlan = Omit<AIPlan, 'weeklyWorkout'> & {
+  weeklyWorkout: LegacyWorkoutDay[];
+};
+
+const LEGACY_DAY_ORDER: LegacyDayOfWeek[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+function normalizeWorkoutDay(day: LegacyWorkoutDay, index: number): WorkoutDay {
+  if (day.dayLabel) {
+    return {
+      ...day,
+      dayLabel: day.dayLabel,
+    };
+  }
+
+  if (day.dayOfWeek) {
+    const legacyIndex = LEGACY_DAY_ORDER.indexOf(day.dayOfWeek);
+    if (legacyIndex >= 0) {
+      return {
+        ...day,
+        dayLabel: `day${legacyIndex + 1}` as WorkoutDay['dayLabel'],
+      };
+    }
+  }
+
+  const fallbackIndex = Math.min(Math.max(index + 1, 1), 7);
+  return {
+    ...day,
+    dayLabel: `day${fallbackIndex}` as WorkoutDay['dayLabel'],
+  };
+}
+
+function normalizeAIPlan(plan: AIPlan | LegacyAIPlan | null): AIPlan | null {
+  if (!plan) return null;
+
+  return {
+    ...plan,
+    weeklyWorkout: (plan.weeklyWorkout ?? []).map(normalizeWorkoutDay),
+  };
+}
+
 // ─── 스토어 ────────────────────────────────────────────────────────────────────
 
 interface AIPlanState {
@@ -124,7 +171,7 @@ export const useAIPlanStore = create<AIPlanState>()(
       setCurrentPlan: (plan) =>
         set((state) => ({
           previousPlan: state.currentPlan,
-          currentPlan: plan,
+          currentPlan: normalizeAIPlan(plan),
           error: null,
           isGenerating: false,
         })),
@@ -142,7 +189,7 @@ export const useAIPlanStore = create<AIPlanState>()(
 
       restorePreviousPlan: () =>
         set((state) => ({
-          currentPlan: state.previousPlan ?? state.currentPlan,
+          currentPlan: normalizeAIPlan(state.previousPlan ?? state.currentPlan),
           previousPlan: null,
         })),
 
@@ -161,7 +208,7 @@ export const useAIPlanStore = create<AIPlanState>()(
         }),
 
       applyRuleBasedAdjustment: async (userId: string) => {
-        const { currentPlan } = get();
+        const currentPlan = normalizeAIPlan(get().currentPlan);
         if (!currentPlan) return;
 
         set({ isAdjusting: true });
@@ -213,6 +260,17 @@ export const useAIPlanStore = create<AIPlanState>()(
     {
       name: 'ai-plan-store',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
+      migrate: (persistedState) => {
+        const state = persistedState as Partial<AIPlanState> | undefined;
+        if (!state) return persistedState as AIPlanState;
+
+        return {
+          ...state,
+          currentPlan: normalizeAIPlan(state.currentPlan as AIPlan | LegacyAIPlan | null),
+          previousPlan: normalizeAIPlan(state.previousPlan as AIPlan | LegacyAIPlan | null),
+        } as AIPlanState;
+      },
     }
   )
 );
