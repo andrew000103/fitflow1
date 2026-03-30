@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
@@ -186,9 +187,12 @@ function ExplanationCard({ plan, colors }: { plan: AIPlan; colors: any }) {
             </View>
           )}
           <View style={[exStyles.disclaimer, { backgroundColor: colors.separator }]}>
-            <Text style={[exStyles.disclaimerText, { color: colors.textTertiary }]}>
-              ⚠️ 이 계획은 의료적 조언이 아닙니다. 건강 이상이 있으면 전문가와 상담하세요.
-            </Text>
+            <View style={exStyles.disclaimerRow}>
+              <MaterialCommunityIcons name="alert-outline" size={15} color={colors.textTertiary} />
+              <Text style={[exStyles.disclaimerText, { color: colors.textTertiary }]}>
+                이 계획은 의료적 조언이 아닙니다. 건강 이상이 있으면 전문가와 상담하세요.
+              </Text>
+            </View>
           </View>
         </View>
       )}
@@ -208,6 +212,7 @@ const exStyles = StyleSheet.create({
   sourcesTitle: { fontSize: 12, fontWeight: '600', marginBottom: 6 },
   sourceItem: { fontSize: 12, lineHeight: 18 },
   disclaimer: { borderRadius: 8, padding: 10 },
+  disclaimerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
   disclaimerText: { fontSize: 12, lineHeight: 18 },
 });
 
@@ -262,9 +267,12 @@ function DietTab({ plan, colors }: { plan: AIPlan; colors: any }) {
 
       {/* 면책 */}
       <View style={[dtStyles.disclaimerBox, { backgroundColor: colors.card }]}>
-        <Text style={[dtStyles.disclaimerText, { color: colors.textTertiary }]}>
-          ⚠️ 이 식단은 예시입니다. 식단 탭에서 직접 기록하면 더 정확한 추적이 가능합니다.
-        </Text>
+        <View style={dtStyles.disclaimerRow}>
+          <MaterialCommunityIcons name="alert-outline" size={16} color={colors.textTertiary} />
+          <Text style={[dtStyles.disclaimerText, { color: colors.textTertiary }]}>
+            이 식단은 예시입니다. 식단 탭에서 직접 기록하면 더 정확한 추적이 가능합니다.
+          </Text>
+        </View>
       </View>
     </>
   );
@@ -285,6 +293,7 @@ const dtStyles = StyleSheet.create({
   foodItem: { fontSize: 14, lineHeight: 22 },
   macroLine: { fontSize: 12, marginTop: 8 },
   disclaimerBox: { borderRadius: 14, padding: 14, marginBottom: 10 },
+  disclaimerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   disclaimerText: { fontSize: 13, lineHeight: 20 },
 });
 

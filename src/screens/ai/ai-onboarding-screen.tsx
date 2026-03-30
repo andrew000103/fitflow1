@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
@@ -722,7 +723,7 @@ export default function AIOnboardingScreen() {
                   <Text style={[s.optionText, selected && s.optionTextSelected]}>
                     {opt.label}
                   </Text>
-                  {selected && <Text style={s.checkmark}>✓</Text>}
+                  {selected && <MaterialCommunityIcons name="check" size={18} color="#fff" style={s.checkmark} />}
                 </TouchableOpacity>
               );
             })}
