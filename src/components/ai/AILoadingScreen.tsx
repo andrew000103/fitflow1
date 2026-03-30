@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -27,6 +28,8 @@ const CARD_AUTO_INTERVAL = 3000; // ms
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function AILoadingScreen({ isComplete, onComplete }: AILoadingScreenProps) {
+  const { width, height } = useWindowDimensions();
+  const isCompact = width < 380 || height < 760;
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [currentCard, setCurrentCard] = useState(0);
@@ -107,16 +110,25 @@ export function AILoadingScreen({ isComplete, onComplete }: AILoadingScreenProps
 
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isCompact && styles.containerCompact]}>
       {/* 타이틀 */}
-      <View style={{flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 4 }}>
-        <MaterialCommunityIcons name="robot-outline" size={24} color="#FFFFFF" style={{marginRight: 8}} />
-        <Text style={[styles.title, {marginBottom: 0}]}>AI가 플랜을 만들고 있어요</Text>
+      <View style={styles.titleRow}>
+        <MaterialCommunityIcons
+          name="robot-outline"
+          size={isCompact ? 22 : 24}
+          color="#FFFFFF"
+          style={styles.titleIcon}
+        />
+        <Text style={[styles.title, isCompact && styles.titleCompact, { marginBottom: 0 }]}>
+          AI가 플랜을 만들고 있어요
+        </Text>
       </View>
-      <Text style={styles.subtitle}>잠깐! 앱을 먼저 살펴볼까요?</Text>
+      <Text style={[styles.subtitle, isCompact && styles.subtitleCompact]}>
+        잠깐! 앱을 먼저 살펴볼까요?
+      </Text>
 
       {/* Step Progress */}
-      <View style={styles.stepsContainer}>
+      <View style={[styles.stepsContainer, isCompact && styles.stepsContainerCompact]}>
         {LOADING_STEPS.map((step, index) => {
           const isCompleted = index < currentStep;
           const isActive = index === currentStep;
@@ -127,7 +139,7 @@ export function AILoadingScreen({ isComplete, onComplete }: AILoadingScreenProps
               <View style={{ width: 28, alignItems: 'center' }}>
                 <MaterialCommunityIcons
                   name={(isCompleted ? 'check' : step.icon) as any}
-                  size={18}
+                  size={isCompact ? 16 : 18}
                   color={isCompleted ? '#AAAAAA' : isPending ? '#666666' : '#FFFFFF'}
                 />
               </View>
@@ -135,6 +147,7 @@ export function AILoadingScreen({ isComplete, onComplete }: AILoadingScreenProps
                 <Text
                   style={[
                     styles.stepMessage,
+                    isCompact && styles.stepMessageCompact,
                     isCompleted && styles.stepDimmed,
                     isPending && styles.stepPending,
                     isActive && styles.stepActive,
@@ -170,16 +183,21 @@ export function AILoadingScreen({ isComplete, onComplete }: AILoadingScreenProps
           style={styles.carousel}
         >
           {LOADING_CARDS.map((card, index) => (
-            <View key={index} style={[styles.card, { width: cardWidth }]}>
-              <MaterialCommunityIcons name={card.icon as any} size={40} color="#FFFFFF" style={styles.cardIcon} />
+            <View key={index} style={[styles.card, isCompact && styles.cardCompact, { width: cardWidth }]}>
+              <MaterialCommunityIcons
+                name={card.icon as any}
+                size={isCompact ? 34 : 40}
+                color="#FFFFFF"
+                style={styles.cardIcon}
+              />
               {card.type === 'tip' && card.category && (
-                <Text style={styles.cardCategory}>{card.category}</Text>
+                <Text style={[styles.cardCategory, isCompact && styles.cardCategoryCompact]}>{card.category}</Text>
               )}
               {card.type === 'feature' && (
-                <Text style={styles.cardCategory}>앱 기능</Text>
+                <Text style={[styles.cardCategory, isCompact && styles.cardCategoryCompact]}>앱 기능</Text>
               )}
-              <Text style={styles.cardTitle}>{card.title}</Text>
-              <Text style={styles.cardBody}>{card.body}</Text>
+              <Text style={[styles.cardTitle, isCompact && styles.cardTitleCompact]}>{card.title}</Text>
+              <Text style={[styles.cardBody, isCompact && styles.cardBodyCompact]}>{card.body}</Text>
             </View>
           ))}
         </ScrollView>
@@ -211,6 +229,20 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     backgroundColor: '#0F0F0F',
   },
+  containerCompact: {
+    paddingHorizontal: 16,
+    paddingTop: 28,
+    paddingBottom: 16,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  titleIcon: {
+    marginRight: 8,
+  },
   title: {
     fontSize: 20,
     fontWeight: '700',
@@ -218,17 +250,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 4,
   },
+  titleCompact: {
+    fontSize: 18,
+  },
   subtitle: {
     fontSize: 13,
     color: '#888888',
     textAlign: 'center',
     marginBottom: 32,
   },
+  subtitleCompact: {
+    marginBottom: 24,
+  },
 
   // Step Progress
   stepsContainer: {
     marginBottom: 24,
     gap: 12,
+  },
+  stepsContainerCompact: {
+    marginBottom: 18,
+    gap: 10,
   },
   stepRow: {
     flexDirection: 'row',
@@ -242,6 +284,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#FFFFFF',
     fontWeight: '500',
+  },
+  stepMessageCompact: {
+    fontSize: 14,
+    lineHeight: 19,
   },
   stepActive: {
     color: '#A78BFA',
@@ -285,6 +331,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2A2A4A',
   },
+  cardCompact: {
+    paddingHorizontal: 18,
+    paddingVertical: 20,
+  },
   cardIcon: {
     marginBottom: 4,
   },
@@ -295,17 +345,27 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+  cardCategoryCompact: {
+    fontSize: 10,
+  },
   cardTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#FFFFFF',
     textAlign: 'center',
   },
+  cardTitleCompact: {
+    fontSize: 16,
+  },
   cardBody: {
     fontSize: 14,
     color: '#AAAAAA',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  cardBodyCompact: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 
   // Dot indicators

@@ -1,19 +1,21 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AILoadingScreen } from '../../components/ai/AILoadingScreen';
+import { AIFlowScreen } from '../../components/ai/AIFlowScreen';
 import {
   Alert,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   buildWorkoutHistorySection,
   fetchUserHistorySummary,
@@ -45,6 +47,8 @@ function OneRMCalcModal({
   onApply: (value: number) => void;
   colors: ReturnType<typeof useAppTheme>['colors'];
 }) {
+  const { width, height } = useWindowDimensions();
+  const isCompact = width < 380 || height < 760;
   const [rmWeight, setRmWeight] = React.useState('');
   const [rmReps, setRmReps] = React.useState('');
 
@@ -72,7 +76,16 @@ function OneRMCalcModal({
       <TouchableWithoutFeedback onPress={handleClose}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
           <TouchableWithoutFeedback onPress={() => {}}>
-            <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 44 }}>
+            <View
+              style={{
+                backgroundColor: colors.card,
+                borderTopLeftRadius: 20,
+                borderTopRightRadius: 20,
+                paddingHorizontal: isCompact ? 16 : 24,
+                paddingTop: 24,
+                paddingBottom: 44,
+              }}
+            >
               {/* 핸들바 */}
               <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 20 }} />
               <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
@@ -83,10 +96,25 @@ function OneRMCalcModal({
               </Text>
 
               {/* 입력 행 */}
-              <View style={{ flexDirection: 'row', gap: 16, marginBottom: 20 }}>
+              <View
+                style={{
+                  flexDirection: isCompact ? 'column' : 'row',
+                  gap: 16,
+                  marginBottom: 20,
+                }}
+              >
                 <View style={{ flex: 1, alignItems: 'center' }}>
                   <TextInput
-                    style={{ fontSize: 28, fontWeight: '700', color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.border, textAlign: 'center', width: '100%', paddingVertical: 6 }}
+                    style={{
+                      fontSize: isCompact ? 24 : 28,
+                      fontWeight: '700',
+                      color: colors.text,
+                      borderBottomWidth: 2,
+                      borderBottomColor: colors.border,
+                      textAlign: 'center',
+                      width: '100%',
+                      paddingVertical: 6,
+                    }}
                     keyboardType="numeric"
                     placeholder="무게"
                     placeholderTextColor={colors.textSecondary}
@@ -96,10 +124,19 @@ function OneRMCalcModal({
                   />
                   <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>kg</Text>
                 </View>
-                <Text style={{ fontSize: 28, color: colors.textSecondary, paddingTop: 8 }}>×</Text>
+                {!isCompact && <Text style={{ fontSize: 28, color: colors.textSecondary, paddingTop: 8 }}>×</Text>}
                 <View style={{ flex: 1, alignItems: 'center' }}>
                   <TextInput
-                    style={{ fontSize: 28, fontWeight: '700', color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.border, textAlign: 'center', width: '100%', paddingVertical: 6 }}
+                    style={{
+                      fontSize: isCompact ? 24 : 28,
+                      fontWeight: '700',
+                      color: colors.text,
+                      borderBottomWidth: 2,
+                      borderBottomColor: colors.border,
+                      textAlign: 'center',
+                      width: '100%',
+                      paddingVertical: 6,
+                    }}
                     keyboardType="numeric"
                     placeholder="횟수"
                     placeholderTextColor={colors.textSecondary}
@@ -119,7 +156,15 @@ function OneRMCalcModal({
               )}
 
               {/* 추정 1RM */}
-              <Text style={{ fontSize: 22, fontWeight: '700', color: estimated !== null ? colors.accent : colors.textSecondary, textAlign: 'center', marginBottom: 24 }}>
+              <Text
+                style={{
+                  fontSize: isCompact ? 20 : 22,
+                  fontWeight: '700',
+                  color: estimated !== null ? colors.accent : colors.textSecondary,
+                  textAlign: 'center',
+                  marginBottom: 24,
+                }}
+              >
                 {estimated !== null ? `추정 1RM: ${estimated} kg` : '무게와 횟수를 입력하세요'}
               </Text>
 
@@ -314,10 +359,14 @@ const MAIN_EXERCISES = [
 
 export default function AIOnboardingScreen() {
   const { colors } = useAppTheme();
+  const { width, height } = useWindowDimensions();
   const navigation = useNavigation<NavProp>();
   const user = useAuthStore((s) => s.user);
   const { setOnboardingData, setCurrentPlan, setGenerating, setError } =
     useAIPlanStore();
+  const isCompact = width < 380 || height < 760;
+  const horizontalPadding = isCompact ? 16 : 24;
+  const scrollRef = useRef<ScrollView>(null);
 
   const [step, setStep] = useState(0);
   const [skippedPhase2, setSkippedPhase2] = useState(false);
@@ -519,56 +568,94 @@ export default function AIOnboardingScreen() {
     }
   };
 
-  const s = styles(colors);
+  const s = styles(colors, {
+    horizontalPadding,
+    isCompact,
+  });
+
+  const scrollToFocusedInput = (y: number) => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y, animated: true });
+    });
+  };
 
   // ─── 로딩 화면 ──────────────────────────────────────────────────────────────
   if (generating) {
     return (
-      <SafeAreaView style={s.container}>
+      <AIFlowScreen scroll={false}>
         <AILoadingScreen isComplete={planReady} onComplete={handleNavigate} />
-      </SafeAreaView>
+      </AIFlowScreen>
     );
   }
 
   // ─── Phase 2 구분선 ──────────────────────────────────────────────────────────
   if (isPhase2Separator) {
     return (
-      <SafeAreaView style={s.container}>
-        <View style={s.header}>
-          <TouchableOpacity onPress={handleBack} style={s.backBtn}>
-            <Text style={s.backText}>←</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={s.separatorContent}>
+      <AIFlowScreen
+        scroll={false}
+        header={
+          <View style={s.header}>
+            <TouchableOpacity onPress={handleBack} style={s.backBtn}>
+              <Text style={s.backText}>←</Text>
+            </TouchableOpacity>
+          </View>
+        }
+        bodyStyle={s.separatorContent}
+        footer={
+          <>
+            <TouchableOpacity
+              style={s.primaryBtn}
+              onPress={() => setPassedSeparator(true)}
+            >
+              <Text style={s.primaryBtnText}>계속 입력하기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.skipBtn} onPress={handleSkipPhase2}>
+              <Text style={s.skipText}>건너뛰고 플랜 받기</Text>
+            </TouchableOpacity>
+          </>
+        }
+      >
           <Text style={s.separatorIcon}>💡</Text>
           <Text style={s.separatorTitle}>선택 사항</Text>
           <Text style={s.separatorDesc}>
             다음 질문을 추가로 답해주시면{'\n'}AI 플랜의 정확도가 더 높아집니다.
           </Text>
-          <TouchableOpacity
-            style={s.primaryBtn}
-            onPress={() => setPassedSeparator(true)}
-          >
-            <Text style={s.primaryBtnText}>계속 입력하기</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.skipBtn} onPress={handleSkipPhase2}>
-            <Text style={s.skipText}>건너뛰고 플랜 받기</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      </AIFlowScreen>
     );
   }
 
   // ─── 강도 프로필 입력 화면 ────────────────────────────────────────────────────
   if (isStrengthStep) {
     return (
-      <SafeAreaView style={s.container}>
-        <View style={s.header}>
-          <TouchableOpacity onPress={() => setPassedSeparator(false)} style={s.backBtn}>
-            <Text style={s.backText}>←</Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+      <AIFlowScreen
+        header={
+          <View style={s.header}>
+            <TouchableOpacity onPress={() => setPassedSeparator(false)} style={s.backBtn}>
+              <Text style={s.backText}>←</Text>
+            </TouchableOpacity>
+          </View>
+        }
+        scrollRef={scrollRef}
+        keyboardVerticalOffset={16}
+        contentContainerStyle={s.content}
+        footer={
+          <>
+            <TouchableOpacity style={s.primaryBtn} onPress={() => setPassedStrengthStep(true)} activeOpacity={0.85}>
+              <Text style={s.primaryBtnText}>다음</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.skipBtn}
+              onPress={() => { setStrengthSkipped(true); setPassedStrengthStep(true); }}
+              activeOpacity={0.85}
+            >
+              <Text style={s.skipText}>모르면 건너뛰기 (맨몸 기준으로 설정)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.skipBtn, { marginTop: 2 }]} onPress={handleSkipPhase2}>
+              <Text style={[s.skipText, { fontSize: 13 }]}>건너뛰고 플랜 받기</Text>
+            </TouchableOpacity>
+          </>
+        }
+      >
           <View style={s.phaseBadge}>
             <Text style={s.phaseBadgeText}>선택 질문</Text>
           </View>
@@ -588,52 +675,42 @@ export default function AIOnboardingScreen() {
             }}
             colors={colors}
           />
-          <View style={{ gap: 16 }}>
+          <View style={s.strengthList}>
             {MAIN_EXERCISES.map(ex => (
-              <View key={ex.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{ color: colors.text, fontSize: 16, fontWeight: '600', flex: 1 }}>{ex.label}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <TextInput
-                    style={[s.numberInput, { width: 90, color: colors.text, borderColor: colors.border, fontSize: 18 }]}
-                    keyboardType="numeric"
-                    placeholder="0"
-                    placeholderTextColor={colors.textSecondary}
-                    value={strengthInputs[ex.id] ?? ''}
-                    onChangeText={text => {
-                      const numeric = text.replace(/[^0-9]/g, '');
-                      setStrengthInputs(prev => ({ ...prev, [ex.id]: numeric }));
-                    }}
-                    maxLength={4}
-                  />
-                  <Text style={{ color: colors.textSecondary, fontSize: 15, minWidth: 24 }}>kg</Text>
-                  <TouchableOpacity
-                    onPress={() => setRmCalcTarget(ex.id)}
-                    style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: colors.accent }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={{ fontSize: 11, color: colors.accent, fontWeight: '600' }}>1RM 계산</Text>
-                  </TouchableOpacity>
+              <View key={ex.id} style={s.strengthCard}>
+                <Text style={s.strengthLabel}>{ex.label}</Text>
+                <View style={s.strengthInputRow}>
+                  <View style={s.strengthInputWrap}>
+                    <Text style={s.strengthInputHint}>현재 사용 중량</Text>
+                    <View style={s.strengthInputInner}>
+                      <TextInput
+                        style={[s.numberInput, s.strengthInput, { color: colors.text, borderColor: colors.border }]}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor={colors.textSecondary}
+                        value={strengthInputs[ex.id] ?? ''}
+                        onChangeText={text => {
+                          const numeric = text.replace(/[^0-9]/g, '');
+                          setStrengthInputs(prev => ({ ...prev, [ex.id]: numeric }));
+                        }}
+                        onFocus={() => scrollToFocusedInput(260)}
+                        maxLength={4}
+                      />
+                      <Text style={s.strengthUnit}>kg</Text>
+                    </View>
+                  </View>
                 </View>
+                <TouchableOpacity
+                  onPress={() => setRmCalcTarget(ex.id)}
+                  style={s.rmButton}
+                  activeOpacity={0.7}
+                >
+                  <Text style={s.rmButtonText}>1RM 계산기로 입력하기</Text>
+                </TouchableOpacity>
               </View>
             ))}
           </View>
-        </ScrollView>
-        <View style={s.footer}>
-          <TouchableOpacity style={s.primaryBtn} onPress={() => setPassedStrengthStep(true)} activeOpacity={0.85}>
-            <Text style={s.primaryBtnText}>다음</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.skipBtn}
-            onPress={() => { setStrengthSkipped(true); setPassedStrengthStep(true); }}
-            activeOpacity={0.85}
-          >
-            <Text style={s.skipText}>모르면 건너뛰기 (맨몸 기준으로 설정)</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[s.skipBtn, { marginTop: 2 }]} onPress={handleSkipPhase2}>
-            <Text style={[s.skipText, { fontSize: 13 }]}>건너뛰고 플랜 받기</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      </AIFlowScreen>
     );
   }
 
@@ -652,25 +729,41 @@ export default function AIOnboardingScreen() {
 
   // ─── 질문 화면 ──────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={handleBack} style={s.backBtn}>
-          <Text style={s.backText}>←</Text>
-        </TouchableOpacity>
-        <View style={s.progressBar}>
-          {Array.from({ length: totalSteps }).map((_, i) => (
-            <View
-              key={i}
-              style={[s.progressDot, i <= step && s.progressDotActive]}
-            />
-          ))}
+      <AIFlowScreen
+      header={
+        <View style={s.header}>
+          <TouchableOpacity onPress={handleBack} style={s.backBtn}>
+            <Text style={s.backText}>←</Text>
+          </TouchableOpacity>
+          <View style={s.progressBar}>
+            {Array.from({ length: totalSteps }).map((_, i) => (
+              <View
+                key={i}
+                style={[s.progressDot, i <= step && s.progressDotActive]}
+              />
+            ))}
+          </View>
+          <Text style={s.stepLabel}>
+            {step + 1}/{totalSteps}
+          </Text>
         </View>
-        <Text style={s.stepLabel}>
-          {step + 1}/{totalSteps}
-        </Text>
-      </View>
-
-      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+      }
+      scrollRef={scrollRef}
+      keyboardVerticalOffset={16}
+      contentContainerStyle={s.content}
+      footer={
+        <TouchableOpacity
+          style={[s.primaryBtn, !canProceed && s.btnDisabled]}
+          onPress={handleNext}
+          disabled={!canProceed}
+          activeOpacity={0.85}
+        >
+          <Text style={s.primaryBtnText}>
+            {step === totalSteps - 1 ? 'AI 플랜 생성하기' : '다음'}
+          </Text>
+        </TouchableOpacity>
+      }
+    >
         {currentQuestion.phase === 2 && (
           <View style={s.phaseBadge}>
             <Text style={s.phaseBadgeText}>선택 질문</Text>
@@ -691,6 +784,7 @@ export default function AIOnboardingScreen() {
                 const numeric = text.replace(/[^0-9]/g, '');
                 setAnswers((prev) => ({ ...prev, [currentQuestion.key]: numeric }));
               }}
+              onFocus={() => scrollToFocusedInput(180)}
               maxLength={3}
               autoFocus
             />
@@ -728,20 +822,6 @@ export default function AIOnboardingScreen() {
             })}
           </View>
         )}
-      </ScrollView>
-
-      <View style={s.footer}>
-        <TouchableOpacity
-          style={[s.primaryBtn, !canProceed && s.btnDisabled]}
-          onPress={handleNext}
-          disabled={!canProceed}
-          activeOpacity={0.85}
-        >
-          <Text style={s.primaryBtnText}>
-            {step === totalSteps - 1 ? 'AI 플랜 생성하기' : '다음'}
-          </Text>
-        </TouchableOpacity>
-      </View>
 
       {/* ─── EquipmentDetailSheet ────────────────────────────────────────── */}
       <Modal
@@ -753,50 +833,54 @@ export default function AIOnboardingScreen() {
         <TouchableWithoutFeedback onPress={() => handleEquipmentClose([])}>
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
             <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40, maxHeight: '80%' }}>
+              <View style={s.sheetContainer}>
                 {/* 핸들바 */}
-                <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 20 }} />
+                <View style={s.sheetHandle} />
 
                 {equipmentStep === 'confirm' ? (
                   <>
-                    <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 8 }}>
+                    <Text style={s.sheetTitle}>
                       세부 장비를 지정할까요?
                     </Text>
-                    <Text style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 28, lineHeight: 20 }}>
+                    <Text style={s.sheetSubtitle}>
                       보유 장비를 직접 선택하면 해당 장비로 가능한 종목만 추천됩니다.
                     </Text>
                     <TouchableOpacity
-                      style={{ backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginBottom: 12 }}
+                      style={s.sheetPrimaryButton}
                       onPress={() => setEquipmentStep('select')}
                     >
-                      <Text style={{ fontSize: 16, fontWeight: '600', color: '#fff' }}>네, 직접 선택할게요</Text>
+                      <Text style={s.sheetPrimaryButtonText}>네, 직접 선택할게요</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={{ alignItems: 'center', paddingVertical: 12 }}
+                      style={s.sheetSecondaryAction}
                       onPress={() => handleEquipmentClose([])}
                     >
-                      <Text style={{ fontSize: 15, color: colors.textSecondary }}>아니요, 기본으로 진행</Text>
+                      <Text style={s.sheetSecondaryActionText}>아니요, 기본으로 진행</Text>
                     </TouchableOpacity>
                   </>
                 ) : (
                   <>
-                    <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
+                    <Text style={s.sheetTitle}>
                       보유 장비 선택
                     </Text>
-                    <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 16 }}>
+                    <Text style={s.sheetCaption}>
                       사용 가능한 장비를 모두 선택하세요
                     </Text>
-                    <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                    <ScrollView
+                      showsVerticalScrollIndicator={false}
+                      style={s.sheetScroll}
+                      contentContainerStyle={s.sheetScrollContent}
+                    >
                       {[
                         { category: '프리웨이트', items: ['덤벨', '케틀벨', '바벨', 'EZ바', '트랩바'] },
                         { category: '랙·벤치', items: ['스쿼트랙', '플랫벤치', '인클라인벤치', '풀업바'] },
                         { category: '케이블·머신', items: ['케이블 크로스오버', '랫풀다운', '로우케이블', '렉프레스', '레그익스텐션', '레그컬'] },
                       ].map(({ category, items }) => (
-                        <View key={category} style={{ marginBottom: 16 }}>
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 8 }}>
+                        <View key={category} style={s.sheetCategory}>
+                          <Text style={s.sheetCategoryTitle}>
                             {category}
                           </Text>
-                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                          <View style={s.sheetChipWrap}>
                             {items.map((item) => {
                               const selected = selectedEquipment.includes(item);
                               return (
@@ -809,16 +893,15 @@ export default function AIOnboardingScreen() {
                                         : [...prev, item]
                                     )
                                   }
-                                  style={{
-                                    paddingHorizontal: 12,
-                                    paddingVertical: 8,
-                                    borderRadius: 20,
-                                    borderWidth: 1.5,
-                                    borderColor: selected ? colors.accent : colors.border,
-                                    backgroundColor: selected ? colors.accent + '20' : 'transparent',
-                                  }}
+                                  style={[
+                                    s.sheetChip,
+                                    {
+                                      borderColor: selected ? colors.accent : colors.border,
+                                      backgroundColor: selected ? colors.accentMuted : 'transparent',
+                                    },
+                                  ]}
                                 >
-                                  <Text style={{ fontSize: 14, color: selected ? colors.accent : colors.text }}>
+                                  <Text style={[s.sheetChipText, { color: selected ? colors.accent : colors.text }]}>
                                     {item}
                                   </Text>
                                 </TouchableOpacity>
@@ -828,14 +911,16 @@ export default function AIOnboardingScreen() {
                         </View>
                       ))}
                     </ScrollView>
-                    <TouchableOpacity
-                      style={{ backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16, alignItems: 'center' }}
-                      onPress={() => handleEquipmentClose(selectedEquipment)}
-                    >
-                      <Text style={{ fontSize: 16, fontWeight: '600', color: '#fff' }}>
-                        완료 {selectedEquipment.length > 0 ? `(${selectedEquipment.length}개 선택)` : ''}
-                      </Text>
-                    </TouchableOpacity>
+                    <View style={s.sheetFooter}>
+                      <TouchableOpacity
+                        style={s.sheetPrimaryButton}
+                        onPress={() => handleEquipmentClose(selectedEquipment)}
+                      >
+                        <Text style={s.sheetPrimaryButtonText}>
+                          완료 {selectedEquipment.length > 0 ? `(${selectedEquipment.length}개 선택)` : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </>
                 )}
               </View>
@@ -843,20 +928,19 @@ export default function AIOnboardingScreen() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-    </SafeAreaView>
+    </AIFlowScreen>
   );
 }
 
-const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
+const styles = (
+  colors: ReturnType<typeof useAppTheme>['colors'],
+  layout: { horizontalPadding: number; isCompact: boolean }
+) =>
   StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 16,
+      paddingHorizontal: layout.horizontalPadding,
       paddingTop: 8,
       paddingBottom: 12,
       gap: 12,
@@ -872,10 +956,9 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       flex: 1,
       flexDirection: 'row',
       gap: 4,
-      flexWrap: 'wrap',
     },
     progressDot: {
-      width: 8,
+      flex: 1,
       height: 4,
       borderRadius: 2,
       backgroundColor: colors.border,
@@ -890,9 +973,9 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       textAlign: 'right',
     },
     content: {
-      paddingHorizontal: 24,
-      paddingTop: 20,
-      paddingBottom: 100,
+      paddingHorizontal: layout.horizontalPadding,
+      paddingTop: layout.isCompact ? 16 : 20,
+      paddingBottom: 24,
     },
     phaseBadge: {
       alignSelf: 'flex-start',
@@ -908,42 +991,43 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       fontWeight: '600',
     },
     questionText: {
-      fontSize: 22,
+      fontSize: layout.isCompact ? 20 : 22,
       fontWeight: '700',
       color: colors.text,
-      lineHeight: 30,
-      marginBottom: 28,
+      lineHeight: layout.isCompact ? 28 : 30,
+      marginBottom: layout.isCompact ? 24 : 28,
     },
     optionsWrap: {
       gap: 12,
     },
     numberInputWrap: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
+      flexDirection: layout.isCompact ? 'column' : 'row',
+      alignItems: layout.isCompact ? 'flex-start' : 'center',
+      gap: layout.isCompact ? 8 : 12,
       marginTop: 8,
     },
     numberInput: {
-      flex: 1,
-      fontSize: 32,
+      flex: layout.isCompact ? 0 : 1,
+      width: layout.isCompact ? '100%' : undefined,
+      fontSize: layout.isCompact ? 28 : 32,
       fontWeight: '700',
       borderBottomWidth: 2,
       paddingVertical: 8,
-      textAlign: 'center',
+      textAlign: layout.isCompact ? 'left' : 'center',
     },
     numberUnit: {
-      fontSize: 20,
+      fontSize: layout.isCompact ? 16 : 20,
       fontWeight: '600',
-      minWidth: 40,
+      minWidth: layout.isCompact ? 0 : 40,
     },
     optionBtn: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       justifyContent: 'space-between',
       backgroundColor: colors.card,
       borderRadius: 14,
-      paddingHorizontal: 20,
-      paddingVertical: 18,
+      paddingHorizontal: layout.isCompact ? 16 : 20,
+      paddingVertical: layout.isCompact ? 16 : 18,
       borderWidth: 1.5,
       borderColor: 'transparent',
     },
@@ -954,6 +1038,9 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
     optionText: {
       fontSize: 16,
       color: colors.text,
+      flex: 1,
+      lineHeight: 22,
+      marginRight: 12,
     },
     optionTextSelected: {
       color: colors.accent,
@@ -963,16 +1050,6 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       fontSize: 16,
       color: colors.accent,
       fontWeight: '700',
-    },
-    footer: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      paddingHorizontal: 24,
-      paddingBottom: 40,
-      paddingTop: 12,
-      backgroundColor: colors.background,
     },
     primaryBtn: {
       backgroundColor: colors.accent,
@@ -992,8 +1069,9 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
     // Phase 2 separator
     separatorContent: {
       flex: 1,
-      paddingHorizontal: 24,
-      paddingTop: 60,
+      paddingHorizontal: layout.horizontalPadding,
+      paddingTop: layout.isCompact ? 32 : 60,
+      justifyContent: 'center',
       alignItems: 'center',
     },
     separatorIcon: {
@@ -1001,7 +1079,7 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       marginBottom: 20,
     },
     separatorTitle: {
-      fontSize: 24,
+      fontSize: layout.isCompact ? 22 : 24,
       fontWeight: '700',
       color: colors.text,
       marginBottom: 12,
@@ -1018,6 +1096,151 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       paddingVertical: 8,
     },
     skipText: {
+      fontSize: 15,
+      color: colors.textSecondary,
+    },
+    strengthList: {
+      gap: 16,
+    },
+    strengthCard: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: layout.isCompact ? 14 : 16,
+      gap: 12,
+    },
+    strengthLabel: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    strengthInputRow: {
+      minHeight: 0,
+    },
+    strengthInputWrap: {
+      width: '100%',
+    },
+    strengthInputHint: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      marginBottom: 6,
+    },
+    strengthInputInner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    strengthInput: {
+      fontSize: 22,
+      width: undefined,
+      textAlign: 'left',
+      flex: 1,
+    },
+    strengthUnit: {
+      color: colors.textSecondary,
+      fontSize: 15,
+      minWidth: 24,
+    },
+    rmButton: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.accent,
+      backgroundColor: colors.accentMuted,
+    },
+    rmButtonText: {
+      fontSize: 13,
+      color: colors.accent,
+      fontWeight: '600',
+    },
+    sheetContainer: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingHorizontal: layout.horizontalPadding,
+      paddingTop: 16,
+      paddingBottom: Platform.OS === 'ios' ? 24 : 20,
+      maxHeight: '85%',
+    },
+    sheetHandle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+      alignSelf: 'center',
+      marginBottom: 20,
+    },
+    sheetTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.text,
+      marginBottom: 8,
+    },
+    sheetSubtitle: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: 28,
+      lineHeight: 20,
+    },
+    sheetCaption: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginBottom: 16,
+    },
+    sheetScroll: {
+      flexGrow: 0,
+      marginBottom: 12,
+    },
+    sheetScrollContent: {
+      paddingBottom: 8,
+    },
+    sheetCategory: {
+      marginBottom: 16,
+    },
+    sheetCategoryTitle: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginBottom: 8,
+    },
+    sheetChipWrap: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    sheetChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+      borderWidth: 1.5,
+    },
+    sheetChipText: {
+      fontSize: 14,
+    },
+    sheetFooter: {
+      paddingTop: 8,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
+    sheetPrimaryButton: {
+      backgroundColor: colors.accent,
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    sheetPrimaryButtonText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#fff',
+    },
+    sheetSecondaryAction: {
+      alignItems: 'center',
+      paddingVertical: 12,
+    },
+    sheetSecondaryActionText: {
       fontSize: 15,
       color: colors.textSecondary,
     },

@@ -3,14 +3,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { AIFlowScreen } from '../../components/ai/AIFlowScreen';
 import { saveAIConsent } from '../../lib/ai-planner';
 import { useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
@@ -28,6 +28,8 @@ const DATA_ITEMS = [
 
 export default function AIConsentScreen() {
   const { colors } = useAppTheme();
+  const { width, height } = useWindowDimensions();
+  const isCompact = width < 380 || height < 760;
   const navigation = useNavigation<NavProp>();
   const user = useAuthStore((s) => s.user);
   const setNeedsOnboarding = useAIPlanStore((s) => s.setNeedsOnboarding);
@@ -58,11 +60,32 @@ export default function AIConsentScreen() {
     navigation.goBack();
   };
 
-  const s = styles(colors);
+  const s = styles(colors, { isCompact });
 
   return (
-    <SafeAreaView style={s.container}>
-      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+    <AIFlowScreen
+      contentContainerStyle={s.content}
+      footer={
+        <>
+          <TouchableOpacity
+            style={[s.primaryBtn, loading && s.btnDisabled]}
+            onPress={handleConsent}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={s.primaryBtnText}>AI 플랜 시작하기</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={s.skipBtn} onPress={handleSkip} activeOpacity={0.7}>
+            <Text style={s.skipText}>지금은 건너뛰기 (나중에 프로필에서 켜기 가능)</Text>
+          </TouchableOpacity>
+        </>
+      }
+    >
         <View style={[s.iconWrap, { backgroundColor: colors.accentMuted }]}>
           <MaterialCommunityIcons name="creation" size={40} color={colors.accent} />
         </View>
@@ -84,69 +107,49 @@ export default function AIConsentScreen() {
             </View>
           ))}
         </View>
-
-        <TouchableOpacity
-          style={[s.primaryBtn, loading && s.btnDisabled]}
-          onPress={handleConsent}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={s.primaryBtnText}>AI 플랜 시작하기</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity style={s.skipBtn} onPress={handleSkip} activeOpacity={0.7}>
-          <Text style={s.skipText}>지금은 건너뛰기 (나중에 프로필에서 켜기 가능)</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+    </AIFlowScreen>
   );
 }
 
-const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
+const styles = (
+  colors: ReturnType<typeof useAppTheme>['colors'],
+  layout: { isCompact: boolean }
+) =>
   StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
     content: {
-      paddingHorizontal: 24,
-      paddingTop: 48,
-      paddingBottom: 40,
+      paddingHorizontal: layout.isCompact ? 16 : 24,
+      paddingTop: layout.isCompact ? 28 : 48,
       alignItems: 'center',
     },
     iconWrap: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
+      width: layout.isCompact ? 68 : 80,
+      height: layout.isCompact ? 68 : 80,
+      borderRadius: layout.isCompact ? 34 : 40,
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: 24,
+      marginBottom: layout.isCompact ? 20 : 24,
     },
     title: {
-      fontSize: 26,
+      fontSize: layout.isCompact ? 22 : 26,
       fontWeight: '700',
       color: colors.text,
       textAlign: 'center',
-      lineHeight: 34,
+      lineHeight: layout.isCompact ? 30 : 34,
       marginBottom: 12,
     },
     subtitle: {
-      fontSize: 15,
+      fontSize: layout.isCompact ? 14 : 15,
       color: colors.textSecondary,
       textAlign: 'center',
       lineHeight: 22,
-      marginBottom: 32,
+      marginBottom: layout.isCompact ? 24 : 32,
     },
     card: {
       width: '100%',
       backgroundColor: colors.card,
       borderRadius: 16,
-      padding: 20,
-      marginBottom: 32,
+      padding: layout.isCompact ? 16 : 20,
+      marginBottom: layout.isCompact ? 24 : 32,
     },
     cardTitle: {
       fontSize: 15,
@@ -181,18 +184,17 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       borderRadius: 14,
       paddingVertical: 16,
       alignItems: 'center',
-      marginBottom: 16,
     },
     btnDisabled: {
       opacity: 0.6,
     },
     primaryBtnText: {
-      fontSize: 17,
+      fontSize: layout.isCompact ? 16 : 17,
       fontWeight: '600',
       color: '#fff',
     },
     skipBtn: {
-      paddingVertical: 8,
+      paddingVertical: 12,
     },
     skipText: {
       fontSize: 14,

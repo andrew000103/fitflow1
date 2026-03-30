@@ -4,14 +4,14 @@ import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { AIFlowScreen } from '../../components/ai/AIFlowScreen';
 import {
   fetchUserHistorySummary,
   generateAIPlan,
@@ -42,31 +42,33 @@ function formatDayHeader(weekStart: string, dayLabel: string): string {
 
 // ─── GoalSummaryCard ──────────────────────────────────────────────────────────
 function GoalSummaryCard({ plan, colors }: { plan: AIPlan; colors: any }) {
+  const { width } = useWindowDimensions();
+  const isCompact = width < 380;
   return (
     <View style={[cardStyles.wrap, { backgroundColor: colors.card }]}>
       <Text style={[cardStyles.title, { color: colors.text }]}>목표</Text>
-      <View style={cardStyles.row}>
+      <View style={[cardStyles.row, isCompact && cardStyles.rowCompact]}>
         <View style={cardStyles.item}>
           <Text style={[cardStyles.value, { color: colors.accent }]}>
             {plan.targetCalories.toLocaleString()}
           </Text>
           <Text style={[cardStyles.label, { color: colors.textSecondary }]}>kcal</Text>
         </View>
-        <View style={[cardStyles.divider, { backgroundColor: colors.border }]} />
+        <View style={[cardStyles.divider, isCompact && cardStyles.dividerCompact, { backgroundColor: colors.border }]} />
         <View style={cardStyles.item}>
           <Text style={[cardStyles.value, { color: colors.protein }]}>
             {plan.targetMacros.protein}g
           </Text>
           <Text style={[cardStyles.label, { color: colors.textSecondary }]}>단백질</Text>
         </View>
-        <View style={[cardStyles.divider, { backgroundColor: colors.border }]} />
+        <View style={[cardStyles.divider, isCompact && cardStyles.dividerCompact, { backgroundColor: colors.border }]} />
         <View style={cardStyles.item}>
           <Text style={[cardStyles.value, { color: colors.carbs }]}>
             {plan.targetMacros.carbs}g
           </Text>
           <Text style={[cardStyles.label, { color: colors.textSecondary }]}>탄수화물</Text>
         </View>
-        <View style={[cardStyles.divider, { backgroundColor: colors.border }]} />
+        <View style={[cardStyles.divider, isCompact && cardStyles.dividerCompact, { backgroundColor: colors.border }]} />
         <View style={cardStyles.item}>
           <Text style={[cardStyles.value, { color: colors.fat }]}>
             {plan.targetMacros.fat}g
@@ -82,14 +84,18 @@ const cardStyles = StyleSheet.create({
   wrap: { borderRadius: 16, padding: 16, marginBottom: 12 },
   title: { fontSize: 13, fontWeight: '600', marginBottom: 12 },
   row: { flexDirection: 'row', alignItems: 'center' },
+  rowCompact: { flexWrap: 'wrap', rowGap: 12 },
   item: { flex: 1, alignItems: 'center' },
   value: { fontSize: 18, fontWeight: '700' },
   label: { fontSize: 11, marginTop: 2 },
   divider: { width: StyleSheet.hairlineWidth, height: 32, marginHorizontal: 4 },
+  dividerCompact: { width: '100%', height: StyleSheet.hairlineWidth, marginHorizontal: 0 },
 });
 
 // ─── WorkoutDayCard ───────────────────────────────────────────────────────────
 function WorkoutDayCard({ day, weekStart, colors }: { day: WorkoutDay; weekStart: string; colors: any }) {
+  const { width } = useWindowDimensions();
+  const isCompact = width < 380;
   const dayNum = day.dayLabel.replace('day', '');
   const dateStr = formatDayHeader(weekStart, day.dayLabel);
 
@@ -117,7 +123,7 @@ function WorkoutDayCard({ day, weekStart, colors }: { day: WorkoutDay; weekStart
           <Text style={[wdStyles.dateText, { color: colors.textTertiary }]}>{dateStr}</Text>
         </View>
         {day.focus && (
-          <Text style={[wdStyles.focusText, { color: colors.accent }]}>{day.focus}</Text>
+          <Text style={[wdStyles.focusText, isCompact && wdStyles.focusTextCompact, { color: colors.accent }]}>{day.focus}</Text>
         )}
       </View>
       {day.exercises.map((ex, i) => (
@@ -135,10 +141,11 @@ function WorkoutDayCard({ day, weekStart, colors }: { day: WorkoutDay; weekStart
 
 const wdStyles = StyleSheet.create({
   wrap: { borderRadius: 14, padding: 14, marginBottom: 10 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 12 },
   dayText: { fontSize: 15, fontWeight: '600' },
   dateText: { fontSize: 12, marginTop: 2 },
   focusText: { fontSize: 13 },
+  focusTextCompact: { flex: 1, textAlign: 'right' },
   restBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 },
   restText: { fontSize: 12 },
   exRow: { paddingVertical: 8 },
@@ -213,6 +220,8 @@ const exStyles = StyleSheet.create({
 
 // ─── DietTab ──────────────────────────────────────────────────────────────────
 function DietTab({ plan, colors }: { plan: AIPlan; colors: any }) {
+  const { width } = useWindowDimensions();
+  const isCompact = width < 380;
   const diet = plan.weeklyDiet[0];
   if (!diet) return null;
 
@@ -226,7 +235,7 @@ function DietTab({ plan, colors }: { plan: AIPlan; colors: any }) {
     <>
       {/* 목표 매크로 */}
       <View style={[dtStyles.macroCard, { backgroundColor: colors.card }]}>
-        <View style={dtStyles.macroHeader}>
+        <View style={[dtStyles.macroHeader, isCompact && dtStyles.macroHeaderCompact]}>
           <Text style={[dtStyles.title, { color: colors.text }]}>하루 목표</Text>
           <Text style={[dtStyles.calText, { color: colors.accent }]}>
             {plan.targetCalories.toLocaleString()} kcal
@@ -243,7 +252,7 @@ function DietTab({ plan, colors }: { plan: AIPlan; colors: any }) {
       {/* 끼니별 */}
       {diet.meals.map((meal, i) => (
         <View key={i} style={[dtStyles.mealCard, { backgroundColor: colors.card }]}>
-          <View style={dtStyles.mealHeader}>
+          <View style={[dtStyles.mealHeader, isCompact && dtStyles.mealHeaderCompact]}>
             <Text style={[dtStyles.mealTiming, { color: colors.text }]}>{meal.timing}</Text>
             <Text style={[dtStyles.mealCal, { color: colors.textSecondary }]}>
               약 {meal.calories}kcal
@@ -273,6 +282,7 @@ function DietTab({ plan, colors }: { plan: AIPlan; colors: any }) {
 const dtStyles = StyleSheet.create({
   macroCard: { borderRadius: 14, padding: 16, marginBottom: 10 },
   macroHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  macroHeaderCompact: { alignItems: 'flex-start', gap: 8 },
   title: { fontSize: 15, fontWeight: '600' },
   calText: { fontSize: 17, fontWeight: '700' },
   macroRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 },
@@ -280,6 +290,7 @@ const dtStyles = StyleSheet.create({
   macroValue: { fontSize: 14, fontWeight: '600' },
   mealCard: { borderRadius: 14, padding: 16, marginBottom: 10 },
   mealHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  mealHeaderCompact: { alignItems: 'flex-start', gap: 8 },
   mealTiming: { fontSize: 15, fontWeight: '600' },
   mealCal: { fontSize: 13 },
   foodItem: { fontSize: 14, lineHeight: 22 },
@@ -305,6 +316,8 @@ function StartDateSheet({
   onClose: () => void;
   colors: ReturnType<typeof useAppTheme>['colors'];
 }) {
+  const { width } = useWindowDimensions();
+  const isCompact = width < 380;
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDateStr, setSelectedDateStr] = useState<string | null>(null);
 
@@ -355,18 +368,18 @@ function StartDateSheet({
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
           <TouchableWithoutFeedback onPress={() => {}}>
-            <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 44 }}>
+            <View style={[sheetStyles.container, isCompact && sheetStyles.containerCompact, { backgroundColor: colors.card }]}>
               {/* 핸들바 */}
-              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 20 }} />
-              <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
+              <View style={[sheetStyles.handle, { backgroundColor: colors.border }]} />
+              <Text style={[sheetStyles.title, { color: colors.text }]}>
                 Day 1 시작일 선택
               </Text>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 20 }}>
+              <Text style={[sheetStyles.subtitle, { color: colors.textSecondary }]}>
                 선택한 날이 Day 1이 됩니다 (Day 7까지 순서대로 이어집니다)
               </Text>
 
               {/* 주 네비게이터 */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <View style={sheetStyles.weekNav}>
                 <TouchableOpacity
                   onPress={() => handleOffsetChange(-1)}
                   style={{ padding: 8 }}
@@ -374,7 +387,7 @@ function StartDateSheet({
                 >
                   <Text style={{ fontSize: 22, color: weekOffset <= -4 ? colors.border : colors.accent }}>‹</Text>
                 </TouchableOpacity>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{rangeLabel}</Text>
+                <Text style={[sheetStyles.weekLabel, isCompact && sheetStyles.weekLabelCompact, { color: colors.text }]}>{rangeLabel}</Text>
                 <TouchableOpacity
                   onPress={() => handleOffsetChange(1)}
                   style={{ padding: 8 }}
@@ -385,7 +398,7 @@ function StartDateSheet({
               </View>
 
               {/* 날짜 버튼 행 */}
-              <View style={{ flexDirection: 'row', gap: 5, marginBottom: 20 }}>
+              <View style={[sheetStyles.dayGrid, isCompact && sheetStyles.dayGridCompact]}>
                 {weekDays.map((day, i) => {
                   const isSelected = selectedDateStr === day.dateStr;
                   const isCurrent = day.isCurrentStart;
@@ -394,7 +407,8 @@ function StartDateSheet({
                       key={i}
                       onPress={() => setSelectedDateStr(day.dateStr)}
                       style={{
-                        flex: 1,
+                        width: isCompact ? '30.5%' : undefined,
+                        flex: isCompact ? undefined : 1,
                         alignItems: 'center',
                         paddingVertical: 10,
                         borderRadius: 10,
@@ -420,7 +434,7 @@ function StartDateSheet({
 
               {/* 선택 확인 텍스트 */}
               {selectedDateStr && (
-                <View style={{ backgroundColor: colors.accentMuted, borderRadius: 10, padding: 12, marginBottom: 16 }}>
+                <View style={[sheetStyles.selectionBox, { backgroundColor: colors.accentMuted }]}>
                   <Text style={{ fontSize: 13, color: colors.text }}>
                     Day 1: {weekDays.find(d => d.dateStr === selectedDateStr)?.label} ({weekDays.find(d => d.dateStr === selectedDateStr)?.dayKo}) ~
                     Day 7: {(() => {
@@ -434,14 +448,14 @@ function StartDateSheet({
 
               {/* 확정 버튼 */}
               <TouchableOpacity
-                style={{ backgroundColor: selectedDateStr ? colors.accent : colors.border, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 12 }}
+                style={[sheetStyles.primaryButton, { backgroundColor: selectedDateStr ? colors.accent : colors.border }]}
                 onPress={handleConfirm}
                 disabled={!selectedDateStr}
                 activeOpacity={0.85}
               >
                 <Text style={{ fontSize: 16, fontWeight: '600', color: '#fff' }}>이 날로 시작</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={{ alignItems: 'center', paddingVertical: 8 }} onPress={onClose}>
+              <TouchableOpacity style={sheetStyles.secondaryAction} onPress={onClose}>
                 <Text style={{ fontSize: 15, color: colors.textSecondary }}>취소</Text>
               </TouchableOpacity>
             </View>
@@ -469,18 +483,20 @@ function RegenBottomSheet({
   onClose: () => void;
   colors: ReturnType<typeof useAppTheme>['colors'];
 }) {
+  const { width } = useWindowDimensions();
+  const isCompact = width < 380;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
           <TouchableWithoutFeedback onPress={() => {}}>
-            <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 44 }}>
+            <View style={[sheetStyles.container, isCompact && sheetStyles.containerCompact, { backgroundColor: colors.card }]}>
               {/* 핸들바 */}
-              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 20 }} />
-              <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
+              <View style={[sheetStyles.handle, { backgroundColor: colors.border }]} />
+              <Text style={[sheetStyles.title, { color: colors.text }]}>
                 플랜 다시 만들기
               </Text>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 20 }}>
+              <Text style={[sheetStyles.subtitle, { color: colors.textSecondary }]}>
                 어떻게 새 플랜을 만들까요?
               </Text>
 
@@ -527,6 +543,8 @@ function RegenBottomSheet({
 // ─── AIPlanResultScreen ───────────────────────────────────────────────────────
 export default function AIPlanResultScreen() {
   const { colors } = useAppTheme();
+  const { width } = useWindowDimensions();
+  const isCompact = width < 380;
   const navigation = useNavigation<NavProp>();
   const user = useAuthStore((s) => s.user);
   const { currentPlan, onboardingData, setCurrentPlan, setGenerating, setError, updateWeekStart } =
@@ -573,7 +591,7 @@ export default function AIPlanResultScreen() {
 
   if (!currentPlan) {
     return (
-      <SafeAreaView style={[s.container, { backgroundColor: colors.background }]}>
+      <AIFlowScreen scroll={false}>
         <View style={s.emptyWrap}>
           <Text style={[s.emptyText, { color: colors.textSecondary }]}>
             플랜 데이터가 없습니다.
@@ -582,7 +600,7 @@ export default function AIPlanResultScreen() {
             <Text style={{ color: colors.accent }}>돌아가기</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </AIFlowScreen>
     );
   }
 
@@ -600,43 +618,47 @@ export default function AIPlanResultScreen() {
   })();
 
   return (
-    <SafeAreaView style={[s.container, { backgroundColor: colors.background }]}>
-      {/* 헤더 */}
-      <View style={[s.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Text style={[s.backText, { color: colors.accent }]}>← 닫기</Text>
-        </TouchableOpacity>
-        <View style={s.headerCenter}>
-          <Text style={[s.headerTitle, { color: colors.text }]}>이번 주 AI 플랜</Text>
-          <TouchableOpacity onPress={() => setStartDateSheetVisible(true)} activeOpacity={0.7}>
-            <Text style={[s.headerSub, { color: colors.accent }]}>{weekLabel} ✎</Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity
-          onPress={() => setRegenSheetVisible(true)}
-          disabled={regenerating}
-          style={s.regenBtn}
-        >
-          <Text style={[s.regenText, { color: regenerating ? colors.textTertiary : colors.accent }]}>
-            {regenerating ? '생성 중...' : '재생성'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+    <AIFlowScreen
+      header={
+        <>
+          <View style={[s.header, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+              <Text style={[s.backText, { color: colors.accent }]}>← 닫기</Text>
+            </TouchableOpacity>
+            <View style={s.headerCenter}>
+              <Text style={[s.headerTitle, { color: colors.text }]}>이번 주 AI 플랜</Text>
+              <TouchableOpacity onPress={() => setStartDateSheetVisible(true)} activeOpacity={0.7}>
+                <Text style={[s.headerSub, { color: colors.accent }]}>{weekLabel} ✎</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              onPress={() => setRegenSheetVisible(true)}
+              disabled={regenerating}
+              style={s.regenBtn}
+            >
+              <Text style={[s.regenText, { color: regenerating ? colors.textTertiary : colors.accent }]}>
+                {regenerating ? '생성 중...' : '재생성'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-      {/* 탭바 */}
-      <View style={[s.tabBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        {(['workout', 'diet'] as const).map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[s.tab, activeTab === tab && { borderBottomColor: colors.accent, borderBottomWidth: 2 }]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[s.tabText, { color: activeTab === tab ? colors.accent : colors.textSecondary }]}>
-              {tab === 'workout' ? `운동 계획 (주 ${workoutDays}일)` : '식단 계획'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+          <View style={[s.tabBar, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+            {(['workout', 'diet'] as const).map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                style={[s.tab, isCompact && s.tabCompact, activeTab === tab && { borderBottomColor: colors.accent, borderBottomWidth: 2 }]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Text style={[s.tabText, isCompact && s.tabTextCompact, { color: activeTab === tab ? colors.accent : colors.textSecondary }]}>
+                  {tab === 'workout' ? `운동 계획 (주 ${workoutDays}일)` : '식단 계획'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      }
+      contentContainerStyle={s.content}
+    >
 
       <StartDateSheet
         visible={startDateSheetVisible}
@@ -656,31 +678,25 @@ export default function AIPlanResultScreen() {
       />
 
       {/* 컨텐츠 */}
-      <ScrollView
-        contentContainerStyle={s.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <GoalSummaryCard plan={currentPlan} colors={colors} />
+      <GoalSummaryCard plan={currentPlan} colors={colors} />
 
-        {activeTab === 'workout' ? (
-          <>
-            <ExplanationCard plan={currentPlan} colors={colors} />
-            {sortedWorkout.map((day) => (
-              <WorkoutDayCard key={day.dayLabel} day={day} weekStart={currentPlan.weekStart} colors={colors} />
-            ))}
-          </>
-        ) : (
-          <DietTab plan={currentPlan} colors={colors} />
-        )}
+      {activeTab === 'workout' ? (
+        <>
+          <ExplanationCard plan={currentPlan} colors={colors} />
+          {sortedWorkout.map((day) => (
+            <WorkoutDayCard key={day.dayLabel} day={day} weekStart={currentPlan.weekStart} colors={colors} />
+          ))}
+        </>
+      ) : (
+        <DietTab plan={currentPlan} colors={colors} />
+      )}
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </SafeAreaView>
+      <View style={{ height: 12 }} />
+    </AIFlowScreen>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -692,7 +708,7 @@ const s = StyleSheet.create({
   backText: { fontSize: 15 },
   headerCenter: { flex: 1, alignItems: 'center' },
   headerTitle: { fontSize: 16, fontWeight: '600' },
-  headerSub: { fontSize: 12, marginTop: 1 },
+  headerSub: { fontSize: 12, marginTop: 1, textAlign: 'center' },
   regenBtn: { minWidth: 56, alignItems: 'flex-end' },
   regenText: { fontSize: 14 },
   tabBar: {
@@ -700,8 +716,76 @@ const s = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabCompact: { paddingHorizontal: 8 },
   tabText: { fontSize: 14, fontWeight: '500' },
-  content: { padding: 16 },
+  tabTextCompact: { fontSize: 13, textAlign: 'center' },
+  content: { padding: 16, paddingBottom: 24 },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontSize: 16 },
+});
+
+const sheetStyles = StyleSheet.create({
+  container: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 44,
+  },
+  containerCompact: {
+    paddingHorizontal: 16,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 13,
+    marginBottom: 20,
+  },
+  weekNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  weekLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  weekLabelCompact: {
+    fontSize: 14,
+  },
+  dayGrid: {
+    flexDirection: 'row',
+    gap: 5,
+    marginBottom: 20,
+  },
+  dayGridCompact: {
+    flexWrap: 'wrap',
+    rowGap: 8,
+  },
+  selectionBox: {
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+  },
+  primaryButton: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  secondaryAction: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
 });
