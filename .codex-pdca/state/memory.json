@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-03-30T00:00:00.000Z",
+  "project": "fit",
+  "preferences": {
+    "language": "ko",
+    "pdcaLevel": "dynamic",
+    "outputStyle": "concise"
+  },
+  "projectRules": {
+    "deviceFirstTesting": true,
+    "dbSystem": "supabase",
+    "nativeInvariantForWebWork": true,
+    "analyzeRequired": true
+  },
+  "recentFeatures": [
+    "ai-plan-loading-ux",
+    "food-schema-unification",
+    "pdca-orchestrator-bootstrap"
+  ],
+  "knownConstraints": [
+    "web external food apis may fail due to cors",
+    "docs schema and spec may lag implementation",
+    "legacy ai plans may require normalization"
+  ]
+}

@@ -107,6 +107,7 @@ src/
 - `docs/seed_nsuns_programs.sql`: Supabase SQL Editor에서 수동 실행 필요. 중복 실행 안전.
 - `profiles` 테이블: Supabase DB에 잔존 (코드 참조는 제거됨, DB에서 수동 삭제 필요)
 - AI 플랜 `dayLabel` 포맷 변경: 기존 AsyncStorage에 저장된 플랜(`dayOfWeek` 포맷)은 재생성 필요
+- 퍼소나 시스템: 현재는 온보딩 + 최근 행동을 섞는 휴리스틱 추정치이며, 사용자 정체성의 확정 판정이 아니다. QA/운영에서는 결과가 재계산 시 달라질 수 있다는 전제와 함께, 중립적/격려형 문구 유지 여부를 수동 확인해야 한다.
 
 ---
 
@@ -257,6 +258,129 @@ src/
 ### C. 검색 품질은 앞으로 튜닝 가능
 - 현재 랭킹은 꽤 좋아졌지만, 아래 검색어는 실제 수동 테스트 추천:
   - `닭가슴살`
+
+---
+
+## 추가 작업 로그 (2026-03-30)
+
+### 6. 퍼소나 시스템 1차 구현 및 안정화
+- 목표:
+  - 온보딩 + 최근 행동 데이터를 함께 써서, 초반에는 부담 없이 동기를 주고 데이터가 쌓일수록 정교해지는 퍼소나 시스템 추가
+- 신규 파일:
+  - `src/lib/persona-engine.ts`
+  - `src/stores/persona-store.ts`
+  - `src/components/home/persona-summary-card.tsx`
+- 반영 화면:
+  - `src/screens/home/home-screen.tsx`
+- 핵심 내용:
+  - `starter / learning / established` 단계 기반 퍼소나 계산
+  - `dailyState`, `headlineMessage`, `confidence`, `sourceBreakdown`, `dataCompleteness` 계산
+  - 홈 상단에 퍼소나 요약 카드 추가
+  - `"활기찬 리트리버 페르소나"` 같은 표기에서 접미사 `"페르소나"` 제거
+  - `RESTING`, `ACTIVE`, `HUNGRY` 같은 상태 기반 아이콘 사용
+
+#### 6-1. 퍼소나 안정화 후속 수정
+- `user goal > onboarding > default` 우선순위로 목표 적용
+- 입력 sanity check 추가 (age/height/weight/workoutDays)
+- 계산 실패 시 stale persona clear
+- low readiness / low completeness 시 confidence 보수화
+- `supportingMessage`, `reliabilityState`, `validationWarnings` 추가
+- 홈 포커스/원격 fetch에 latest-request guard 추가
+- 운영 메모:
+  - 퍼소나는 현재 휴리스틱 기반 추정치이며 확정 판정이 아님
+  - QA/운영 시 중립적/격려형 문구 유지 여부 수동 검증 필요
+
+### 7. 홈 탭 목표 칼로리/매크로 반영 순서 수정
+- 문제:
+  - 홈 탭 목표값이 AI 플랜보다 `user_goals` 또는 기본값 위주로 보일 수 있었음
+- 수정:
+  - `src/screens/home/home-screen.tsx`
+  - 우선순위 변경:
+    1. 승인된 AI 플랜 목표
+    2. `user_goals`
+    3. 기본값
+
+### 8. AI 플랜 승인 적용 UX 도입
+- 목표:
+  - AI 플랜 결과를 단순 참고가 아니라 사용자가 승인 후 실제 계획으로 채택하도록 변경
+- 핵심 파일:
+  - `src/screens/ai/ai-plan-result-screen.tsx`
+  - `src/stores/ai-plan-store.ts`
+  - `src/screens/home/home-screen.tsx`
+  - `src/screens/workout/workout-screen.tsx`
+  - `src/screens/diet/diet-screen.tsx`
+  - `src/screens/profile/profile-screen.tsx`
+
+#### 8-1. 결과 화면 UX 변경
+- 상단 우측 액션:
+  - `재생성` → `완료`
+- 하단 액션:
+  - primary: `이 플랜 적용하기`
+  - secondary: `다른 플랜 받아보기`
+  - 보조: `플랜 시작일 변경`
+- 적용 시트:
+  - `운동`
+  - `식단`
+  - `목표`
+  - 3개 섹션을 개별 선택 후 승인 가능
+
+#### 8-2. 승인 상태 메타 저장
+- `src/stores/ai-plan-store.ts`
+  - `AIPlan`에 아래 메타 추가:
+    - `isApplied`
+    - `appliedAt`
+    - `appliedSections`
+  - `markCurrentPlanApplied()` 액션 추가
+  - persist version 2로 마이그레이션
+
+#### 8-3. 실제 반영 규칙
+- **목표 적용**:
+  - 승인 시 `user_goals`에 `calories_target`, `protein_target_g`, `carbs_target_g`, `fat_target_g` 저장
+- **운동 적용**:
+  - 승인된 `workout` 섹션이 있어야 운동 탭에서 현재 AI 운동 계획 표시/시작 가능
+- **식단 적용**:
+  - 승인된 `diet` 섹션이 있어야 식단 탭에서 AI 식단 가이드 표시
+- **미적용 플랜**:
+  - 홈/운동/식단에서 실사용 플랜처럼 자동 반영되지 않음
+
+#### 8-4. 정합성 보강
+- 적용 직후 성공 피드백 추가:
+  - 어떤 섹션이 반영됐는지 Alert로 명시
+- 홈 카드:
+  - `검토 중인 AI 플랜` vs `반복 중인 AI 플랜` 구분
+  - 적용 섹션 요약 표시
+- 운동 탭:
+  - `현재 적용 중인 AI 운동 계획`
+  - 몇 주차 / Day 몇 기준인지 표시
+- 식단 탭:
+  - `적용된 AI 식단 가이드`
+  - 몇 주차 / Day 몇 기준 추천인지 표시
+- 프로필 탭:
+  - `AI 플랜 초안` vs `AI 플랜 목표` 구분
+  - 승인 시점(`appliedAt`) 표시
+
+### 9. Codex용 PDCA 운영 기반 추가
+- 목적:
+  - 이 프로젝트와 이후 작업에서 `plan / design / do / analyze` 흐름을 Codex 기준으로 재사용 가능하게 만들기
+- 추가 경로:
+  - `.codex/skills/pdca-orchestrator/`
+  - `.codex-pdca/`
+  - `scripts/pdca.js`
+  - `bin/pdca`
+  - `scripts/install-pdca-shell.sh`
+- 포함 내용:
+  - Codex 전용 `pdca-orchestrator` skill
+  - 상태/메모리/룰 디렉터리
+  - `pdca plan`, `pdca design`, `pdca do`, `pdca analyze`
+  - `pdca status`, `pdca next`, `pdca report`, `pdca team`
+- 참고:
+  - 이 시스템은 Codex 로컬/전역 skill + 프로젝트 규칙 기반 운영 레이어이며, Claude Code의 네이티브 slash command와 동일한 구현은 아님
+
+### 10. 오늘 검증 메모
+- `npm exec tsc -- --noEmit`: 통과
+- AI 플랜 승인 적용 설계 대비 구현 정합성:
+  - 초기 구현 후 약 `93%`
+  - 정합성 보강 후 `95%+` 수준으로 판단
   - `훈제 닭가슴살`
 
 ---

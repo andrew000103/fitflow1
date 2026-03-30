@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-03-30T00:00:00.000Z",
+  "activeFeature": "pdca-orchestrator-bootstrap",
+  "features": {
+    "pdca-orchestrator-bootstrap": {
+      "phase": "design",
+      "phaseNumber": 2,
+      "status": "active",
+      "startedAt": "2026-03-30T00:00:00.000Z",
+      "lastUpdated": "2026-03-30T00:00:00.000Z",
+      "lastFile": ".codex/skills/pdca-orchestrator/SKILL.md",
+      "constraints": [
+        "project-context-first",
+        "rules-enforced",
+        "native-invariant-for-web-changes",
+        "analyze-required"
+      ],
+      "documents": {
+        "design": ".codex-pdca/memory/project-status/pdca-orchestrator-bootstrap.md"
+      }
+    }
+  },
+  "history": [
+    {
+      "timestamp": "2026-03-30T00:00:00.000Z",
+      "feature": "pdca-orchestrator-bootstrap",
+      "phase": "design",
+      "action": "created"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+version: 1
+display_name: PDCA Orchestrator
+short_description: Run work through plan, design, do, and analyze with project rules and optional subagents.
+default_prompt: Use the PDCA orchestrator workflow for this task. Load project context, determine the current phase, and proceed through plan, design, do, and analyze with concise phase updates.

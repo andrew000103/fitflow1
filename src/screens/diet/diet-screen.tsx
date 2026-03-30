@@ -14,6 +14,7 @@ import { AppButton } from '../../components/common/AppButton';
 import { useDietStore } from '../../stores/diet-store';
 import { useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
+import { getPlanCycleInfo } from '../../lib/ai-plan-schedule';
 import { getUserProfile, getLatestUserGoal } from '../../lib/profile';
 import { useAppTheme } from '../../theme';
 import { UserProfileRecord } from '../../types/profile';
@@ -106,6 +107,15 @@ function MealSection({ title, entries, onAdd, onOpenMenu }: { title: string; ent
   );
 }
 
+function getPlanDietForDate(weekStart: string, todayKey: string, weeklyDietLength: number) {
+  const start = new Date(weekStart + 'T00:00:00');
+  const [year, month, day] = todayKey.split('-').map(Number);
+  const today = new Date(year, month - 1, day);
+  const diffDays = Math.round((today.getTime() - start.getTime()) / 86400000);
+  if (diffDays < 0 || diffDays >= weeklyDietLength) return null;
+  return diffDays;
+}
+
 export default function DietScreen({ navigation }: Props) {
   const { colors, typography, spacing, isDark } = useAppTheme();
   const entriesByDate = useDietStore((state) => state.entriesByDate);
@@ -113,6 +123,9 @@ export default function DietScreen({ navigation }: Props) {
   const updateAmount = useDietStore((state) => state.updateAmount);
   const currentPlan = useAIPlanStore((s) => s.currentPlan);
   const { user } = useAuthStore();
+  const appliedSections = currentPlan?.isApplied ? currentPlan.appliedSections ?? ['workout', 'diet', 'goals'] : [];
+  const appliedGoalPlan = currentPlan?.isApplied && appliedSections.includes('goals') ? currentPlan : null;
+  const appliedDietPlan = currentPlan?.isApplied && appliedSections.includes('diet') ? currentPlan : null;
 
   const [calorieGoal, setCalorieGoal] = useState(2000);
   const [macroGoals, setMacroGoals] = useState({ protein_g: 150, carbs_g: 250, fat_g: 65 });
@@ -120,12 +133,12 @@ export default function DietScreen({ navigation }: Props) {
   const [editingAmount, setEditingAmount] = useState('');
 
   useEffect(() => {
-    if (currentPlan) {
-      setCalorieGoal(currentPlan.targetCalories);
+    if (appliedGoalPlan) {
+      setCalorieGoal(appliedGoalPlan.targetCalories);
       setMacroGoals({
-        protein_g: currentPlan.targetMacros.protein,
-        carbs_g: currentPlan.targetMacros.carbs,
-        fat_g: currentPlan.targetMacros.fat,
+        protein_g: appliedGoalPlan.targetMacros.protein,
+        carbs_g: appliedGoalPlan.targetMacros.carbs,
+        fat_g: appliedGoalPlan.targetMacros.fat,
       });
       return;
     }
@@ -149,10 +162,19 @@ export default function DietScreen({ navigation }: Props) {
         }
       } catch {}
     })();
-  }, [currentPlan, user?.id]);
+  }, [appliedGoalPlan, user?.id]);
 
   const today = useMemo(() => getTodayKey(), []);
   const dayEntries = entriesByDate[today] ?? [];
+  const todayPlanDiet = useMemo(() => {
+    if (!appliedDietPlan) return null;
+    const planIndex = getPlanDietForDate(appliedDietPlan.weekStart, today, appliedDietPlan.weeklyDiet.length);
+    return planIndex == null ? null : appliedDietPlan.weeklyDiet[planIndex] ?? null;
+  }, [appliedDietPlan, today]);
+  const dietCycleInfo = useMemo(
+    () => (appliedDietPlan ? getPlanCycleInfo(appliedDietPlan) : null),
+    [appliedDietPlan]
+  );
 
   const totals = useMemo(() => dayEntries.reduce((acc, e) => ({
     calories: acc.calories + e.calories,
@@ -202,6 +224,42 @@ export default function DietScreen({ navigation }: Props) {
           </View>
         </AppCard>
 
+        {todayPlanDiet && (
+          <AppCard variant="elevated" style={styles.aiDietCard}>
+            <View style={styles.aiDietHeader}>
+              <Text style={[styles.aiDietTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
+                적용된 AI 식단 가이드
+              </Text>
+              <View style={[styles.aiDietBadge, { backgroundColor: colors.accentMuted }]}>
+                <Text style={[styles.aiDietBadgeText, { color: colors.accent }]}>적용됨</Text>
+              </View>
+            </View>
+            <Text style={[styles.aiDietMeta, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
+              {dietCycleInfo?.started
+                ? `${dietCycleInfo.cycle + 1}주차 · Day ${(dietCycleInfo.dayIndex ?? 0) + 1} 기준 추천 식단이에요`
+                : '플랜 시작일 전이라 첫 주 식단을 미리 보여드리고 있어요'}
+            </Text>
+            {todayPlanDiet.meals.map((meal, index) => (
+              <View key={`${meal.timing}-${index}`} style={[styles.aiMealRow, index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.aiMealTiming, { color: colors.text, fontFamily: typography.fontFamily }]}>
+                    {meal.timing}
+                  </Text>
+                  <Text style={[styles.aiMealFoods, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
+                    {meal.foods.join(' · ')}
+                  </Text>
+                </View>
+                <Text style={[styles.aiMealCalories, { color: colors.accent, fontFamily: typography.fontFamily }]}>
+                  {meal.calories} kcal
+                </Text>
+              </View>
+            ))}
+            <Text style={[styles.aiDietCaption, { color: colors.textTertiary, fontFamily: typography.fontFamily }]}>
+              실제 섭취는 아래에서 직접 기록하고, AI 식단은 참고 가이드로 활용하세요.
+            </Text>
+          </AppCard>
+        )}
+
         <View style={styles.mealSections}>
           {MEAL_ORDER.map(type => (
             <MealSection key={type} title={MEAL_TYPE_LABEL[type]} entries={grouped[type]} onAdd={() => navigation.navigate('FoodSearch', { mealType: type, date: today })} onOpenMenu={e => { setSelectedEntry(e); setEditingAmount(String(e.amount)); }} />
@@ -233,6 +291,17 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { padding: 16, gap: 16 },
   summaryCard: { padding: 20 },
+  aiDietCard: { padding: 16 },
+  aiDietHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12 },
+  aiDietTitle: { fontSize: 16, fontWeight: '700' },
+  aiDietBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  aiDietBadgeText: { fontSize: 12, fontWeight: '700' },
+  aiDietMeta: { fontSize: 12, lineHeight: 18, marginBottom: 8 },
+  aiMealRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 12 },
+  aiMealTiming: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  aiMealFoods: { fontSize: 13, lineHeight: 19 },
+  aiMealCalories: { fontSize: 13, fontWeight: '700' },
+  aiDietCaption: { fontSize: 12, lineHeight: 18, marginTop: 8 },
   ringArea: { alignItems: 'center', justifyContent: 'center' },
   ringCenter: { position: 'absolute', alignItems: 'center' },
   caloriesTotal: { fontSize: 36, fontWeight: '800' },

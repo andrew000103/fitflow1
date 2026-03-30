@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
@@ -9,15 +9,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import CalorieRing from '../../components/home/calorie-ring';
 import MacroBars from '../../components/home/macro-bars';
+import PersonaSummaryCard, { type PersonaSummaryStage } from '../../components/home/persona-summary-card';
 import { AppCard } from '../../components/common/AppCard';
 import { AppHeader } from '../../components/common/AppHeader';
 import { AppButton } from '../../components/common/AppButton';
 
 import { getLatestUserGoal } from '../../lib/profile';
+import { getPlanCycleInfo } from '../../lib/ai-plan-schedule';
 import { supabase } from '../../lib/supabase';
 import { useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { useDietStore } from '../../stores/diet-store';
+import { usePersonaStore } from '../../stores/persona-store';
 import { useThemeStore } from '../../stores/theme-store';
 import { useAppTheme } from '../../theme';
 import { NutritionSummary } from '../../types/nutrition';
@@ -52,6 +55,23 @@ function todayLabel() {
     weekday: 'short',
   });
 }
+
+function formatAppliedSectionLabel(section: 'workout' | 'diet' | 'goals') {
+  if (section === 'workout') return '운동';
+  if (section === 'diet') return '식단';
+  return '목표';
+}
+
+type PersonaCardState = {
+  confidence: number | null;
+  dailyState: string | null;
+  hasPersona: boolean;
+  headline: string | null;
+  message: string | null;
+  personaId: string | null;
+  personaName: string | null;
+  stage: PersonaSummaryStage | null;
+};
 
 // ─── WeeklyCalorieChart ───────────────────────────────────────────────────────
 function WeeklyCalorieChart({
@@ -174,6 +194,7 @@ function AIPlanCard() {
   const { colors, typography, spacing, radius } = useAppTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { currentPlan, hasCompletedOnboarding, setNeedsOnboarding } = useAIPlanStore();
+  const isAppliedPlan = Boolean(currentPlan?.isApplied);
 
   const handlePress = () => {
     if (currentPlan) {
@@ -187,26 +208,42 @@ function AIPlanCard() {
   };
 
   const getContent = () => {
-    if (currentPlan) {
-      const startMs = new Date(currentPlan.weekStart + 'T00:00:00').getTime();
-      const todayMs = (() => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
-      const diffDays = Math.round((todayMs - startMs) / 86400000);
-      const todayDayLabel = (diffDays >= 0 && diffDays <= 6) ? `day${diffDays + 1}` : null;
-      const todayPlan = todayDayLabel ? currentPlan.weeklyWorkout.find((d) => d.dayLabel === todayDayLabel) : null;
-      const isRestDay = todayPlan?.isRestDay ?? true;
+    if (currentPlan && isAppliedPlan) {
+      const cycleInfo = getPlanCycleInfo(currentPlan);
+      const todayPlan = cycleInfo.dayLabel
+        ? currentPlan.weeklyWorkout.find((d) => d.dayLabel === cycleInfo.dayLabel)
+        : null;
+      const isRestDay = cycleInfo.started ? (todayPlan?.isRestDay ?? true) : true;
       const dateRange = (() => {
         const m = new Date(currentPlan.weekStart + 'T00:00:00');
         const s = new Date(m); s.setDate(m.getDate() + 6);
         return `Day1 ${m.getMonth()+1}/${m.getDate()}~Day7 ${s.getMonth()+1}/${s.getDate()}`;
       })();
 
+      const appliedSections = (currentPlan.appliedSections ?? ['workout', 'diet', 'goals']) as Array<'workout' | 'diet' | 'goals'>;
+      const appliedSectionsLabel = appliedSections.map(formatAppliedSectionLabel)
+        .join(', ');
+
       return {
         icon: 'clipboard-text-outline',
-        title: '이번 주 AI 플랜',
-        subtitle: `${currentPlan.targetCalories.toLocaleString()}kcal · 단백질 ${currentPlan.targetMacros.protein}g`,
-        extra: `오늘: ${isRestDay ? '휴식일' : (todayPlan?.focus ?? '운동')}`,
-        badge: dateRange,
+        title: '반복 중인 AI 플랜',
+        subtitle: `${currentPlan.targetCalories.toLocaleString()}kcal · 단백질 ${currentPlan.targetMacros.protein}g · ${appliedSectionsLabel} 적용`,
+        extra: !cycleInfo.started
+          ? '오늘: 시작 전'
+          : `오늘: ${isRestDay ? '휴식일' : (todayPlan?.focus ?? '운동')}`,
+        badge: cycleInfo.started ? `반복 ${cycleInfo.cycle + 1}주차` : dateRange,
         cta: '보기'
+      };
+    }
+
+    if (currentPlan) {
+      return {
+        icon: 'clipboard-clock-outline',
+        title: '검토 중인 AI 플랜',
+        subtitle: '결과 화면에서 승인하면 홈, 운동, 식단에 반영됩니다',
+        extra: null,
+        badge: '미적용',
+        cta: '검토하기'
       };
     }
 
@@ -325,6 +362,22 @@ export default function HomeScreen() {
   const { user } = useAuthStore();
   const toggle = useThemeStore((s) => s.toggle);
   const getDayTotals = useDietStore((s) => s.getDayTotals);
+  const currentPlan = useAIPlanStore((s) => s.currentPlan);
+  const syncRecurringPlanForToday = useAIPlanStore((s) => s.syncRecurringPlanForToday);
+  const appliedPlan = currentPlan?.isApplied ? currentPlan : null;
+  const appliedSections = currentPlan?.isApplied ? currentPlan.appliedSections ?? ['workout', 'diet', 'goals'] : [];
+  const calculatePersona = usePersonaStore((s) => s.calculatePersona);
+  const personaId = usePersonaStore((s) => s.personaId);
+  const personaStage = usePersonaStore((s) => s.personaStage);
+  const personaConfidence = usePersonaStore((s) => s.confidence);
+  const personaDailyState = usePersonaStore((s) => s.dailyState);
+  const personaHeadline = usePersonaStore((s) => s.headlineMessage);
+  const personaSupportingMessage = usePersonaStore((s) => s.supportingMessage);
+  const personaReliabilityState = usePersonaStore((s) => s.reliabilityState);
+  const personaValidationWarnings = usePersonaStore((s) => s.validationWarnings);
+  const personaNickname = usePersonaStore((s) => s.nickname);
+  const isPersonaLoading = usePersonaStore((s) => s.isCalculating);
+  const personaError = usePersonaStore((s) => s.error);
 
   const today = dateStr(new Date());
   const last7 = getLast7Days();
@@ -333,6 +386,7 @@ export default function HomeScreen() {
   const [weeklyCount, setWeeklyCount] = useState(0);
   const [weightHistory, setWeightHistory] = useState<{ date: string; weight_kg: number }[]>([]);
   const [goals, setGoals] = useState(DEFAULT_GOALS);
+  const remoteRequestIdRef = useRef(0);
 
   const todayTotals = getDayTotals(today);
   const nutrition: NutritionSummary = {
@@ -348,11 +402,31 @@ export default function HomeScreen() {
     calories: getDayTotals(date).calories,
   }));
 
+  const personaSummary: PersonaCardState = {
+    confidence: personaConfidence > 0 ? personaConfidence : null,
+    dailyState: personaDailyState,
+    hasPersona: Boolean(personaId || personaNickname || personaHeadline || personaStage),
+    headline: personaHeadline,
+    message:
+      personaReliabilityState === 'error'
+        ? '페르소나 정보를 잠시 불러오지 못했어요.'
+        : personaSupportingMessage
+          ?? (personaValidationWarnings.includes('low-data-completeness')
+            ? '기록이 아직 적어서 오늘은 가벼운 추정 기반으로 보여드리고 있어요.'
+            : personaValidationWarnings.includes('goal-derived-from-fallback')
+              ? '현재 목표 정보가 충분하지 않아 기본 목표 가정이 일부 반영됐어요.'
+              : null),
+    personaId,
+    personaName: personaNickname,
+    stage: personaStage,
+  };
+
   const fetchRemote = useCallback(async () => {
     if (!user?.id) return;
+    const requestId = ++remoteRequestIdRef.current;
 
-    const todayStart = `${today}T00:00:00.000Z`;
-    const todayEnd = `${today}T23:59:59.999Z`;
+    const todayStart = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).toISOString();
+    const todayEnd = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 23, 59, 59, 999).toISOString();
     const weekAgo = dateStr(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
 
     try {
@@ -365,6 +439,7 @@ export default function HomeScreen() {
         .not('ended_at', 'is', null);
 
       if (sessions && sessions.length > 0) {
+        if (requestId !== remoteRequestIdRef.current) return;
         const allSets = sessions.flatMap((s: any) => s.workout_sets ?? []);
         setTodayWorkout({
           setCount: allSets.length,
@@ -372,6 +447,7 @@ export default function HomeScreen() {
           exerciseNames: [...new Set(allSets.map((s: any) => s.exercises?.name_ko).filter(Boolean))] as string[]
         });
       } else {
+        if (requestId !== remoteRequestIdRef.current) return;
         setTodayWorkout(null);
       }
     } catch {}
@@ -383,6 +459,7 @@ export default function HomeScreen() {
         .eq('user_id', user.id)
         .gte('started_at', `${weekAgo}T00:00:00.000Z`)
         .not('ended_at', 'is', null);
+      if (requestId !== remoteRequestIdRef.current) return;
       setWeeklyCount(count ?? 0);
     } catch {}
 
@@ -395,24 +472,49 @@ export default function HomeScreen() {
         .order('measured_at', { ascending: true });
 
       if (weights && !error) {
+        if (requestId !== remoteRequestIdRef.current) return;
         setWeightHistory(weights.map((w: any) => ({ date: w.measured_at.split('T')[0], weight_kg: w.weight_kg })));
       }
     } catch {}
 
     try {
       const goal = await getLatestUserGoal(user.id);
-      if (goal) {
+      if (requestId !== remoteRequestIdRef.current) return;
+
+      if (appliedPlan && appliedSections.includes('goals')) {
+        setGoals({
+          calories: appliedPlan.targetCalories ?? goal?.calories_target ?? DEFAULT_GOALS.calories,
+          protein: appliedPlan.targetMacros.protein ?? goal?.protein_target_g ?? DEFAULT_GOALS.protein,
+          carbs: appliedPlan.targetMacros.carbs ?? goal?.carbs_target_g ?? DEFAULT_GOALS.carbs,
+          fat: appliedPlan.targetMacros.fat ?? goal?.fat_target_g ?? DEFAULT_GOALS.fat,
+        });
+      } else if (goal) {
         setGoals({
           calories: goal.calories_target ?? DEFAULT_GOALS.calories,
           protein: goal.protein_target_g ?? DEFAULT_GOALS.protein,
           carbs: goal.carbs_target_g ?? DEFAULT_GOALS.carbs,
           fat: goal.fat_target_g ?? DEFAULT_GOALS.fat,
         });
+      } else {
+        setGoals(DEFAULT_GOALS);
       }
     } catch {}
-  }, [user?.id, today]);
+  }, [appliedPlan, appliedSections, user?.id, today]);
 
-  useFocusEffect(useCallback(() => { fetchRemote(); }, [fetchRemote]));
+  const refreshPersona = useCallback(async () => {
+    if (!user?.id) {
+      return;
+    }
+    await calculatePersona(user.id);
+  }, [calculatePersona, user?.id]);
+
+  useFocusEffect(useCallback(() => {
+    if (user?.id) {
+      syncRecurringPlanForToday(user.id).catch(() => {});
+    }
+    fetchRemote();
+    refreshPersona();
+  }, [fetchRemote, refreshPersona, syncRecurringPlanForToday, user?.id]));
 
   const latestWeight = weightHistory.length > 0 ? weightHistory[weightHistory.length - 1].weight_kg : null;
 
@@ -431,6 +533,18 @@ export default function HomeScreen() {
 
         <View style={styles.summaryContainer}>
           <AppCard variant="elevated" style={styles.calorieCard}>
+            <PersonaSummaryCard
+              confidence={personaSummary.confidence}
+              dailyState={personaSummary.dailyState}
+              hasPersona={personaSummary.hasPersona}
+              hasStore
+              headline={personaSummary.headline}
+              loading={isPersonaLoading}
+              message={personaSummary.message}
+              personaId={personaSummary.personaId}
+              personaName={personaSummary.personaName}
+              stage={personaSummary.stage}
+            />
             <View style={styles.ringArea}>
               <CalorieRing current={nutrition.calories.current} goal={goals.calories} />
             </View>

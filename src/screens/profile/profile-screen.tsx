@@ -35,6 +35,8 @@ export default function ProfileScreen() {
 
   const currentPlan = useAIPlanStore((s) => s.currentPlan);
   const onboardingData = useAIPlanStore((s) => s.onboardingData);
+  const isAppliedPlan = Boolean(currentPlan?.isApplied);
+  const appliedSections = currentPlan?.isApplied ? currentPlan.appliedSections ?? ['workout', 'diet', 'goals'] : [];
 
   const [refreshing, setRefreshing] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -140,7 +142,9 @@ export default function ProfileScreen() {
           <View style={[styles.aiPlanCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.aiPlanHeader}>
               <View style={{ backgroundColor: colors.accentMuted, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }}>
-                <Text style={{ color: colors.accent, fontSize: 12, fontWeight: '700' }}>AI 플랜 목표</Text>
+                <Text style={{ color: colors.accent, fontSize: 12, fontWeight: '700' }}>
+                  {isAppliedPlan ? 'AI 플랜 목표' : 'AI 플랜 초안'}
+                </Text>
               </View>
               {onboardingData?.goal && (
                 <Text style={[styles.aiPlanGoal, { color: colors.text, fontFamily: typography.fontFamily }]}>
@@ -148,6 +152,16 @@ export default function ProfileScreen() {
                 </Text>
               )}
             </View>
+            <Text style={[styles.aiPlanStatus, { color: isAppliedPlan ? colors.accent : colors.textSecondary }]}>
+              {isAppliedPlan
+                ? `적용 중 · ${appliedSections.map((section) => section === 'workout' ? '운동' : section === 'diet' ? '식단' : '목표').join(', ')}`
+                : '아직 적용 전 · 결과 화면에서 승인하면 실제 계획에 반영됩니다'}
+            </Text>
+            {currentPlan.appliedAt && (
+              <Text style={[styles.aiPlanAppliedAt, { color: colors.textTertiary }]}>
+                승인 시점: {new Date(currentPlan.appliedAt).toLocaleString('ko-KR')}
+              </Text>
+            )}
             <View style={styles.aiPlanRow}>
               <Text style={[styles.aiPlanLabel, { color: colors.textSecondary }]}>목표 칼로리</Text>
               <Text style={[styles.aiPlanValue, { color: colors.text }]}>{currentPlan.targetCalories} kcal</Text>
@@ -256,6 +270,8 @@ const styles = StyleSheet.create({
   },
   aiPlanHeader: { gap: 8 },
   aiPlanGoal: { fontSize: 18, fontWeight: '700' },
+  aiPlanStatus: { fontSize: 13, lineHeight: 19 },
+  aiPlanAppliedAt: { fontSize: 11, marginTop: -4 },
   aiPlanRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   aiPlanMacros: { flexDirection: 'row', justifyContent: 'space-between' },
   aiPlanMacroItem: { alignItems: 'center', flex: 1 },

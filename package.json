@@ -7,7 +7,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build": "expo export --platform web && node scripts/postprocess-web-export.js"
+    "build": "expo export --platform web && node scripts/postprocess-web-export.js",
+    "pdca": "node scripts/pdca.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
