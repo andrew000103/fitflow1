@@ -93,6 +93,58 @@ CREATE TABLE meal_logs (
 );
 ```
 
+## programs
+```sql
+CREATE TABLE programs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  creator_name TEXT,
+  name TEXT NOT NULL,
+  description TEXT,
+  is_public BOOLEAN DEFAULT FALSE,
+  duration_weeks INTEGER DEFAULT 4,
+  days_per_week INTEGER DEFAULT 3,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+## program_days
+```sql
+CREATE TABLE program_days (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  program_id UUID REFERENCES programs(id) ON DELETE CASCADE,
+  day_number INTEGER NOT NULL,
+  name TEXT
+);
+```
+
+## program_exercises
+```sql
+CREATE TABLE program_exercises (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  program_day_id UUID REFERENCES program_days(id) ON DELETE CASCADE,
+  exercise_id UUID REFERENCES exercises(id) ON DELETE SET NULL,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  target_sets INTEGER DEFAULT 3,
+  target_reps INTEGER DEFAULT 10,
+  target_weight_kg NUMERIC(6,2) DEFAULT 0
+);
+```
+
+## user_programs
+```sql
+CREATE TABLE user_programs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  program_id UUID REFERENCES programs(id) ON DELETE CASCADE,
+  started_at TIMESTAMPTZ DEFAULT NOW(),
+  current_day INTEGER DEFAULT 1,
+  completed_sessions INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
+  UNIQUE(user_id, program_id)
+);
+```
+
 ## meal_items
 ```sql
 CREATE TABLE meal_items (

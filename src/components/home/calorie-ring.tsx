@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import Svg, { Circle } from 'react-native-svg';
 import { useAppTheme } from '../../theme';
@@ -11,6 +11,7 @@ interface Props {
 }
 
 const STROKE_WIDTH = 16;
+const isWeb = Platform.OS === 'web';
 
 export default function CalorieRing({ current, goal, size = 196 }: Props) {
   const { colors, typography } = useAppTheme();
@@ -47,7 +48,7 @@ export default function CalorieRing({ current, goal, size = 196 }: Props) {
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
           rotation="-90"
-          origin={`${size / 2}, ${size / 2}`}
+          origin={isWeb ? undefined : `${size / 2}, ${size / 2}`}
         />
       </Svg>
 

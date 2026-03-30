@@ -9,3 +9,70 @@ export type MainTabParamList = {
   Diet: undefined;
   Profile: undefined;
 };
+
+export type WorkoutStackParamList = {
+  WorkoutList: undefined;
+  WorkoutHistory: undefined;
+  WorkoutSession: undefined;
+  ExerciseSearch: undefined;
+  WorkoutSummary: {
+    totalVolumeKg: number;
+    setCount: number;
+    durationSeconds: number;
+    exercises: Array<{ name: string; sets: number; volume_kg: number }>;
+    nsunsAmrapResults?: Array<{
+      exerciseName: string;
+      exerciseKey: string;
+      currentTm: number;
+      amrapReps: number;
+      suggestedIncrease: number;
+      newTm: number;
+    }>;
+    userProgramId?: string;
+  };
+  ProgramList: undefined;
+  ProgramDetail: { programId: string };
+  ProgramCreate: undefined;
+  ProgramReview: { programId: string; programName: string };
+  TrainingMaxSetup: {
+    userProgramId: string;
+    programName: string;
+    autoStartWorkout?: boolean;
+    programId?: string;
+    currentDay?: number;
+    daysPerWeek?: number;
+  };
+};
+
+export type DietStackParamList = {
+  DietMain: undefined;
+  FoodSearch: { mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack'; date: string };
+  CustomFoodForm: {
+    mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+    date: string;
+    foodId?: string;
+    initialQuery?: string;
+  };
+};
+
+export type ProfileStackParamList = {
+  ProfileMain: undefined;
+  EditProfile: undefined;
+  GoalSettings: undefined;
+  WeightHistory: undefined;
+};
+
+export type AIModalParamList = {
+  AIConsent: undefined;
+  AIOnboarding: undefined;
+  AIPlanResult: { planId?: string };
+  AIPlanWeekly: { weekStart: string };
+};
+
+export type RootStackParamList = {
+  Main: undefined;
+  AIConsent: undefined;
+  AIOnboarding: undefined;
+  AIPlanResult: { planId?: string };
+  AIPlanWeekly: { weekStart: string };
+};

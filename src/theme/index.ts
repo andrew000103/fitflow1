@@ -6,11 +6,29 @@ import { typography } from './typography';
 export { DarkColors, LightColors, typography };
 export type { AppColors };
 
+export const theme = {
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 24,
+    xxl: 32,
+  },
+  radius: {
+    sm: 12,
+    md: 16,
+    lg: 20,
+    xl: 24,
+    full: 9999,
+  },
+} as const;
+
 /** 컴포넌트 내에서 현재 테마 색상/타이포 가져오기 */
 export function useAppTheme() {
   const isDark = useThemeStore((s) => s.isDark);
   const colors: AppColors = isDark ? DarkColors : LightColors;
-  return { colors, typography, isDark };
+  return { colors, typography, isDark, ...theme };
 }
 
 // ─── React Native Paper 테마 ──────────────────────────────────────────────────

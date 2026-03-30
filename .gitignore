@@ -41,3 +41,12 @@ yarn-error.*
 /android
 .env
 .claude/settings.local.json
+.claude/settings.json
+.claude/launch.json
+.claude/agent-memory/
+.gemini/
+.bkit/
+supabase/.temp/
+
+# seed scripts progress
+scripts/.mfds-seed-progress.json

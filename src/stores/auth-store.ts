@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { AuthUser } from '../types/auth';
+import { useAIPlanStore } from './ai-plan-store';
 
 interface AuthStore {
   user: AuthUser | null;
@@ -18,20 +19,30 @@ const toAuthUser = (user: { id: string; email?: string | null }): AuthUser => ({
   email: user.email ?? null,
 });
 
-export const useAuthStore = create<AuthStore>((set) => ({
+export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
   loading: false,
   initialized: false,
 
   initialize: async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    set({
-      user: session?.user ? toAuthUser(session.user) : null,
-      initialized: true,
-    });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      set({
+        user: session?.user ? toAuthUser(session.user) : null,
+        initialized: true,
+      });
+    } catch {
+      set({ initialized: true });
+    }
 
     supabase.auth.onAuthStateChange((_event, session) => {
-      set({ user: session?.user ? toAuthUser(session.user) : null });
+      const newUser = session?.user ? toAuthUser(session.user) : null;
+      const currentUserId = get().user?.id;
+      // 다른 유저로 로그인 시 AI 플랜 스토어 리셋 (이전 유저 데이터 격리)
+      if (newUser?.id && currentUserId && currentUserId !== newUser.id) {
+        useAIPlanStore.getState().reset();
+      }
+      set({ user: newUser });
     });
   },
 
@@ -67,6 +78,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   signOut: async () => {
     await supabase.auth.signOut();
+    useAIPlanStore.getState().reset();
     set({ user: null });
   },
 }));

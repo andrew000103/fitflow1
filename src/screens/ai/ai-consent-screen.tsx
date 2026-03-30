@@ -1,0 +1,202 @@
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import React, { useState } from 'react';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Text } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { saveAIConsent } from '../../lib/ai-planner';
+import { useAIPlanStore } from '../../stores/ai-plan-store';
+import { useAuthStore } from '../../stores/auth-store';
+import { useAppTheme } from '../../theme';
+import { RootStackParamList } from '../../types/navigation';
+
+type NavProp = NativeStackNavigationProp<RootStackParamList>;
+
+const DATA_ITEMS = [
+  '입력하신 신체 정보 (나이, 키, 체중, 목표)',
+  '최근 7일 운동 완료 기록',
+  '최근 7일 체중 변화 추이',
+  '이름 등 개인 식별 정보는 전달되지 않습니다',
+];
+
+export default function AIConsentScreen() {
+  const { colors } = useAppTheme();
+  const navigation = useNavigation<NavProp>();
+  const user = useAuthStore((s) => s.user);
+  const setNeedsOnboarding = useAIPlanStore((s) => s.setNeedsOnboarding);
+  const [loading, setLoading] = useState(false);
+
+  const handleConsent = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    try {
+      await saveAIConsent(user.id, true);
+    } catch {
+      // 저장 실패해도 온보딩은 진행 (앱 재시작 시 재시도)
+    } finally {
+      setLoading(false);
+    }
+    setNeedsOnboarding(false);
+    navigation.replace('AIOnboarding');
+  };
+
+  const handleSkip = async () => {
+    if (!user?.id) return;
+    try {
+      await saveAIConsent(user.id, false);
+    } catch {
+      // 무시
+    }
+    setNeedsOnboarding(false);
+    navigation.goBack();
+  };
+
+  const s = styles(colors);
+
+  return (
+    <SafeAreaView style={s.container}>
+      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+        <View style={[s.iconWrap, { backgroundColor: colors.accentMuted }]}>
+          <MaterialCommunityIcons name="creation" size={40} color={colors.accent} />
+        </View>
+
+        <Text style={s.title}>AI가 나만의 플랜을{'\n'}만들어드릴게요</Text>
+        <Text style={s.subtitle}>
+          체중, 운동 기록을 분석해서 정체기를 돌파하는{'\n'}
+          맞춤 식단·운동 계획을 매주 제공합니다
+        </Text>
+
+        <View style={s.card}>
+          <Text style={s.cardTitle}>AI가 활용하는 데이터</Text>
+          {DATA_ITEMS.map((item, i) => (
+            <View key={i} style={s.dataRow}>
+              <Text style={[s.bullet, i === 3 && s.noticeText]}>
+                {i === 3 ? '※' : '•'}
+              </Text>
+              <Text style={[s.dataText, i === 3 && s.noticeText]}>{item}</Text>
+            </View>
+          ))}
+        </View>
+
+        <TouchableOpacity
+          style={[s.primaryBtn, loading && s.btnDisabled]}
+          onPress={handleConsent}
+          disabled={loading}
+          activeOpacity={0.85}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={s.primaryBtnText}>AI 플랜 시작하기</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity style={s.skipBtn} onPress={handleSkip} activeOpacity={0.7}>
+          <Text style={s.skipText}>지금은 건너뛰기 (나중에 프로필에서 켜기 가능)</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    content: {
+      paddingHorizontal: 24,
+      paddingTop: 48,
+      paddingBottom: 40,
+      alignItems: 'center',
+    },
+    iconWrap: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    title: {
+      fontSize: 26,
+      fontWeight: '700',
+      color: colors.text,
+      textAlign: 'center',
+      lineHeight: 34,
+      marginBottom: 12,
+    },
+    subtitle: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: 32,
+    },
+    card: {
+      width: '100%',
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 32,
+    },
+    cardTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 14,
+    },
+    dataRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: 10,
+    },
+    bullet: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginRight: 8,
+      lineHeight: 20,
+    },
+    dataText: {
+      flex: 1,
+      fontSize: 14,
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    noticeText: {
+      color: colors.textTertiary,
+      fontSize: 13,
+    },
+    primaryBtn: {
+      width: '100%',
+      backgroundColor: colors.accent,
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    btnDisabled: {
+      opacity: 0.6,
+    },
+    primaryBtnText: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: '#fff',
+    },
+    skipBtn: {
+      paddingVertical: 8,
+    },
+    skipText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+  });
