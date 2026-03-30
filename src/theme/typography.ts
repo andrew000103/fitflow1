@@ -1,7 +1,16 @@
 import { Platform } from 'react-native';
 
-// SF Pro on iOS, system sans-serif on Android
-const fontFamily = Platform.select({ ios: 'System', default: 'sans-serif' });
+// Keep native typography unchanged, but let web fall back to emoji-capable fonts.
+const webFontStack =
+  '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji"';
+
+// SF Pro on iOS, system sans-serif on Android, system+emoji fallback on web
+const fontFamily = Platform.select({
+  ios: 'System',
+  android: 'sans-serif',
+  web: webFontStack,
+  default: 'sans-serif',
+});
 
 export const typography = {
   fontFamily,
