@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { FoodItem } from '../types/food';
 import { foodRowToFoodItem, searchFoods as searchDbFoods } from './diet-search';
 import { searchMfdsFoods } from './mfds';
@@ -116,8 +117,25 @@ export async function searchFoods(query: string, page = 1, userId?: string): Pro
     return cached;
   }
 
+  let dbItems: FoodItem[] = [];
+  try {
+    dbItems = (await searchDbFoods(query)).map(foodRowToFoodItem);
+  } catch {
+    dbItems = [];
+  }
+
+  if (dbItems.length > 0) {
+    const deduped = dedupeFoods(dbItems);
+    await setCachedFoods(query, page, deduped, userId);
+    await saveRecentSearch(query, userId);
+    return deduped;
+  }
+
+  if (Platform.OS === 'web') {
+    return [];
+  }
+
   const results = await Promise.allSettled([
-    withTimeout(searchDbFoods(query).then((rows) => rows.map(foodRowToFoodItem)), '내 음식 검색'),
     withTimeout(searchMfdsFoods(query), '식약처 검색'),
     withTimeout(searchOpenFoodFactsFoods(query, page), 'Open Food Facts 검색'),
     withTimeout(searchUsdaFoods(query), 'USDA 검색'),

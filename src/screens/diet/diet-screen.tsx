@@ -187,7 +187,7 @@ export default function DietScreen({ navigation }: Props) {
           <View style={styles.ringArea}>
             <Svg width={RING_SIZE} height={RING_SIZE}>
               <Circle cx={RING_SIZE/2} cy={RING_SIZE/2} r={radius} stroke={colors.trackBg} strokeWidth={RING_STROKE} fill="none" />
-              <Circle cx={RING_SIZE/2} cy={RING_SIZE/2} r={radius} stroke={totals.calories > calorieGoal ? colors.error : colors.accent} strokeWidth={RING_STROKE} fill="none" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" rotation="-90" origin={`${RING_SIZE/2}, ${RING_SIZE/2}`} />
+              <Circle cx={RING_SIZE/2} cy={RING_SIZE/2} r={radius} stroke={totals.calories > calorieGoal ? colors.error : colors.accent} strokeWidth={RING_STROKE} fill="none" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" rotation="-90" originX={RING_SIZE/2} originY={RING_SIZE/2} />
             </Svg>
             <View style={styles.ringCenter}>
               <Text style={[styles.caloriesTotal, { color: colors.text, fontFamily: typography.fontFamily }]}>{totals.calories}</Text>

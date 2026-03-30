@@ -117,22 +117,86 @@ function round1(n: number) {
   return Math.round(n * 10) / 10;
 }
 
+function escapeLike(value: string) {
+  return value.replace(/[%_]/g, (char) => `\\${char}`);
+}
+
+function makeFuzzyLike(value: string) {
+  const compact = value.replace(/\s+/g, '');
+  if (!compact) return '';
+  return compact
+    .split('')
+    .map((char) => escapeLike(char))
+    .join('%');
+}
+
+function normalizeSearchText(value: string | null | undefined) {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/[\s_()[\]{}\-./]/g, '');
+}
+
+function scoreFoodRow(row: FoodRow, normalizedQuery: string) {
+  const fields = [
+    row.name_ko,
+    row.name_en,
+    row.product_name,
+    row.brand,
+  ];
+
+  let score = 0;
+  for (const field of fields) {
+    const normalized = normalizeSearchText(field);
+    if (!normalized) continue;
+    if (normalized === normalizedQuery) score += 120;
+    else if (normalized.startsWith(normalizedQuery)) score += 60;
+    else if (normalized.includes(normalizedQuery)) score += 30;
+  }
+
+  if (row.source === 'user') score += 3;
+  if (row.source === 'mfds') score += 2;
+
+  return score;
+}
+
 // ─── 1. Supabase DB 검색 ──────────────────────────────────────────────────────
 
 async function searchDb(query: string): Promise<FoodRow[]> {
-  const q = `%${query.trim().replace(/%/g, '\\%').replace(/_/g, '\\_')}%`;
+  const trimmed = query.trim();
+  const q = `%${escapeLike(trimmed)}%`;
+  const fuzzy = `%${makeFuzzyLike(trimmed)}%`;
+  const normalizedQuery = normalizeSearchText(trimmed);
+
+  const orClauses = [
+    `name_ko.ilike.${q}`,
+    `name_en.ilike.${q}`,
+    `product_name.ilike.${q}`,
+    `brand.ilike.${q}`,
+  ];
+
+  if (normalizedQuery.length >= 2) {
+    orClauses.push(
+      `name_ko.ilike.${fuzzy}`,
+      `name_en.ilike.${fuzzy}`,
+      `product_name.ilike.${fuzzy}`,
+      `brand.ilike.${fuzzy}`,
+    );
+  }
 
   const { data, error } = await supabase
     .from('foods')
     .select(SELECT_COLS)
-    .or(
-      `name_ko.ilike.${q},name_en.ilike.${q},product_name.ilike.${q},brand.ilike.${q}`,
-    )
+    .or(orClauses.join(','))
     .order('updated_at', { ascending: false })
-    .limit(50);
+    .limit(120);
 
   if (error) throw error;
-  return (data as FoodRow[]) ?? [];
+
+  const rows = ((data as FoodRow[]) ?? [])
+    .filter((row) => scoreFoodRow(row, normalizedQuery) > 0)
+    .sort((a, b) => scoreFoodRow(b, normalizedQuery) - scoreFoodRow(a, normalizedQuery));
+
+  return rows.slice(0, 50);
 }
 
 // ─── 2. Open Food Facts API ───────────────────────────────────────────────────
