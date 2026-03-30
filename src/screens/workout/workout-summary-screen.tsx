@@ -121,7 +121,7 @@ export default function WorkoutSummaryScreen({ navigation, route }: Props) {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Hero */}
         <View style={styles.hero}>
-          <MaterialCommunityIcons name="weight-lifter" size={46} color={colors.accent} />
+          <Text style={styles.trophy}>🏋️</Text>
           <Text
             style={{
               fontFamily: typography.fontFamily,

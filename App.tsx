@@ -1,5 +1,7 @@
 import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
+import { useFonts } from 'expo-font';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PaperProvider } from 'react-native-paper';
 import RootNavigator from './src/navigation/root-navigator';
 import { useThemeStore } from './src/stores/theme-store';
@@ -31,6 +33,14 @@ function WebAppFrame({ isDark, children }: { isDark: boolean; children: React.Re
 
 function ThemeAwareApp() {
   const isDark = useThemeStore((s) => s.isDark);
+  const [webIconFontsLoaded] = useFonts(
+    Platform.OS === 'web' ? MaterialCommunityIcons.font : {}
+  );
+
+  if (Platform.OS === 'web' && !webIconFontsLoaded) {
+    return null;
+  }
+
   return (
     <PaperProvider theme={isDark ? paperDarkTheme : paperLightTheme}>
       <WebAppFrame isDark={isDark}>
