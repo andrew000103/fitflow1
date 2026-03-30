@@ -136,25 +136,143 @@ function normalizeSearchText(value: string | null | undefined) {
     .replace(/[\s_()[\]{}\-./]/g, '');
 }
 
-function scoreFoodRow(row: FoodRow, normalizedQuery: string) {
-  const fields = [
-    row.name_ko,
-    row.name_en,
-    row.product_name,
-    row.brand,
-  ];
+const PROCESSED_FOOD_KEYWORDS = [
+  '샐러드',
+  '소시지',
+  '볶음밥',
+  '도시락',
+  '만두',
+  '스낵',
+  '칩',
+  '바',
+  '프로틴',
+  '쉐이크',
+  '음료',
+  '주스',
+  '시리얼',
+  '과자',
+  '볼',
+  '큐브',
+  '너겟',
+  '패티',
+  '햄',
+  '훈제',
+  '슬라이스',
+  '양념',
+  '맛',
+  '소스',
+  '토핑',
+  '랩',
+  '브리또',
+  '피자',
+  '버거',
+  '샌드위치',
+  '김밥',
+];
 
-  let score = 0;
-  for (const field of fields) {
-    const normalized = normalizeSearchText(field);
-    if (!normalized) continue;
-    if (normalized === normalizedQuery) score += 120;
-    else if (normalized.startsWith(normalizedQuery)) score += 60;
-    else if (normalized.includes(normalizedQuery)) score += 30;
+const RAW_FOOD_PREFIXES = ['생', '국내산', '무가공', '자연산', '신선한', '유기농'];
+
+function tokenizeSearchText(value: string | null | undefined) {
+  return (value ?? '')
+    .toLowerCase()
+    .split(/[\s_()[\]{}\-./]+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+function getPrimaryDisplayName(row: FoodRow) {
+  return row.name_ko ?? row.product_name ?? '';
+}
+
+function startsWithWordBoundary(text: string, query: string) {
+  if (!text || !query) return false;
+  if (text.startsWith(query)) return true;
+
+  const tokens = tokenizeSearchText(text);
+  return tokens.some((token) => token.startsWith(query));
+}
+
+function getLengthClosenessBonus(text: string, query: string) {
+  if (!text || !query) return 0;
+  const diff = Math.abs(text.length - query.length);
+  return Math.max(0, 18 - diff * 2);
+}
+
+function getProcessedFoodPenalty(row: FoodRow, normalizedQuery: string) {
+  const name = getPrimaryDisplayName(row);
+  const normalizedName = normalizeSearchText(name);
+  const normalizedBrand = normalizeSearchText(row.brand);
+
+  let penalty = 0;
+  for (const keyword of PROCESSED_FOOD_KEYWORDS) {
+    const normalizedKeyword = normalizeSearchText(keyword);
+    if (!normalizedKeyword) continue;
+    if (normalizedName.includes(normalizedKeyword)) {
+      penalty += normalizedQuery === normalizedKeyword ? 0 : 18;
+    }
+    if (normalizedBrand.includes(normalizedKeyword)) {
+      penalty += 4;
+    }
   }
 
-  if (row.source === 'user') score += 3;
-  if (row.source === 'mfds') score += 2;
+  return penalty;
+}
+
+function getRawFoodBonus(row: FoodRow, normalizedQuery: string) {
+  const primaryName = getPrimaryDisplayName(row);
+  const normalizedName = normalizeSearchText(primaryName);
+  if (!normalizedName) return 0;
+
+  if (normalizedName === normalizedQuery) return 26;
+
+  for (const prefix of RAW_FOOD_PREFIXES) {
+    const normalizedPrefix = normalizeSearchText(prefix);
+    if (normalizedName === `${normalizedPrefix}${normalizedQuery}`) {
+      return 18;
+    }
+  }
+
+  return 0;
+}
+
+function scoreFieldMatch(value: string | null | undefined, normalizedQuery: string, weight: number) {
+  const normalized = normalizeSearchText(value);
+  if (!normalized) return 0;
+
+  if (normalized === normalizedQuery) return weight + 120;
+  if (startsWithWordBoundary(normalized, normalizedQuery)) return weight + 75;
+  if (normalized.startsWith(normalizedQuery)) return weight + 60;
+  if (normalized.includes(normalizedQuery)) return weight + 30;
+
+  return 0;
+}
+
+function scoreFoodRow(row: FoodRow, normalizedQuery: string) {
+  const primaryName = getPrimaryDisplayName(row);
+  const normalizedPrimaryName = normalizeSearchText(primaryName);
+  const normalizedBrand = normalizeSearchText(row.brand);
+
+  let score = 0;
+
+  score += scoreFieldMatch(row.name_ko, normalizedQuery, 40);
+  score += scoreFieldMatch(row.product_name, normalizedQuery, 34);
+  score += scoreFieldMatch(row.name_en, normalizedQuery, 18);
+  score += scoreFieldMatch(row.brand, normalizedQuery, 4);
+
+  if (normalizedPrimaryName === normalizedQuery) score += 40;
+  score += getLengthClosenessBonus(normalizedPrimaryName, normalizedQuery);
+  score += getRawFoodBonus(row, normalizedQuery);
+
+  if (normalizedBrand === normalizedQuery) {
+    score -= 12;
+  }
+
+  score -= getProcessedFoodPenalty(row, normalizedQuery);
+
+  if (row.source === 'user') score += 6;
+  else if (row.source === 'mfds') score += 4;
+  else if (row.source === 'usda') score += 2;
+  else if (row.source === 'openfoodfacts') score += 1;
 
   return score;
 }
@@ -194,7 +312,17 @@ async function searchDb(query: string): Promise<FoodRow[]> {
 
   const rows = ((data as FoodRow[]) ?? [])
     .filter((row) => scoreFoodRow(row, normalizedQuery) > 0)
-    .sort((a, b) => scoreFoodRow(b, normalizedQuery) - scoreFoodRow(a, normalizedQuery));
+    .sort((a, b) => {
+      const scoreDiff = scoreFoodRow(b, normalizedQuery) - scoreFoodRow(a, normalizedQuery);
+      if (scoreDiff !== 0) return scoreDiff;
+
+      const aName = normalizeSearchText(getPrimaryDisplayName(a));
+      const bName = normalizeSearchText(getPrimaryDisplayName(b));
+      const lengthDiff = aName.length - bName.length;
+      if (lengthDiff !== 0) return lengthDiff;
+
+      return a.product_name.localeCompare(b.product_name, 'ko');
+    });
 
   return rows.slice(0, 50);
 }
