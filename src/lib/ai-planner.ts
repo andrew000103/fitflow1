@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { AIPlan, GymType, OnboardingData } from '../stores/ai-plan-store';
+import { AI_GOAL_LABEL, AIPlan, GymType, OnboardingData } from '../stores/ai-plan-store';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -300,13 +300,6 @@ function buildPrompt(
   history: UserHistorySummary | null,
   workoutHistorySection: string = ''
 ): string {
-  const goalLabel: Record<string, string> = {
-    weight_loss: '체중 감량',
-    muscle_gain: '근육 증가 (벌크업)',
-    maintenance: '체형 유지',
-    health: '건강 개선',
-  };
-
   const experienceLabel: Record<string, string> = {
     beginner: '입문 (0~6개월)',
     intermediate: '초급~중급 (6개월~2년)',
@@ -325,6 +318,13 @@ function buildPrompt(
     hard: '많이 불편함',
   };
 
+  const primaryStrengthFocusLabel: Record<NonNullable<OnboardingData['primaryStrengthFocus']>, string> = {
+    squat: '스쿼트',
+    bench: '벤치프레스',
+    deadlift: '데드리프트',
+    balanced: '전신 균형',
+  };
+
   const gymLabel: Record<GymType, string> = {
     full_gym: '헬스장 (바벨, 덤벨, 머신 전체 이용 가능)',
     garage_gym: '홈짐 (바벨, 스쿼트랙, 덤벨 일부)',
@@ -341,6 +341,35 @@ function buildPrompt(
     ? data.dietaryRestrictions.join(', ')
     : '없음';
 
+  const goalInstructionMap: Record<OnboardingData['goal'], string> = {
+    weight_loss: [
+      '- 운동은 지방 감량 중에도 근손실을 줄이도록 구성하세요.',
+      '- 과도한 운동 볼륨보다 지속 가능성과 회복 가능성을 우선하세요.',
+      '- 식단은 무리하지 않은 칼로리 적자와 충분한 단백질 확보를 우선하세요.',
+    ].join('\n'),
+    muscle_gain: [
+      '- 운동은 근비대 중심으로 설계하고, 부위별 볼륨을 충분히 확보하세요.',
+      '- 주요 복합 운동과 보조 운동을 균형 있게 포함하세요.',
+      '- 식단은 근성장에 필요한 소폭 칼로리 흑자와 충분한 단백질을 우선하세요.',
+    ].join('\n'),
+    strength_gain: [
+      '- 운동은 스쿼트, 벤치프레스, 데드리프트, 오버헤드프레스 같은 메인 리프트 중심으로 설계하세요.',
+      '- 주요 리프트는 3~6회 반복의 저반복·고중량 성향 세트를 적극 활용하세요.',
+      '- 머신 위주의 보디빌딩식 분할보다 복합 리프트와 기술 연습 우선으로 구성하세요.',
+      '- 보조 운동은 기록 향상과 약점 보완에 필요한 범위로만 최소화하세요.',
+      '- 회복 수준이 낮으면 운동 총량을 보수적으로 줄이고, 세트 수를 과도하게 늘리지 마세요.',
+      '- 식단은 무조건 벌크업하지 말고 유지칼로리 또는 소폭 흑자 수준에서 회복과 퍼포먼스 향상을 우선하세요.',
+    ].join('\n'),
+    maintenance: [
+      '- 운동은 현재 체력과 체형을 유지할 수 있도록 균형 있게 설계하세요.',
+      '- 식단은 유지 가능한 수준과 일관성을 우선하세요.',
+    ].join('\n'),
+    health: [
+      '- 운동은 전신 움직임, 기초 체력, 부상 위험 관리에 초점을 두세요.',
+      '- 식단은 건강 습관 형성과 영양 균형을 우선하세요.',
+    ].join('\n'),
+  };
+
   let strengthSection = '';
   if (data.strengthProfile && data.strengthProfile.length > 0) {
     strengthSection = `
@@ -349,7 +378,9 @@ ${data.strengthProfile.map(e => `- ${e.exercise}: ${e.weightKg}kg`).join('\n')}
 → 위 중량을 기준으로 AI 플랜의 weight_kg 값을 현실적으로 설정해주세요.
 `;
   } else if (Array.isArray(data.strengthProfile) && data.strengthProfile.length === 0) {
-    strengthSection = `\n→ 사용자가 운동 중량을 입력하지 않았습니다. 운동 경험(${experienceLabel[data.experience]})을 고려하여 weight_kg를 맨몸 또는 매우 가벼운 중량(0~10kg)으로 보수적으로 설정해주세요.\n`;
+    strengthSection = data.goal === 'strength_gain'
+      ? `\n→ 사용자가 현재 중량을 입력하지 않았습니다. 운동 경험(${experienceLabel[data.experience]})과 강화 우선 리프트를 고려해 메인 리프트의 weight_kg를 매우 보수적으로 설정하고, 무리한 추정 중량은 피해주세요.\n`
+      : `\n→ 사용자가 운동 중량을 입력하지 않았습니다. 운동 경험(${experienceLabel[data.experience]})을 고려하여 weight_kg를 맨몸 또는 매우 가벼운 중량(0~10kg)으로 보수적으로 설정해주세요.\n`;
   }
 
   let historySection = '';
@@ -363,6 +394,9 @@ ${history.avgDailyCalories > 0 ? `- 평균 일일 칼로리 섭취: ${history.av
   }
 
   const phase2 = [
+    data.primaryStrengthFocus
+      ? `- 강화 우선 리프트: ${primaryStrengthFocusLabel[data.primaryStrengthFocus]}`
+      : '',
     data.recoveryLevel ? `- 운동 후 피로 회복: ${recoveryLabel[data.recoveryLevel]}` : '',
     data.overeatingHabit
       ? `- 습관적 과식 여부: ${
@@ -391,7 +425,7 @@ ${history.avgDailyCalories > 0 ? `- 평균 일일 칼로리 섭취: ${history.av
 아래 사용자 정보를 기반으로 1주일치 맞춤 식단·운동 계획을 작성해주세요.
 
 [사용자 정보]
-- 목표: ${goalLabel[data.goal]}
+- 목표: ${AI_GOAL_LABEL[data.goal]}
 - 성별: ${genderLabel[data.gender]}
 - 나이: ${data.age}세
 - 키: ${data.height}cm / 체중: ${data.weight}kg
@@ -407,6 +441,8 @@ ${strengthSection}${historySection}${workoutHistorySection}
 - 식단은 한국 음식 중심으로 제안하세요
 - 운동 경험 수준에 맞는 난이도로 설계하세요
 - 운동 중량(weight_kg)은 사용자의 현재 중량 프로필을 참고해 현실적으로 설정하세요 (맨몸/카디오는 null)
+- 아래 목표별 지침을 반드시 반영하세요:
+${goalInstructionMap[data.goal]}
 - weeklyWorkout은 반드시 7개 항목 (day1~day7)으로 작성하세요
 - weeklyDiet는 반드시 1개 항목 (대표 하루 식단)으로 작성하세요
 
@@ -462,15 +498,75 @@ function getTodayString(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-// ─── 메인 생성 함수 ────────────────────────────────────────────────────────────
+function parseRepsRangeForValidation(repsRange: string): { min: number; max: number } | null {
+  const match = repsRange.trim().match(/^(\d+)(?:[~\-](\d+))?$/);
+  if (!match) return null;
+  const min = parseInt(match[1], 10);
+  const max = match[2] ? parseInt(match[2], 10) : min;
+  return { min, max };
+}
 
-export async function generateAIPlan(
+function isMainLift(name: string): boolean {
+  return ['스쿼트', '벤치프레스', '데드리프트', '오버헤드프레스'].some((lift) => name.includes(lift));
+}
+
+function validateGeneratedPlanForGoal(
   data: OnboardingData,
-  history: UserHistorySummary | null,
-  workoutHistorySection: string = ''
-): Promise<AIPlan> {
-  const prompt = buildPrompt(data, history, workoutHistorySection);
+  plan: Omit<AIPlan, 'id' | 'weekStart' | 'generatedAt'>
+): { valid: boolean; reasons: string[] } {
+  const reasons: string[] = [];
 
+  if (!Array.isArray(plan.weeklyWorkout) || plan.weeklyWorkout.length !== 7) {
+    reasons.push('weeklyWorkout이 7일 구성이 아닙니다.');
+  }
+
+  if (data.goal !== 'strength_gain') {
+    return { valid: reasons.length === 0, reasons };
+  }
+
+  const exercises = (plan.weeklyWorkout ?? []).flatMap((day) => day.exercises ?? []);
+  const mainLiftExercises = exercises.filter((exercise) => isMainLift(exercise.name));
+
+  if (mainLiftExercises.length < 3) {
+    reasons.push('메인 리프트 비중이 너무 낮습니다.');
+  }
+
+  const lowRepMainLiftCount = mainLiftExercises.filter((exercise) => {
+    const parsed = parseRepsRangeForValidation(exercise.repsRange);
+    return parsed !== null && parsed.max <= 6;
+  }).length;
+
+  if (lowRepMainLiftCount < 2) {
+    reasons.push('메인 리프트에 저반복 세트가 충분하지 않습니다.');
+  }
+
+  const workoutDays = (plan.weeklyWorkout ?? []).filter((day) => !day.isRestDay);
+  const excessiveHighVolumeDays = workoutDays.filter((day) => {
+    const setCount = (day.exercises ?? []).reduce((sum, exercise) => sum + (exercise.sets ?? 0), 0);
+    return setCount > 24;
+  }).length;
+
+  if (excessiveHighVolumeDays >= 2) {
+    reasons.push('근력 강화 목표 대비 운동 볼륨이 과도합니다.');
+  }
+
+  if (data.primaryStrengthFocus && data.primaryStrengthFocus !== 'balanced') {
+    const focusMap: Record<Exclude<NonNullable<OnboardingData['primaryStrengthFocus']>, 'balanced'>, string> = {
+      squat: '스쿼트',
+      bench: '벤치프레스',
+      deadlift: '데드리프트',
+    };
+    const focusLiftName = focusMap[data.primaryStrengthFocus];
+    const hasFocusLift = mainLiftExercises.some((exercise) => exercise.name.includes(focusLiftName));
+    if (!hasFocusLift) {
+      reasons.push(`우선 리프트(${focusLiftName})가 루틴에 반영되지 않았습니다.`);
+    }
+  }
+
+  return { valid: reasons.length === 0, reasons };
+}
+
+async function requestPlanFromModel(prompt: string): Promise<Omit<AIPlan, 'id' | 'weekStart' | 'generatedAt'>> {
   const { data: fnData, error: fnError } = await supabase.functions.invoke(
     'generate-ai-plan',
     { body: { prompt } }
@@ -481,18 +577,48 @@ export async function generateAIPlan(
   }
 
   const responseText: string = fnData?.text ?? '';
-
-  // JSON 파싱 — 마크다운 래핑 제거
   const cleaned = responseText
     .replace(/^```json\s*/m, '')
     .replace(/\s*```$/m, '')
     .trim();
 
-  let parsed: Omit<AIPlan, 'id' | 'weekStart' | 'generatedAt'>;
   try {
-    parsed = JSON.parse(cleaned);
+    return JSON.parse(cleaned);
   } catch {
     throw new Error('AI 응답 파싱에 실패했습니다. 다시 시도해주세요.');
+  }
+}
+
+// ─── 메인 생성 함수 ────────────────────────────────────────────────────────────
+
+export async function generateAIPlan(
+  data: OnboardingData,
+  history: UserHistorySummary | null,
+  workoutHistorySection: string = ''
+): Promise<AIPlan> {
+  const prompt = buildPrompt(data, history, workoutHistorySection);
+  let parsed = await requestPlanFromModel(prompt);
+
+  const validation = validateGeneratedPlanForGoal(data, parsed);
+  if (!validation.valid) {
+    const repairPrompt = `${prompt}
+
+[이전 응답 보정 요청]
+- 직전 응답에 다음 문제가 있었습니다:
+${validation.reasons.map((reason) => `- ${reason}`).join('\n')}
+- 위 문제를 수정해서 목표에 더 정확히 맞는 JSON만 다시 출력하세요.
+- 특히 strength_gain 목표라면 메인 리프트 중심, 저반복 세트, 우선 리프트 반영 여부를 반드시 점검하세요.`;
+
+    parsed = await requestPlanFromModel(repairPrompt);
+
+    const repairedValidation = validateGeneratedPlanForGoal(data, parsed);
+    if (!repairedValidation.valid) {
+      throw new Error(
+        data.goal === 'strength_gain'
+          ? '근력 강화 목표에 맞는 플랜 생성에 실패했습니다. 다시 시도해주세요.'
+          : '생성된 플랜 검증에 실패했습니다. 다시 시도해주세요.'
+      );
+    }
   }
 
   // 최소 칼로리 안전 가드레일: 성별 분화 하한 적용

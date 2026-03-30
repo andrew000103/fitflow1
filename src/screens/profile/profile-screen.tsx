@@ -18,7 +18,7 @@ import {
   getUserProfile,
 } from '../../lib/profile';
 import { useAuthStore } from '../../stores/auth-store';
-import { useAIPlanStore } from '../../stores/ai-plan-store';
+import { AI_GOAL_LABEL, useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAppTheme } from '../../theme';
 import {
   BodyWeightRecord,
@@ -35,13 +35,6 @@ export default function ProfileScreen() {
 
   const currentPlan = useAIPlanStore((s) => s.currentPlan);
   const onboardingData = useAIPlanStore((s) => s.onboardingData);
-
-  const AI_GOAL_LABEL: Record<string, string> = {
-    weight_loss: '체중 감량',
-    muscle_gain: '근육 증가',
-    maintenance: '체형 유지',
-    health: '건강 개선',
-  };
 
   const [refreshing, setRefreshing] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);

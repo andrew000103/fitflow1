@@ -24,7 +24,7 @@ import {
   saveOnboardingDataToSupabase,
   validateSafety,
 } from '../../lib/ai-planner';
-import { GymType, OnboardingData, StrengthEntry, useAIPlanStore } from '../../stores/ai-plan-store';
+import { AIGoal, GymType, OnboardingData, StrengthEntry, useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { supabase } from '../../lib/supabase';
 import { useAppTheme } from '../../theme';
@@ -199,6 +199,7 @@ type Question = {
   phase: 1 | 2;
   unit?: string;
   placeholder?: string;
+  showWhen?: (answers: Partial<Record<keyof OnboardingData, string | string[]>>) => boolean;
 };
 
 const QUESTIONS: Question[] = [
@@ -211,8 +212,22 @@ const QUESTIONS: Question[] = [
     options: [
       { label: '체중 감량', value: 'weight_loss' },
       { label: '근육 증가 (벌크업)', value: 'muscle_gain' },
+      { label: '근력 강화 (파워리프팅/힘 증가)', value: 'strength_gain' },
       { label: '체형 유지', value: 'maintenance' },
       { label: '건강 개선', value: 'health' },
+    ],
+  },
+  {
+    key: 'primaryStrengthFocus',
+    question: '어떤 리프트의 근력 향상이 가장 중요하신가요?',
+    type: 'single',
+    phase: 1,
+    showWhen: (answers) => answers.goal === 'strength_gain',
+    options: [
+      { label: '스쿼트', value: 'squat' },
+      { label: '벤치프레스', value: 'bench' },
+      { label: '데드리프트', value: 'deadlift' },
+      { label: '전신 균형', value: 'balanced' },
     ],
   },
   {
@@ -345,7 +360,11 @@ const QUESTIONS: Question[] = [
   },
 ];
 
-const PHASE1_COUNT = QUESTIONS.filter((q) => q.phase === 1).length;
+function getVisibleQuestions(
+  answers: Partial<Record<keyof OnboardingData, string | string[]>>
+): Question[] {
+  return QUESTIONS.filter((question) => (question.showWhen ? question.showWhen(answers) : true));
+}
 
 const MAIN_EXERCISES = [
   { id: 'squat', label: '스쿼트' },
@@ -407,13 +426,15 @@ export default function AIOnboardingScreen() {
     navigation.replace('AIPlanResult', {});
   };
 
-  const isPhase2Separator = step === PHASE1_COUNT && !skippedPhase2 && !passedSeparator;
-  const isStrengthStep = passedSeparator && !passedStrengthStep && !skippedPhase2;
   const visibleQuestions = skippedPhase2
-    ? QUESTIONS.filter((q) => q.phase === 1)
-    : QUESTIONS;
+    ? getVisibleQuestions(answers).filter((q) => q.phase === 1)
+    : getVisibleQuestions(answers);
+  const phase1Count = visibleQuestions.filter((q) => q.phase === 1).length;
+  const isPhase2Separator = step === phase1Count && !skippedPhase2 && !passedSeparator;
+  const isStrengthStep = passedSeparator && !passedStrengthStep && !skippedPhase2;
   const currentQuestion = (isPhase2Separator || isStrengthStep) ? null : visibleQuestions[step];
   const totalSteps = visibleQuestions.length;
+  const selectedGoal = answers.goal as AIGoal | undefined;
 
   // ─── 단일 선택 ──────────────────────────────────────────────────────────────
   const handleSingleSelect = (value: string) => {
@@ -489,6 +510,9 @@ export default function AIOnboardingScreen() {
 
     const data: OnboardingData = {
       goal: (raw.goal as OnboardingData['goal']) ?? 'health',
+      ...(raw.goal === 'strength_gain' && raw.primaryStrengthFocus
+        ? { primaryStrengthFocus: raw.primaryStrengthFocus as OnboardingData['primaryStrengthFocus'] }
+        : {}),
       gender: (raw.gender as OnboardingData['gender']) ?? 'undisclosed',
       age: parseInt(String(raw.age ?? '0'), 10),
       height: parseFloat(String(raw.height ?? '0')),
@@ -559,7 +583,7 @@ export default function AIOnboardingScreen() {
       // skippedPhase2=true 상태에서 실패하면 step=9가 blank screen이 되므로 separator로 복원
       if (skipPhase2) {
         setSkippedPhase2(false);
-        setStep(PHASE1_COUNT);
+        setStep(phase1Count);
       }
       Alert.alert('오류', msg, [
         { text: '다시 시도', onPress: () => handleFinish(skipPhase2) },
@@ -771,6 +795,12 @@ export default function AIOnboardingScreen() {
         )}
 
         <Text style={s.questionText}>{currentQuestion.question}</Text>
+
+        {currentQuestion.key === 'primaryStrengthFocus' && selectedGoal === 'strength_gain' && (
+          <Text style={[s.helperText, { color: colors.textSecondary }]}>
+            우선순위 리프트를 알면 근력 강화 루틴을 더 정확하게 맞출 수 있어요.
+          </Text>
+        )}
 
         {currentQuestion.type === 'number' ? (
           <View style={s.numberInputWrap}>
@@ -996,6 +1026,12 @@ const styles = (
       color: colors.text,
       lineHeight: layout.isCompact ? 28 : 30,
       marginBottom: layout.isCompact ? 24 : 28,
+    },
+    helperText: {
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: -10,
+      marginBottom: 20,
     },
     optionsWrap: {
       gap: 12,

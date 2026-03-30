@@ -13,11 +13,12 @@ import {
 import { Text } from 'react-native-paper';
 import { AIFlowScreen } from '../../components/ai/AIFlowScreen';
 import {
+  buildWorkoutHistorySection,
   fetchUserHistorySummary,
   generateAIPlan,
   saveAIPlanToSupabase,
 } from '../../lib/ai-planner';
-import { AIPlan, WorkoutDay, useAIPlanStore } from '../../stores/ai-plan-store';
+import { AI_GOAL_LABEL, AIPlan, OnboardingData, WorkoutDay, useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { supabase } from '../../lib/supabase';
 import { useAppTheme } from '../../theme';
@@ -41,12 +42,42 @@ function formatDayHeader(weekStart: string, dayLabel: string): string {
 }
 
 // ─── GoalSummaryCard ──────────────────────────────────────────────────────────
-function GoalSummaryCard({ plan, colors }: { plan: AIPlan; colors: any }) {
+function GoalSummaryCard({
+  plan,
+  onboardingData,
+  colors,
+}: {
+  plan: AIPlan;
+  onboardingData: OnboardingData | null;
+  colors: any;
+}) {
   const { width } = useWindowDimensions();
   const isCompact = width < 380;
+
+  const primaryStrengthFocusLabel: Record<NonNullable<OnboardingData['primaryStrengthFocus']>, string> = {
+    squat: '스쿼트',
+    bench: '벤치프레스',
+    deadlift: '데드리프트',
+    balanced: '전신 균형',
+  };
+
   return (
     <View style={[cardStyles.wrap, { backgroundColor: colors.card }]}>
-      <Text style={[cardStyles.title, { color: colors.text }]}>목표</Text>
+      <View style={cardStyles.header}>
+        <Text style={[cardStyles.title, { color: colors.text }]}>목표</Text>
+        {onboardingData?.goal && (
+          <View style={[cardStyles.goalBadge, { backgroundColor: colors.accentMuted }]}>
+            <Text style={[cardStyles.goalBadgeText, { color: colors.accent }]}>
+              {AI_GOAL_LABEL[onboardingData.goal]}
+            </Text>
+          </View>
+        )}
+      </View>
+      {onboardingData?.goal === 'strength_gain' && onboardingData.primaryStrengthFocus && (
+        <Text style={[cardStyles.subLabel, { color: colors.textSecondary }]}>
+          우선 리프트: {primaryStrengthFocusLabel[onboardingData.primaryStrengthFocus]}
+        </Text>
+      )}
       <View style={[cardStyles.row, isCompact && cardStyles.rowCompact]}>
         <View style={cardStyles.item}>
           <Text style={[cardStyles.value, { color: colors.accent }]}>
@@ -82,7 +113,11 @@ function GoalSummaryCard({ plan, colors }: { plan: AIPlan; colors: any }) {
 
 const cardStyles = StyleSheet.create({
   wrap: { borderRadius: 16, padding: 16, marginBottom: 12 },
-  title: { fontSize: 13, fontWeight: '600', marginBottom: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 },
+  title: { fontSize: 13, fontWeight: '600' },
+  goalBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  goalBadgeText: { fontSize: 12, fontWeight: '700' },
+  subLabel: { fontSize: 12, marginBottom: 12 },
   row: { flexDirection: 'row', alignItems: 'center' },
   rowCompact: { flexWrap: 'wrap', rowGap: 12 },
   item: { flex: 1, alignItems: 'center' },
@@ -561,7 +596,12 @@ export default function AIPlanResultScreen() {
     setGenerating(true);
     try {
       const history = user?.id ? await fetchUserHistorySummary(user.id) : null;
-      const plan = await generateAIPlan(onboardingData, history);
+      let workoutHistorySection = '';
+      if (user?.id && currentPlan) {
+        workoutHistorySection = await buildWorkoutHistorySection(user.id, currentPlan);
+      }
+
+      const plan = await generateAIPlan(onboardingData, history, workoutHistorySection);
       setCurrentPlan(plan);
       if (user?.id) {
         saveAIPlanToSupabase(user.id, plan, onboardingData).catch(() => {});
@@ -678,7 +718,7 @@ export default function AIPlanResultScreen() {
       />
 
       {/* 컨텐츠 */}
-      <GoalSummaryCard plan={currentPlan} colors={colors} />
+      <GoalSummaryCard plan={currentPlan} onboardingData={onboardingData} colors={colors} />
 
       {activeTab === 'workout' ? (
         <>

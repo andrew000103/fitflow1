@@ -4,10 +4,18 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
-export type AIGoal = 'weight_loss' | 'muscle_gain' | 'maintenance' | 'health';
+export type AIGoal = 'weight_loss' | 'muscle_gain' | 'strength_gain' | 'maintenance' | 'health';
 export type AIGender = 'male' | 'female' | 'undisclosed';
 export type AIExperience = 'beginner' | 'intermediate' | 'advanced';
 export type GymType = 'full_gym' | 'garage_gym' | 'dumbbell_only' | 'bodyweight';
+
+export const AI_GOAL_LABEL: Record<AIGoal, string> = {
+  weight_loss: '체중 감량',
+  muscle_gain: '근육 증가 (벌크업)',
+  strength_gain: '근력 강화',
+  maintenance: '체형 유지',
+  health: '건강 개선',
+};
 
 export interface StrengthEntry {
   exercise: string;
@@ -16,6 +24,7 @@ export interface StrengthEntry {
 
 export interface OnboardingData {
   goal: AIGoal;
+  primaryStrengthFocus?: 'squat' | 'bench' | 'deadlift' | 'balanced';
   gender: AIGender;
   age: number;
   height: number;
