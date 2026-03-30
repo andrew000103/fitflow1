@@ -499,11 +499,32 @@ function getTodayString(): string {
 }
 
 function parseRepsRangeForValidation(repsRange: string): { min: number; max: number } | null {
-  const match = repsRange.trim().match(/^(\d+)(?:[~\-](\d+))?$/);
-  if (!match) return null;
-  const min = parseInt(match[1], 10);
-  const max = match[2] ? parseInt(match[2], 10) : min;
-  return { min, max };
+  const normalized = repsRange
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/회/g, '')
+    .replace(/세트/g, '')
+    .replace(/×/g, 'x');
+
+  const fiveByFiveMatch = normalized.match(/(\d+)x(\d+)/);
+  if (fiveByFiveMatch) {
+    const reps = parseInt(fiveByFiveMatch[2], 10);
+    return { min: reps, max: reps };
+  }
+
+  const rangeMatch = normalized.match(/(\d+)(?:[~\-](\d+))/);
+  if (rangeMatch) {
+    return {
+      min: parseInt(rangeMatch[1], 10),
+      max: parseInt(rangeMatch[2], 10),
+    };
+  }
+
+  const singleMatch = normalized.match(/(\d+)/);
+  if (!singleMatch) return null;
+  const reps = parseInt(singleMatch[1], 10);
+  return { min: reps, max: reps };
 }
 
 function isMainLift(name: string): boolean {
@@ -513,21 +534,26 @@ function isMainLift(name: string): boolean {
 function validateGeneratedPlanForGoal(
   data: OnboardingData,
   plan: Omit<AIPlan, 'id' | 'weekStart' | 'generatedAt'>
-): { valid: boolean; reasons: string[] } {
+): { valid: boolean; reasons: string[]; hardFailures: string[]; score: number } {
   const reasons: string[] = [];
+  const hardFailures: string[] = [];
 
   if (!Array.isArray(plan.weeklyWorkout) || plan.weeklyWorkout.length !== 7) {
-    reasons.push('weeklyWorkout이 7일 구성이 아닙니다.');
+    hardFailures.push('weeklyWorkout이 7일 구성이 아닙니다.');
   }
 
   if (data.goal !== 'strength_gain') {
-    return { valid: reasons.length === 0, reasons };
+    const valid = hardFailures.length === 0;
+    return { valid, reasons, hardFailures, score: valid ? 1 : 0 };
   }
 
   const exercises = (plan.weeklyWorkout ?? []).flatMap((day) => day.exercises ?? []);
   const mainLiftExercises = exercises.filter((exercise) => isMainLift(exercise.name));
+  let score = 0;
 
-  if (mainLiftExercises.length < 3) {
+  if (mainLiftExercises.length >= 2) {
+    score += 1;
+  } else {
     reasons.push('메인 리프트 비중이 너무 낮습니다.');
   }
 
@@ -536,17 +562,21 @@ function validateGeneratedPlanForGoal(
     return parsed !== null && parsed.max <= 6;
   }).length;
 
-  if (lowRepMainLiftCount < 2) {
+  if (lowRepMainLiftCount >= 1) {
+    score += 1;
+  } else {
     reasons.push('메인 리프트에 저반복 세트가 충분하지 않습니다.');
   }
 
   const workoutDays = (plan.weeklyWorkout ?? []).filter((day) => !day.isRestDay);
   const excessiveHighVolumeDays = workoutDays.filter((day) => {
     const setCount = (day.exercises ?? []).reduce((sum, exercise) => sum + (exercise.sets ?? 0), 0);
-    return setCount > 24;
+    return setCount > 28;
   }).length;
 
-  if (excessiveHighVolumeDays >= 2) {
+  if (excessiveHighVolumeDays <= 2) {
+    score += 1;
+  } else {
     reasons.push('근력 강화 목표 대비 운동 볼륨이 과도합니다.');
   }
 
@@ -558,12 +588,17 @@ function validateGeneratedPlanForGoal(
     };
     const focusLiftName = focusMap[data.primaryStrengthFocus];
     const hasFocusLift = mainLiftExercises.some((exercise) => exercise.name.includes(focusLiftName));
-    if (!hasFocusLift) {
+    if (hasFocusLift) {
+      score += 1;
+    } else {
       reasons.push(`우선 리프트(${focusLiftName})가 루틴에 반영되지 않았습니다.`);
     }
+  } else {
+    score += 1;
   }
 
-  return { valid: reasons.length === 0, reasons };
+  const valid = hardFailures.length === 0 && score >= 3;
+  return { valid, reasons, hardFailures, score };
 }
 
 async function requestPlanFromModel(prompt: string): Promise<Omit<AIPlan, 'id' | 'weekStart' | 'generatedAt'>> {
@@ -605,7 +640,7 @@ export async function generateAIPlan(
 
 [이전 응답 보정 요청]
 - 직전 응답에 다음 문제가 있었습니다:
-${validation.reasons.map((reason) => `- ${reason}`).join('\n')}
+${[...validation.hardFailures, ...validation.reasons].map((reason) => `- ${reason}`).join('\n')}
 - 위 문제를 수정해서 목표에 더 정확히 맞는 JSON만 다시 출력하세요.
 - 특히 strength_gain 목표라면 메인 리프트 중심, 저반복 세트, 우선 리프트 반영 여부를 반드시 점검하세요.`;
 
@@ -613,11 +648,18 @@ ${validation.reasons.map((reason) => `- ${reason}`).join('\n')}
 
     const repairedValidation = validateGeneratedPlanForGoal(data, parsed);
     if (!repairedValidation.valid) {
-      throw new Error(
-        data.goal === 'strength_gain'
-          ? '근력 강화 목표에 맞는 플랜 생성에 실패했습니다. 다시 시도해주세요.'
-          : '생성된 플랜 검증에 실패했습니다. 다시 시도해주세요.'
-      );
+      if (repairedValidation.hardFailures.length > 0) {
+        throw new Error(
+          data.goal === 'strength_gain'
+            ? '근력 강화 목표에 맞는 플랜 생성에 실패했습니다. 다시 시도해주세요.'
+            : '생성된 플랜 검증에 실패했습니다. 다시 시도해주세요.'
+        );
+      }
+
+      parsed.safetyFlags = [
+        ...(parsed.safetyFlags ?? []),
+        `근력 강화 목표 반영이 일부 제한될 수 있습니다: ${repairedValidation.reasons.join(', ')}`,
+      ];
     }
   }
 

@@ -35,22 +35,30 @@ type NavProp = NativeStackNavigationProp<RootStackParamList>;
 // ─── 1RM 계산기 모달 ────────────────────────────────────────────────────────────
 
 function OneRMCalcModal({
+  targetId,
   exerciseLabel,
   visible,
   onClose,
   onApply,
   colors,
 }: {
+  targetId: string | null;
   exerciseLabel: string;
   visible: boolean;
   onClose: () => void;
-  onApply: (value: number) => void;
+  onApply: (targetId: string, value: number) => void;
   colors: ReturnType<typeof useAppTheme>['colors'];
 }) {
   const { width, height } = useWindowDimensions();
   const isCompact = width < 380 || height < 760;
   const [rmWeight, setRmWeight] = React.useState('');
   const [rmReps, setRmReps] = React.useState('');
+
+  useEffect(() => {
+    if (!visible) return;
+    setRmWeight('');
+    setRmReps('');
+  }, [visible, targetId]);
 
   const w = parseFloat(rmWeight);
   const r = parseInt(rmReps, 10);
@@ -65,8 +73,8 @@ function OneRMCalcModal({
   };
 
   const handleApply = () => {
-    if (estimated === null) return;
-    onApply(estimated);
+    if (estimated === null || !targetId) return;
+    onApply(targetId, estimated);
     setRmWeight('');
     setRmReps('');
   };
@@ -386,6 +394,7 @@ export default function AIOnboardingScreen() {
   const isCompact = width < 380 || height < 760;
   const horizontalPadding = isCompact ? 16 : 24;
   const scrollRef = useRef<ScrollView>(null);
+  const strengthCardOffsets = useRef<Record<string, number>>({});
 
   const [step, setStep] = useState(0);
   const [skippedPhase2, setSkippedPhase2] = useState(false);
@@ -599,7 +608,7 @@ export default function AIOnboardingScreen() {
 
   const scrollToFocusedInput = (y: number) => {
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ y, animated: true });
+      scrollRef.current?.scrollTo({ y: Math.max(y, 0), animated: true });
     });
   };
 
@@ -661,21 +670,22 @@ export default function AIOnboardingScreen() {
         }
         scrollRef={scrollRef}
         keyboardVerticalOffset={16}
-        contentContainerStyle={s.content}
+        contentContainerStyle={[s.content, s.strengthContent]}
+        footerStyle={s.strengthFooter}
         footer={
           <>
             <TouchableOpacity style={s.primaryBtn} onPress={() => setPassedStrengthStep(true)} activeOpacity={0.85}>
               <Text style={s.primaryBtnText}>다음</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={s.skipBtn}
+              style={[s.skipBtn, s.centeredSkipBtn]}
               onPress={() => { setStrengthSkipped(true); setPassedStrengthStep(true); }}
               activeOpacity={0.85}
             >
-              <Text style={s.skipText}>모르면 건너뛰기 (맨몸 기준으로 설정)</Text>
+              <Text style={[s.skipText, s.centeredSkipText]}>모르면 건너뛰기 (맨몸 기준으로 설정)</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[s.skipBtn, { marginTop: 2 }]} onPress={handleSkipPhase2}>
-              <Text style={[s.skipText, { fontSize: 13 }]}>건너뛰고 플랜 받기</Text>
+            <TouchableOpacity style={[s.skipBtn, s.centeredSkipBtn, { marginTop: 2 }]} onPress={handleSkipPhase2}>
+              <Text style={[s.skipText, s.centeredSkipText, { fontSize: 13 }]}>건너뛰고 플랜 받기</Text>
             </TouchableOpacity>
           </>
         }
@@ -683,53 +693,55 @@ export default function AIOnboardingScreen() {
           <View style={s.phaseBadge}>
             <Text style={s.phaseBadgeText}>선택 질문</Text>
           </View>
-          <Text style={s.questionText}>주요 운동의 현재{'\n'}사용 중량을 알려주세요</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 14, marginBottom: 24, lineHeight: 20 }}>
-            입력하신 중량을 바탕으로 AI가 더 정확한 운동 중량을 설정합니다.{'\n'}모르는 항목은 비워두세요.
+          <Text style={s.questionText}>주요 운동의 현재{'\n'}사용 중량을 입력해주세요</Text>
+          <Text style={s.strengthIntroText}>
+            현재 사용 중량을 바로 입력하면 됩니다.{'\n'}
+            1RM을 모르면 오른쪽 계산기로 간단히 입력할 수 있어요.
           </Text>
           <OneRMCalcModal
+            targetId={rmCalcTarget}
             exerciseLabel={MAIN_EXERCISES.find(ex => ex.id === rmCalcTarget)?.label ?? ''}
             visible={rmCalcTarget !== null}
             onClose={() => setRmCalcTarget(null)}
-            onApply={value => {
-              if (rmCalcTarget) {
-                setStrengthInputs(prev => ({ ...prev, [rmCalcTarget]: String(value) }));
-              }
+            onApply={(targetId, value) => {
+              setStrengthInputs(prev => ({ ...prev, [targetId]: String(value) }));
               setRmCalcTarget(null);
             }}
             colors={colors}
           />
           <View style={s.strengthList}>
             {MAIN_EXERCISES.map(ex => (
-              <View key={ex.id} style={s.strengthCard}>
-                <Text style={s.strengthLabel}>{ex.label}</Text>
-                <View style={s.strengthInputRow}>
-                  <View style={s.strengthInputWrap}>
-                    <Text style={s.strengthInputHint}>현재 사용 중량</Text>
-                    <View style={s.strengthInputInner}>
-                      <TextInput
-                        style={[s.numberInput, s.strengthInput, { color: colors.text, borderColor: colors.border }]}
-                        keyboardType="numeric"
-                        placeholder="0"
-                        placeholderTextColor={colors.textSecondary}
-                        value={strengthInputs[ex.id] ?? ''}
-                        onChangeText={text => {
-                          const numeric = text.replace(/[^0-9]/g, '');
-                          setStrengthInputs(prev => ({ ...prev, [ex.id]: numeric }));
-                        }}
-                        onFocus={() => scrollToFocusedInput(260)}
-                        maxLength={4}
-                      />
-                      <Text style={s.strengthUnit}>kg</Text>
-                    </View>
-                  </View>
+              <View
+                key={ex.id}
+                style={s.strengthRow}
+                onLayout={(event) => {
+                  strengthCardOffsets.current[ex.id] = event.nativeEvent.layout.y;
+                }}
+              >
+                <Text style={s.strengthName}>{ex.label}</Text>
+                <View style={s.strengthValueGroup}>
+                  <TextInput
+                    style={[s.strengthInputCompact, { color: colors.text, borderColor: colors.border }]}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor={colors.textSecondary}
+                    value={strengthInputs[ex.id] ?? ''}
+                    onChangeText={text => {
+                      const numeric = text.replace(/[^0-9]/g, '');
+                      setStrengthInputs(prev => ({ ...prev, [ex.id]: numeric }));
+                    }}
+                    onFocus={() => scrollToFocusedInput((strengthCardOffsets.current[ex.id] ?? 0) - 24)}
+                    maxLength={4}
+                  />
+                  <Text style={s.strengthUnitCompact}>kg</Text>
                 </View>
                 <TouchableOpacity
                   onPress={() => setRmCalcTarget(ex.id)}
-                  style={s.rmButton}
+                  style={s.strengthCalcButtonCompact}
                   activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Text style={s.rmButtonText}>1RM 계산기로 입력하기</Text>
+                  <Text style={s.strengthCalcButtonTextCompact}>1RM 계산</Text>
                 </TouchableOpacity>
               </View>
             ))}
@@ -1007,6 +1019,9 @@ const styles = (
       paddingTop: layout.isCompact ? 16 : 20,
       paddingBottom: 24,
     },
+    strengthContent: {
+      paddingBottom: layout.isCompact ? 96 : 112,
+    },
     phaseBadge: {
       alignSelf: 'flex-start',
       backgroundColor: colors.accentMuted,
@@ -1032,6 +1047,12 @@ const styles = (
       lineHeight: 20,
       marginTop: -10,
       marginBottom: 20,
+    },
+    strengthIntroText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      lineHeight: 20,
+      marginBottom: 22,
     },
     optionsWrap: {
       gap: 12,
@@ -1131,64 +1152,71 @@ const styles = (
       marginTop: 16,
       paddingVertical: 8,
     },
+    centeredSkipBtn: {
+      alignItems: 'center',
+    },
     skipText: {
       fontSize: 15,
       color: colors.textSecondary,
     },
-    strengthList: {
-      gap: 16,
+    centeredSkipText: {
+      textAlign: 'center',
+      lineHeight: 20,
     },
-    strengthCard: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      padding: layout.isCompact ? 14 : 16,
+    strengthFooter: {
+      paddingTop: 14,
+    },
+    strengthList: {
       gap: 12,
     },
-    strengthLabel: {
-      color: colors.text,
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    strengthInputRow: {
-      minHeight: 0,
-    },
-    strengthInputWrap: {
-      width: '100%',
-    },
-    strengthInputHint: {
-      color: colors.textSecondary,
-      fontSize: 13,
-      marginBottom: 6,
-    },
-    strengthInputInner: {
+    strengthRow: {
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: layout.isCompact ? 12 : 14,
+      paddingVertical: layout.isCompact ? 12 : 14,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
     },
-    strengthInput: {
-      fontSize: 22,
-      width: undefined,
-      textAlign: 'left',
+    strengthName: {
+      color: colors.text,
+      fontSize: layout.isCompact ? 14 : 15,
+      fontWeight: '600',
       flex: 1,
     },
-    strengthUnit: {
+    strengthValueGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    strengthInputCompact: {
+      width: layout.isCompact ? 68 : 76,
+      fontSize: 18,
+      fontWeight: '700',
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      textAlign: 'right',
+      backgroundColor: colors.background,
+    },
+    strengthUnitCompact: {
       color: colors.textSecondary,
-      fontSize: 15,
+      fontSize: 13,
       minWidth: 24,
     },
-    rmButton: {
-      alignSelf: 'flex-start',
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderRadius: 10,
+    strengthCalcButtonCompact: {
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      borderRadius: 999,
       borderWidth: 1,
       borderColor: colors.accent,
       backgroundColor: colors.accentMuted,
     },
-    rmButtonText: {
-      fontSize: 13,
+    strengthCalcButtonTextCompact: {
+      fontSize: 12,
       color: colors.accent,
       fontWeight: '600',
     },
