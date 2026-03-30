@@ -33,11 +33,11 @@ function WebAppFrame({ isDark, children }: { isDark: boolean; children: React.Re
 
 function ThemeAwareApp() {
   const isDark = useThemeStore((s) => s.isDark);
-  const [webIconFontsLoaded] = useFonts(
+  const [webIconFontsLoaded, webIconFontsError] = useFonts(
     Platform.OS === 'web' ? MaterialCommunityIcons.font : {}
   );
 
-  if (Platform.OS === 'web' && !webIconFontsLoaded) {
+  if (Platform.OS === 'web' && !webIconFontsLoaded && !webIconFontsError) {
     return null;
   }
 
