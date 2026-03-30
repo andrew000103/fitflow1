@@ -69,14 +69,14 @@ export default function AIPlanWeeklyScreen() {
           <TouchableOpacity onPress={handleApply} style={s.backBtn}>
             <Text style={s.backText}>←</Text>
           </TouchableOpacity>
-          <Text style={s.title}>새로운 주간 플랜</Text>
+          <Text style={s.title}>새 플랜 비교</Text>
         </View>
       }
       contentContainerStyle={s.content}
       footer={
         <>
           <TouchableOpacity style={s.primaryBtn} onPress={handleApply}>
-            <Text style={s.primaryBtnText}>이번 주 플랜 적용하기</Text>
+            <Text style={s.primaryBtnText}>이 플랜으로 교체하기</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.adjustBtn, isAdjusting && { opacity: 0.5 }]}
@@ -87,12 +87,12 @@ export default function AIPlanWeeklyScreen() {
             {isAdjusting ? (
               <ActivityIndicator size="small" color={colors.accent} />
             ) : (
-              <Text style={s.adjustBtnText}>중량 자동 조정 (지난 주 기반)</Text>
+              <Text style={s.adjustBtnText}>전주 기록 반영하기</Text>
             )}
           </TouchableOpacity>
           {prev && (
             <TouchableOpacity style={s.secondaryBtn} onPress={handleKeepOld}>
-              <Text style={s.secondaryBtnText}>이전 플랜 유지</Text>
+              <Text style={s.secondaryBtnText}>현재 플랜 유지</Text>
             </TouchableOpacity>
           )}
         </>
@@ -100,7 +100,7 @@ export default function AIPlanWeeklyScreen() {
     >
         {prev ? (
           <View style={s.card}>
-            <Text style={s.cardTitle}>지난 주 vs 이번 주 변경사항</Text>
+            <Text style={s.cardTitle}>기존 플랜 vs 새 플랜</Text>
             <View style={s.divider} />
             <DiffRow
               label="목표 칼로리"
@@ -120,7 +120,7 @@ export default function AIPlanWeeklyScreen() {
           </View>
         ) : (
           <View style={s.card}>
-            <Text style={s.cardTitle}>이번 주 플랜</Text>
+            <Text style={s.cardTitle}>새로 만든 플랜</Text>
             <View style={s.divider} />
             <DiffRow label="목표 칼로리" prev="" next={`${next.targetCalories}kcal`} />
             <DiffRow label="단백질 목표" prev="" next={`${next.targetMacros.protein}g`} />

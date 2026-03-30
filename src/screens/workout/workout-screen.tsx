@@ -16,6 +16,7 @@ import { useProgramStore } from '../../stores/program-store';
 import { useWorkoutStore } from '../../stores/workout-store';
 import { useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAppTheme } from '../../theme';
+import { getPlanCycleInfo } from '../../lib/ai-plan-schedule';
 import { isNsunsProgram, getTmKey } from '../../lib/nsuns';
 import { WorkoutStackParamList } from '../../types/navigation';
 import { ProgramExerciseRow } from '../../types/program';
@@ -85,13 +86,16 @@ export default function WorkoutScreen({ navigation }: Props) {
   const [userTMs, setUserTMs] = useState<Record<string, number>>({});
 
   const currentPlan = useAIPlanStore((s) => s.currentPlan);
+  const syncRecurringPlanForToday = useAIPlanStore((s) => s.syncRecurringPlanForToday);
+  const appliedPlan = currentPlan?.isApplied && (currentPlan.appliedSections ?? ['workout', 'diet', 'goals']).includes('workout')
+    ? currentPlan
+    : null;
   const todayAIPlan = (() => {
-    if (!currentPlan) return undefined;
-    const startMs = new Date(currentPlan.weekStart + 'T00:00:00').getTime();
-    const todayMs = (() => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
-    const diffDays = Math.round((todayMs - startMs) / 86400000);
-    const label = (diffDays >= 0 && diffDays <= 6) ? `day${diffDays + 1}` : null;
-    return label ? currentPlan.weeklyWorkout.find((d) => d.dayLabel === label) : undefined;
+    if (!appliedPlan) return undefined;
+    const cycleInfo = getPlanCycleInfo(appliedPlan);
+    return cycleInfo.dayLabel
+      ? appliedPlan.weeklyWorkout.find((d) => d.dayLabel === cycleInfo.dayLabel)
+      : undefined;
   })();
 
   const isNsuns = activeUserProgram ? isNsunsProgram(activeUserProgram.program.creator_name, activeUserProgram.program.name) : false;
@@ -115,12 +119,13 @@ export default function WorkoutScreen({ navigation }: Props) {
   useFocusEffect(useCallback(() => {
     const init = async () => {
       if (!user) return;
+      await syncRecurringPlanForToday(user.id).catch(() => {});
       await fetchActiveProgram();
       const active = useProgramStore.getState().activeUserProgram;
       if (active) await loadPreview(active.program_id, active.id, active.current_day, active.program.name);
     };
     init();
-  }, [user, fetchActiveProgram, loadPreview]));
+  }, [user, fetchActiveProgram, loadPreview, syncRecurringPlanForToday]));
 
   const handleStartProgramWorkout = async () => {
     if (!activeUserProgram || !user) return;
@@ -185,10 +190,22 @@ export default function WorkoutScreen({ navigation }: Props) {
           </>
         )}
 
-        {currentPlan && (
+        {appliedPlan && (
           <>
             <Text style={[styles.sectionTitle, { color: colors.textSecondary, fontFamily: typography.fontFamily, marginTop: 4 }]}>오늘의 AI 플랜</Text>
             <AppCard variant="elevated" style={styles.programCard}>
+              <View style={[styles.appliedMetaRow, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.appliedMetaTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
+                  현재 적용 중인 AI 운동 계획
+                </Text>
+                <Text style={[styles.appliedMetaSub, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
+                  {(() => {
+                    const cycleInfo = getPlanCycleInfo(appliedPlan);
+                    if (!cycleInfo.started) return '시작 전';
+                    return `${cycleInfo.cycle + 1}주차 · Day ${(cycleInfo.dayIndex ?? 0) + 1}`;
+                  })()}
+                </Text>
+              </View>
               {todayAIPlan?.isRestDay ? (
                 <View style={{ alignItems: 'center', paddingVertical: 12 }}>
                   <Text style={{ fontSize: 32, marginBottom: 8 }}>🛌</Text>
@@ -263,6 +280,9 @@ const styles = StyleSheet.create({
   quickStartBtn: { paddingVertical: 18, marginBottom: 24 },
   sectionTitle: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, marginLeft: 4 },
   programCard: { padding: 16, marginBottom: 20 },
+  appliedMetaRow: { paddingBottom: 12, marginBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  appliedMetaTitle: { fontSize: 15, fontWeight: '700' },
+  appliedMetaSub: { fontSize: 12, marginTop: 3 },
   programHeader: { flexDirection: 'row', alignItems: 'center' },
   programName: { fontSize: 18, fontWeight: '700' },
   programSub: { fontSize: 13, marginTop: 2 },

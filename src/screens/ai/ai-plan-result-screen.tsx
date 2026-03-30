@@ -12,17 +12,20 @@ import {
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AIFlowScreen } from '../../components/ai/AIFlowScreen';
+import { getLatestUserGoal, saveUserGoal } from '../../lib/profile';
 import {
   buildWorkoutHistorySection,
   fetchUserHistorySummary,
   generateAIPlan,
   saveAIPlanToSupabase,
+  updateAIPlanSnapshotInSupabase,
 } from '../../lib/ai-planner';
 import { AI_GOAL_LABEL, AIPlan, OnboardingData, WorkoutDay, useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { supabase } from '../../lib/supabase';
 import { useAppTheme } from '../../theme';
 import { RootStackParamList } from '../../types/navigation';
+import { GoalType } from '../../types/profile';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -39,6 +42,21 @@ function formatDayHeader(weekStart: string, dayLabel: string): string {
   const d = getDayDate(weekStart, dayLabel);
   const dayKo = DAY_LABEL_KO[d.getDay()];
   return `${d.getMonth() + 1}/${d.getDate()} (${dayKo})`;
+}
+
+type PlanApplySection = 'workout' | 'diet' | 'goals';
+
+function mapAIGoalToUserGoal(goal?: OnboardingData['goal'] | null): GoalType | undefined {
+  if (!goal) return undefined;
+  if (goal === 'weight_loss') return 'loss';
+  if (goal === 'muscle_gain' || goal === 'strength_gain') return 'gain';
+  return 'maintain';
+}
+
+function formatAppliedSectionLabel(section: PlanApplySection) {
+  if (section === 'workout') return '운동';
+  if (section === 'diet') return '식단';
+  return '목표';
 }
 
 // ─── GoalSummaryCard ──────────────────────────────────────────────────────────
@@ -407,10 +425,10 @@ function StartDateSheet({
               {/* 핸들바 */}
               <View style={[sheetStyles.handle, { backgroundColor: colors.border }]} />
               <Text style={[sheetStyles.title, { color: colors.text }]}>
-                Day 1 시작일 선택
+                플랜 시작일 변경
               </Text>
               <Text style={[sheetStyles.subtitle, { color: colors.textSecondary }]}>
-                선택한 날이 Day 1이 됩니다 (Day 7까지 순서대로 이어집니다)
+                선택한 날짜를 Day 1로 두고 7일 플랜이 반복됩니다
               </Text>
 
               {/* 주 네비게이터 */}
@@ -575,6 +593,128 @@ function RegenBottomSheet({
   );
 }
 
+function ApplyConfirmSheet({
+  visible,
+  isReapply,
+  selectedSections,
+  onToggleSection,
+  onConfirm,
+  onClose,
+  applying,
+  colors,
+}: {
+  visible: boolean;
+  isReapply: boolean;
+  selectedSections: Record<PlanApplySection, boolean>;
+  onToggleSection: (section: PlanApplySection) => void;
+  onConfirm: () => void;
+  onClose: () => void;
+  applying: boolean;
+  colors: ReturnType<typeof useAppTheme>['colors'];
+}) {
+  const { width } = useWindowDimensions();
+  const isCompact = width < 380;
+  const canConfirm = Object.values(selectedSections).some(Boolean) && !applying;
+
+  const sectionRows: Array<{ key: PlanApplySection; title: string; description: string }> = [
+    {
+      key: 'workout',
+      title: '운동 프로그램 적용',
+      description: '운동 탭에서 이번 주 AI 운동 계획을 현재 플랜으로 사용합니다.',
+    },
+    {
+      key: 'diet',
+      title: '식단 계획 적용',
+      description: '식단 탭에서 오늘의 AI 식단 추천을 함께 보여줍니다.',
+    },
+    {
+      key: 'goals',
+      title: '목표 칼로리/매크로 적용',
+      description: '홈과 식단의 목표 칼로리, 단백질, 탄수화물, 지방 목표를 업데이트합니다.',
+    },
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
+          <TouchableWithoutFeedback onPress={() => {}}>
+            <View style={[sheetStyles.container, isCompact && sheetStyles.containerCompact, { backgroundColor: colors.card }]}>
+              <View style={[sheetStyles.handle, { backgroundColor: colors.border }]} />
+              <Text style={[sheetStyles.title, { color: colors.text }]}>
+                {isReapply ? '현재 플랜을 다시 설정할까요?' : '이 플랜을 적용할까요?'}
+              </Text>
+              <Text style={[sheetStyles.subtitle, { color: colors.textSecondary }]}>
+                {isReapply
+                  ? '적용 범위를 다시 확인하면 홈, 운동, 식단 반영 상태를 업데이트합니다.'
+                  : '적용할 범위를 확인한 뒤 승인하면 홈, 운동, 식단에 반영됩니다.'}
+              </Text>
+
+              {sectionRows.map((section) => {
+                const selected = selectedSections[section.key];
+                return (
+                  <TouchableOpacity
+                    key={section.key}
+                    style={[
+                      sheetStyles.sectionRow,
+                      {
+                        backgroundColor: selected ? colors.accentMuted : colors.background,
+                        borderColor: selected ? colors.accent : colors.border,
+                      },
+                    ]}
+                    onPress={() => onToggleSection(section.key)}
+                    activeOpacity={0.85}
+                  >
+                    <View style={sheetStyles.sectionHeader}>
+                      <Text style={[sheetStyles.sectionTitle, { color: colors.text }]}>
+                        {section.title}
+                      </Text>
+                      <View
+                        style={[
+                          sheetStyles.sectionCheck,
+                          {
+                            backgroundColor: selected ? colors.accent : 'transparent',
+                            borderColor: selected ? colors.accent : colors.border,
+                          },
+                        ]}
+                      >
+                        <Text style={[sheetStyles.sectionCheckText, { color: selected ? '#fff' : colors.textTertiary }]}>
+                          {selected ? '✓' : ''}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[sheetStyles.sectionDescription, { color: colors.textSecondary }]}>
+                      {section.description}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+
+              <TouchableOpacity
+                style={[
+                  sheetStyles.applyPrimaryButton,
+                  { backgroundColor: canConfirm ? colors.accent : colors.border },
+                ]}
+                onPress={onConfirm}
+                disabled={!canConfirm}
+                activeOpacity={0.85}
+              >
+                <Text style={sheetStyles.applyPrimaryButtonText}>
+                  {applying ? '적용 중...' : isReapply ? '다시 설정하기' : '적용하고 닫기'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={sheetStyles.secondaryAction} onPress={onClose}>
+                <Text style={{ fontSize: 15, color: colors.textSecondary }}>취소</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
+}
+
 // ─── AIPlanResultScreen ───────────────────────────────────────────────────────
 export default function AIPlanResultScreen() {
   const { colors } = useAppTheme();
@@ -584,11 +724,90 @@ export default function AIPlanResultScreen() {
   const user = useAuthStore((s) => s.user);
   const { currentPlan, onboardingData, setCurrentPlan, setGenerating, setError, updateWeekStart } =
     useAIPlanStore();
+  const markCurrentPlanApplied = useAIPlanStore((s) => s.markCurrentPlanApplied);
 
   const [activeTab, setActiveTab] = useState<'workout' | 'diet'>('workout');
   const [regenerating, setLocalRegenerating] = useState(false);
+  const [applySheetVisible, setApplySheetVisible] = useState(false);
+  const [applyingPlan, setApplyingPlan] = useState(false);
   const [regenSheetVisible, setRegenSheetVisible] = useState(false);
   const [startDateSheetVisible, setStartDateSheetVisible] = useState(false);
+  const [selectedSections, setSelectedSections] = useState<Record<PlanApplySection, boolean>>({
+    workout: true,
+    diet: true,
+    goals: true,
+  });
+
+  const openApplySheet = () => {
+    if (regenerating || !currentPlan) return;
+    setApplySheetVisible(true);
+  };
+
+  const toggleApplySection = (section: PlanApplySection) => {
+    setSelectedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const handleApplyConfirm = async () => {
+    if (!currentPlan) return;
+
+    const appliedSections = (Object.entries(selectedSections) as Array<[PlanApplySection, boolean]>)
+      .filter(([, enabled]) => enabled)
+      .map(([section]) => section);
+
+    if (appliedSections.length === 0) {
+      Alert.alert('적용 항목 선택', '적어도 한 가지 항목은 선택해주세요.');
+      return;
+    }
+
+    setApplyingPlan(true);
+    try {
+      const nextAppliedPlan: AIPlan = {
+        ...currentPlan,
+        isApplied: true,
+        appliedAt: new Date().toISOString(),
+        appliedSections,
+      };
+
+      if (user?.id && selectedSections.goals) {
+        const existingGoal = await getLatestUserGoal(user.id);
+        await saveUserGoal(
+          user.id,
+          {
+            goal_type: mapAIGoalToUserGoal(onboardingData?.goal),
+            calories_target: currentPlan.targetCalories,
+            protein_target_g: currentPlan.targetMacros.protein,
+            carbs_target_g: currentPlan.targetMacros.carbs,
+            fat_target_g: currentPlan.targetMacros.fat,
+          },
+          existingGoal?.id
+        );
+      }
+
+      await updateAIPlanSnapshotInSupabase(nextAppliedPlan);
+      markCurrentPlanApplied(appliedSections);
+      setApplySheetVisible(false);
+      const appliedLabel = appliedSections.map(formatAppliedSectionLabel).join(', ');
+      Alert.alert(
+        '플랜 적용 완료',
+        `${appliedLabel}이(가) 지금부터 내 계획에 반영됩니다.`,
+        [
+          {
+            text: '확인',
+            onPress: () =>
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Main' }],
+              }),
+          },
+        ]
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '플랜 적용에 실패했습니다.';
+      Alert.alert('오류', message);
+    } finally {
+      setApplyingPlan(false);
+    }
+  };
 
   const handleRegenerate = async () => {
     if (!onboardingData) return;
@@ -617,16 +836,21 @@ export default function AIPlanResultScreen() {
   };
 
   const handleStartDateConfirm = (newStartDate: string) => {
-    updateWeekStart(newStartDate);
-    setStartDateSheetVisible(false);
-    // Supabase 비동기 업데이트 (결과 무시)
-    if (user?.id && currentPlan) {
-      supabase
-        .from('ai_plans')
-        .update({ week_start: newStartDate })
-        .eq('id', currentPlan.id)
-        .then(() => {});
-    }
+    if (!currentPlan) return;
+
+    const updatedPlan: AIPlan = {
+      ...currentPlan,
+      weekStart: newStartDate,
+    };
+    updateAIPlanSnapshotInSupabase(updatedPlan)
+      .then(() => {
+        updateWeekStart(newStartDate);
+        setStartDateSheetVisible(false);
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : '플랜 시작일 변경에 실패했습니다.';
+        Alert.alert('오류', message);
+      });
   };
 
   if (!currentPlan) {
@@ -656,6 +880,10 @@ export default function AIPlanResultScreen() {
     const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
     return `Day1 ${fmt(start)} ~ Day7 ${fmt(end)}`;
   })();
+  const isAppliedPlan = Boolean(currentPlan.isApplied);
+  const appliedSectionsLabel = currentPlan.isApplied
+    ? ((currentPlan.appliedSections ?? ['workout', 'diet', 'goals']) as PlanApplySection[]).map(formatAppliedSectionLabel).join(', ')
+    : null;
 
   return (
     <AIFlowScreen
@@ -666,18 +894,15 @@ export default function AIPlanResultScreen() {
               <Text style={[s.backText, { color: colors.accent }]}>← 닫기</Text>
             </TouchableOpacity>
             <View style={s.headerCenter}>
-              <Text style={[s.headerTitle, { color: colors.text }]}>이번 주 AI 플랜</Text>
-              <TouchableOpacity onPress={() => setStartDateSheetVisible(true)} activeOpacity={0.7}>
-                <Text style={[s.headerSub, { color: colors.accent }]}>{weekLabel} ✎</Text>
-              </TouchableOpacity>
+              <Text style={[s.headerTitle, { color: colors.text }]}>내 AI 플랜</Text>
             </View>
             <TouchableOpacity
-              onPress={() => setRegenSheetVisible(true)}
-              disabled={regenerating}
+              onPress={() => navigation.goBack()}
+              disabled={regenerating || applyingPlan}
               style={s.regenBtn}
             >
-              <Text style={[s.regenText, { color: regenerating ? colors.textTertiary : colors.accent }]}>
-                {regenerating ? '생성 중...' : '재생성'}
+              <Text style={[s.completeText, { color: regenerating || applyingPlan ? colors.textTertiary : colors.accent }]}>
+                완료
               </Text>
             </TouchableOpacity>
           </View>
@@ -698,13 +923,79 @@ export default function AIPlanResultScreen() {
         </>
       }
       contentContainerStyle={s.content}
+      footer={
+        <View style={s.footerActions}>
+          <TouchableOpacity
+            style={[s.footerSecondaryBtn, { borderColor: colors.border }, (regenerating || applyingPlan) && { opacity: 0.5 }]}
+            onPress={() => setStartDateSheetVisible(true)}
+            disabled={regenerating || applyingPlan}
+            activeOpacity={0.8}
+          >
+            <Text style={[s.footerSecondaryText, { color: colors.textSecondary }]}>플랜 시작일 변경</Text>
+          </TouchableOpacity>
+
+          {!isAppliedPlan ? (
+            <>
+              <TouchableOpacity
+                style={[s.footerPrimaryBtn, { backgroundColor: regenerating ? colors.border : colors.accent }]}
+                onPress={openApplySheet}
+                disabled={regenerating || applyingPlan}
+                activeOpacity={0.85}
+              >
+                <Text style={s.footerPrimaryText}>
+                  {applyingPlan ? '적용 중...' : regenerating ? '생성 중...' : '이 플랜 적용하기'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[s.footerSecondaryBtn, { borderColor: colors.border }, (regenerating || applyingPlan) && { opacity: 0.5 }]}
+                onPress={() => setRegenSheetVisible(true)}
+                disabled={regenerating || applyingPlan}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.footerSecondaryText, { color: colors.textSecondary }]}>다른 플랜 받아보기</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity
+              style={[s.footerPrimaryBtn, { backgroundColor: regenerating ? colors.border : colors.accent }]}
+              onPress={() => setRegenSheetVisible(true)}
+              disabled={regenerating || applyingPlan}
+              activeOpacity={0.85}
+            >
+              <Text style={s.footerPrimaryText}>
+                {regenerating ? '생성 중...' : '플랜 재설정'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      }
     >
+
+      <View style={[s.planMetaCard, { backgroundColor: colors.card }]}>
+        <Text style={[s.planMetaTitle, { color: colors.text }]}>플랜 주기</Text>
+        <Text style={[s.planMetaBody, { color: colors.textSecondary }]}>{weekLabel}</Text>
+        <Text style={[s.planMetaHint, { color: colors.textTertiary }]}>
+          선택한 시작일을 기준으로 Day 1부터 Day 7까지 반복됩니다.
+        </Text>
+      </View>
 
       <StartDateSheet
         visible={startDateSheetVisible}
         currentStartDate={currentPlan.weekStart}
         onConfirm={handleStartDateConfirm}
         onClose={() => setStartDateSheetVisible(false)}
+        colors={colors}
+      />
+
+      <ApplyConfirmSheet
+        visible={applySheetVisible}
+        isReapply={isAppliedPlan}
+        selectedSections={selectedSections}
+        onToggleSection={toggleApplySection}
+        onConfirm={handleApplyConfirm}
+        onClose={() => setApplySheetVisible(false)}
+        applying={applyingPlan}
         colors={colors}
       />
 
@@ -729,7 +1020,7 @@ export default function AIPlanResultScreen() {
         </>
       ) : (
         <DietTab plan={currentPlan} colors={colors} />
-      )}
+        )}
 
       <View style={{ height: 12 }} />
     </AIFlowScreen>
@@ -750,7 +1041,7 @@ const s = StyleSheet.create({
   headerTitle: { fontSize: 16, fontWeight: '600' },
   headerSub: { fontSize: 12, marginTop: 1, textAlign: 'center' },
   regenBtn: { minWidth: 56, alignItems: 'flex-end' },
-  regenText: { fontSize: 14 },
+  completeText: { fontSize: 14, fontWeight: '600' },
   tabBar: {
     flexDirection: 'row',
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -760,6 +1051,48 @@ const s = StyleSheet.create({
   tabText: { fontSize: 14, fontWeight: '500' },
   tabTextCompact: { fontSize: 13, textAlign: 'center' },
   content: { padding: 16, paddingBottom: 24 },
+  footerActions: {
+    gap: 10,
+  },
+  planMetaCard: {
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+  },
+  planMetaTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  planMetaBody: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  planMetaHint: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
+  },
+  footerPrimaryBtn: {
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  footerPrimaryText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  footerSecondaryBtn: {
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  footerSecondaryText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontSize: 16 },
 });
@@ -827,5 +1160,59 @@ const sheetStyles = StyleSheet.create({
   secondaryAction: {
     alignItems: 'center',
     paddingVertical: 8,
+  },
+  sectionRow: {
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 6,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    flex: 1,
+  },
+  sectionDescription: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  sectionCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionCheckText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  applyBox: {
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  applyBoxText: {
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  applyPrimaryButton: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  applyPrimaryButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

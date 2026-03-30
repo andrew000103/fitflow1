@@ -84,6 +84,11 @@ export interface AIPlan {
   };
   safetyFlags: string[];
   generatedAt: string;
+  isApplied?: boolean;
+  appliedAt?: string | null;
+  appliedSections?: string[];
+  lastAutoAdjustedCycle?: number;
+  lastAutoAdjustedAt?: string | null;
 }
 
 type LegacyDayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
@@ -127,9 +132,17 @@ function normalizeWorkoutDay(day: LegacyWorkoutDay, index: number): WorkoutDay {
 function normalizeAIPlan(plan: AIPlan | LegacyAIPlan | null): AIPlan | null {
   if (!plan) return null;
 
+  const isApplied = plan.isApplied ?? false;
+  const appliedAt = isApplied ? plan.appliedAt ?? null : null;
+
   return {
     ...plan,
     weeklyWorkout: (plan.weeklyWorkout ?? []).map(normalizeWorkoutDay),
+    isApplied,
+    appliedAt,
+    appliedSections: isApplied ? plan.appliedSections : undefined,
+    lastAutoAdjustedCycle: plan.lastAutoAdjustedCycle ?? undefined,
+    lastAutoAdjustedAt: plan.lastAutoAdjustedAt ?? null,
   };
 }
 
@@ -148,6 +161,7 @@ interface AIPlanState {
   setOnboardingData: (data: OnboardingData) => void;
   setCurrentPlan: (plan: AIPlan) => void;
   updateWeekStart: (weekStart: string) => void;
+  markCurrentPlanApplied: (appliedSections?: string[]) => void;
   setGenerating: (v: boolean) => void;
   setError: (msg: string | null) => void;
   setNeedsOnboarding: (v: boolean) => void;
@@ -156,6 +170,7 @@ interface AIPlanState {
   clearPlan: () => void;
   reset: () => void;
   applyRuleBasedAdjustment: (userId: string) => Promise<void>;
+  syncRecurringPlanForToday: (userId: string, today?: Date) => Promise<void>;
 }
 
 export const useAIPlanStore = create<AIPlanState>()(
@@ -192,6 +207,18 @@ export const useAIPlanStore = create<AIPlanState>()(
             : null,
         })),
 
+      markCurrentPlanApplied: (appliedSections) =>
+        set((state) => ({
+          currentPlan: state.currentPlan
+            ? {
+                ...state.currentPlan,
+                isApplied: true,
+                appliedAt: new Date().toISOString(),
+                appliedSections: appliedSections ?? state.currentPlan.appliedSections,
+              }
+            : null,
+        })),
+
       setGenerating: (v) => set({ isGenerating: v }),
 
       setError: (msg) => set({ error: msg, isGenerating: false }),
@@ -223,7 +250,11 @@ export const useAIPlanStore = create<AIPlanState>()(
         set({ isAdjusting: true });
         try {
           // dynamic import로 순환 의존성 방지 (ai-planner ↔ ai-plan-store)
-          const { fetchRecentWorkoutPerformance, computeAdjustedWeight } = await import('../lib/ai-planner');
+          const {
+            fetchRecentWorkoutPerformance,
+            computeAdjustedWeight,
+            updateAIPlanSnapshotInSupabase,
+          } = await import('../lib/ai-planner');
 
           const planExercises = currentPlan.weeklyWorkout
             .flatMap((d) => d.exercises)
@@ -261,6 +292,91 @@ export const useAIPlanStore = create<AIPlanState>()(
             currentPlan: updatedPlan,
             isAdjusting: false,
           }));
+          await updateAIPlanSnapshotInSupabase(updatedPlan).catch(() => {});
+        } catch {
+          set({ isAdjusting: false });
+        }
+      },
+
+      syncRecurringPlanForToday: async (userId: string, today = new Date()) => {
+        const currentPlan = normalizeAIPlan(get().currentPlan);
+        if (!currentPlan?.isApplied) return;
+
+        const workoutApplied = (currentPlan.appliedSections ?? ['workout', 'diet', 'goals']).includes('workout');
+        if (!workoutApplied) return;
+
+        const { getCycleDateRange, getPlanCycleInfo } = await import('../lib/ai-plan-schedule');
+        const cycleInfo = getPlanCycleInfo(currentPlan, today);
+        if (!cycleInfo.started || cycleInfo.cycle <= 0) return;
+
+        const lastAdjustedCycle = currentPlan.lastAutoAdjustedCycle ?? null;
+        if (lastAdjustedCycle !== null && lastAdjustedCycle >= cycleInfo.cycle) return;
+
+        set({ isAdjusting: true });
+        try {
+          const {
+            adjustRepsRange,
+            computeAdjustedWeight,
+            fetchRecentWorkoutPerformance,
+            updateAIPlanSnapshotInSupabase,
+          } = await import('../lib/ai-planner');
+
+          const planExercises = currentPlan.weeklyWorkout
+            .flatMap((d) => d.exercises)
+            .filter((e, i, arr) => arr.findIndex((x) => x.name === e.name) === i);
+
+          const previousCycleRange = getCycleDateRange(currentPlan, cycleInfo.cycle - 1);
+          if (!previousCycleRange) {
+            set({ isAdjusting: false });
+            return;
+          }
+
+          const records = await fetchRecentWorkoutPerformance(userId, planExercises, {
+            start: previousCycleRange.start.toISOString(),
+            end: previousCycleRange.end.toISOString(),
+          });
+          if (records.length === 0) {
+            const syncedPlan: AIPlan = {
+              ...currentPlan,
+              lastAutoAdjustedCycle: cycleInfo.cycle,
+              lastAutoAdjustedAt: new Date().toISOString(),
+            };
+            set({
+              currentPlan: syncedPlan,
+              isAdjusting: false,
+            });
+            await updateAIPlanSnapshotInSupabase(syncedPlan).catch(() => {});
+            return;
+          }
+
+          const perfMap = new Map(records.map((r) => [r.exerciseName, r]));
+
+          const updatedPlan: AIPlan = {
+            ...currentPlan,
+            weeklyWorkout: currentPlan.weeklyWorkout.map((day) => ({
+              ...day,
+              exercises: day.exercises.map((ex) => {
+                const perf = perfMap.get(ex.name);
+                if (!perf) return ex;
+
+                if (ex.weight_kg != null) {
+                  const newWeight = computeAdjustedWeight(ex.name, ex.weight_kg, perf.completionRate);
+                  return newWeight === ex.weight_kg ? ex : { ...ex, weight_kg: newWeight };
+                }
+
+                const nextRepsRange = adjustRepsRange(ex.repsRange, perf.completionRate);
+                return nextRepsRange === ex.repsRange ? ex : { ...ex, repsRange: nextRepsRange };
+              }),
+            })),
+            lastAutoAdjustedCycle: cycleInfo.cycle,
+            lastAutoAdjustedAt: new Date().toISOString(),
+          };
+
+          set({
+            currentPlan: updatedPlan,
+            isAdjusting: false,
+          });
+          await updateAIPlanSnapshotInSupabase(updatedPlan).catch(() => {});
         } catch {
           set({ isAdjusting: false });
         }
@@ -269,7 +385,7 @@ export const useAIPlanStore = create<AIPlanState>()(
     {
       name: 'ai-plan-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      version: 3,
       migrate: (persistedState) => {
         const state = persistedState as Partial<AIPlanState> | undefined;
         if (!state) return persistedState as AIPlanState;

@@ -89,17 +89,24 @@ function parseRepsRangeMid(repsRange: string): number {
 export async function fetchRecentWorkoutPerformance(
   userId: string,
   planExercises: { name: string; sets: number; repsRange: string; weight_kg?: number | null }[],
-  days = 14
+  daysOrRange: number | { start: string; end: string } = 14
 ): Promise<ExercisePerformanceRecord[]> {
   try {
-    const since = new Date(Date.now() - days * 86400000).toISOString();
+    const range =
+      typeof daysOrRange === 'number'
+        ? {
+            start: new Date(Date.now() - daysOrRange * 86400000).toISOString(),
+            end: new Date().toISOString(),
+          }
+        : daysOrRange;
 
     // Step 1: 해당 유저의 세션 ID 목록
     const { data: sessions } = await supabase
       .from('workout_sessions')
       .select('id')
       .eq('user_id', userId)
-      .gte('started_at', since);
+      .gte('started_at', range.start)
+      .lte('started_at', range.end);
 
     if (!sessions || sessions.length === 0) return [];
 
@@ -189,6 +196,35 @@ export function computeAdjustedWeight(
     return Math.max(0, Math.round((currentWeightKg - increment) * 10) / 10);
   }
   return currentWeightKg; // 60~89% → 현상 유지
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+export function adjustRepsRange(
+  currentRepsRange: string,
+  completionRate: number
+): string {
+  const match = currentRepsRange.match(/^(\d+)(?:[~\-](\d+))?$/);
+  if (!match) return currentRepsRange;
+
+  const lower = parseInt(match[1], 10);
+  const upper = match[2] ? parseInt(match[2], 10) : lower;
+
+  if (completionRate >= 0.9) {
+    const nextLower = clamp(lower + 1, 3, 20);
+    const nextUpper = clamp(upper + 1, nextLower, 20);
+    return nextLower === nextUpper ? `${nextLower}` : `${nextLower}-${nextUpper}`;
+  }
+
+  if (completionRate < 0.6) {
+    const nextLower = clamp(lower - 1, 3, 20);
+    const nextUpper = clamp(upper - 1, nextLower, 20);
+    return nextLower === nextUpper ? `${nextLower}` : `${nextLower}-${nextUpper}`;
+  }
+
+  return currentRepsRange;
 }
 
 export async function buildWorkoutHistorySection(
@@ -708,6 +744,20 @@ export async function saveAIPlanToSupabase(
     is_active: true,
     generation_context: context,
   });
+}
+
+export async function updateAIPlanSnapshotInSupabase(plan: AIPlan): Promise<void> {
+  await supabase
+    .from('ai_plans')
+    .update({
+      week_start: plan.weekStart,
+      target_calories: plan.targetCalories,
+      target_protein: plan.targetMacros.protein,
+      target_carbs: plan.targetMacros.carbs,
+      target_fat: plan.targetMacros.fat,
+      plan_json: plan,
+    })
+    .eq('id', plan.id);
 }
 
 // ─── 동의 저장 ─────────────────────────────────────────────────────────────────
