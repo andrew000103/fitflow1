@@ -22,6 +22,165 @@ interface FoodSearchCacheEntry {
 
 type FoodSearchCache = Record<string, FoodSearchCacheEntry>;
 
+const PROCESSED_FOOD_KEYWORDS = [
+  '샐러드',
+  '소시지',
+  '볶음밥',
+  '도시락',
+  '만두',
+  '스낵',
+  '칩',
+  '바',
+  '프로틴',
+  '쉐이크',
+  '음료',
+  '주스',
+  '시리얼',
+  '과자',
+  '볼',
+  '큐브',
+  '너겟',
+  '패티',
+  '햄',
+  '훈제',
+  '슬라이스',
+  '양념',
+  '맛',
+  '소스',
+  '토핑',
+  '랩',
+  '브리또',
+  '피자',
+  '버거',
+  '샌드위치',
+  '김밥',
+];
+
+const RAW_FOOD_PRIORITY_QUERIES = [
+  '닭가슴살',
+  '고구마',
+  '현미밥',
+  '계란',
+  '달걀',
+  '바나나',
+  '두부',
+  '오트밀',
+  '감자',
+  '쌀',
+];
+
+function normalizeSearchText(value: string | null | undefined) {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/[\s_()[\]{}\-./]/g, '');
+}
+
+function tokenizeSearchText(value: string | null | undefined) {
+  return (value ?? '')
+    .toLowerCase()
+    .split(/[\s_()[\]{}\-./]+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+function hasWordBoundaryPrefixMatch(value: string | null | undefined, query: string) {
+  if (!value || !query) return false;
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return false;
+  return tokenizeSearchText(value).some(
+    (token) => normalizeSearchText(token).startsWith(normalizedQuery),
+  );
+}
+
+function isRawFoodPriorityQuery(normalizedQuery: string) {
+  return RAW_FOOD_PRIORITY_QUERIES.some(
+    (keyword) => normalizeSearchText(keyword) === normalizedQuery,
+  );
+}
+
+function getProcessedFoodPenalty(item: FoodItem, normalizedQuery: string) {
+  const normalizedName = normalizeSearchText(item.name);
+  const normalizedBrand = normalizeSearchText(item.brand);
+
+  let penalty = 0;
+  for (const keyword of PROCESSED_FOOD_KEYWORDS) {
+    const normalizedKeyword = normalizeSearchText(keyword);
+    if (!normalizedKeyword) continue;
+    if (normalizedName.includes(normalizedKeyword)) {
+      penalty += normalizedQuery === normalizedKeyword ? 0 : 18;
+    }
+    if (normalizedBrand.includes(normalizedKeyword)) {
+      penalty += 4;
+    }
+  }
+  return penalty;
+}
+
+function scoreFieldMatch(value: string | null | undefined, normalizedQuery: string, weight: number) {
+  const normalized = normalizeSearchText(value);
+  if (!normalized) return 0;
+  if (normalized === normalizedQuery) return weight + 120;
+  if (hasWordBoundaryPrefixMatch(value, normalizedQuery)) return weight + 75;
+  if (normalized.startsWith(normalizedQuery)) return weight + 60;
+  if (normalized.includes(normalizedQuery)) return weight + 30;
+  return 0;
+}
+
+function getLengthClosenessBonus(text: string, query: string) {
+  if (!text || !query) return 0;
+  const diff = Math.abs(text.length - query.length);
+  return Math.max(0, 18 - diff * 2);
+}
+
+function scoreFoodItem(item: FoodItem, normalizedQuery: string) {
+  const normalizedName = normalizeSearchText(item.name);
+  const normalizedBrand = normalizeSearchText(item.brand);
+  let score = 0;
+
+  score += scoreFieldMatch(item.name, normalizedQuery, 40);
+  score += scoreFieldMatch(item.brand, normalizedQuery, 4);
+  if (normalizedName === normalizedQuery) score += 40;
+  score += getLengthClosenessBonus(normalizedName, normalizedQuery);
+
+  if (!item.brand?.trim()) {
+    if (normalizedName === normalizedQuery) score += 18;
+    else if (normalizedName.startsWith(normalizedQuery)) score += 8;
+  }
+
+  if (isRawFoodPriorityQuery(normalizedQuery)) {
+    if (normalizedName === normalizedQuery) score += 22;
+    if (normalizedName.startsWith(normalizedQuery)) score += 8;
+    score -= getProcessedFoodPenalty(item, normalizedQuery);
+  } else {
+    score -= getProcessedFoodPenalty(item, normalizedQuery);
+  }
+
+  if (normalizedBrand === normalizedQuery) score -= 12;
+
+  if (item.source === 'custom') score += 6;
+  else if (item.source === 'mfds') score += 4;
+  else if (item.source === 'usda') score += 2;
+  else if (item.source === 'openfoodfacts') score += 1;
+
+  return score;
+}
+
+function rerankFoods(items: FoodItem[], query: string) {
+  const normalizedQuery = normalizeSearchText(query);
+  return [...items].sort((a, b) => {
+    const scoreDiff = scoreFoodItem(b, normalizedQuery) - scoreFoodItem(a, normalizedQuery);
+    if (scoreDiff !== 0) return scoreDiff;
+
+    const lengthDiff = normalizeSearchText(a.name).length - normalizeSearchText(b.name).length;
+    if (lengthDiff !== 0) return lengthDiff;
+
+    const brandlessDiff = Number(Boolean(a.brand?.trim())) - Number(Boolean(b.brand?.trim()));
+    if (brandlessDiff !== 0) return brandlessDiff;
+
+    return a.name.localeCompare(b.name, 'ko');
+  });
+}
+
 function dedupeFoods(items: FoodItem[]) {
   const map = new Map<string, FoodItem>();
 
@@ -125,7 +284,7 @@ export async function searchFoods(query: string, page = 1, userId?: string): Pro
   }
 
   if (dbItems.length > 0) {
-    const deduped = dedupeFoods(dbItems);
+    const deduped = rerankFoods(dedupeFoods(dbItems), query);
     await setCachedFoods(query, page, deduped, userId);
     await saveRecentSearch(query, userId);
     return deduped;
@@ -146,7 +305,7 @@ export async function searchFoods(query: string, page = 1, userId?: string): Pro
     .flatMap((result) => result.value);
 
   if (fulfilled.length > 0) {
-    const deduped = dedupeFoods(fulfilled);
+    const deduped = rerankFoods(dedupeFoods(fulfilled), query);
     await setCachedFoods(query, page, deduped, userId);
     await saveRecentSearch(query, userId);
     return deduped;

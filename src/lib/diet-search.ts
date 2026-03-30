@@ -171,6 +171,18 @@ const PROCESSED_FOOD_KEYWORDS = [
 ];
 
 const RAW_FOOD_PREFIXES = ['생', '국내산', '무가공', '자연산', '신선한', '유기농'];
+const RAW_FOOD_PRIORITY_QUERIES = [
+  '닭가슴살',
+  '고구마',
+  '현미밥',
+  '계란',
+  '달걀',
+  '바나나',
+  '두부',
+  '오트밀',
+  '감자',
+  '쌀',
+];
 
 function tokenizeSearchText(value: string | null | undefined) {
   return (value ?? '')
@@ -184,12 +196,14 @@ function getPrimaryDisplayName(row: FoodRow) {
   return row.name_ko ?? row.product_name ?? '';
 }
 
-function startsWithWordBoundary(text: string, query: string) {
-  if (!text || !query) return false;
-  if (text.startsWith(query)) return true;
+function hasWordBoundaryPrefixMatch(value: string | null | undefined, query: string) {
+  if (!value || !query) return false;
 
-  const tokens = tokenizeSearchText(text);
-  return tokens.some((token) => token.startsWith(query));
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return false;
+
+  const tokens = tokenizeSearchText(value);
+  return tokens.some((token) => normalizeSearchText(token).startsWith(normalizedQuery));
 }
 
 function getLengthClosenessBonus(text: string, query: string) {
@@ -218,6 +232,39 @@ function getProcessedFoodPenalty(row: FoodRow, normalizedQuery: string) {
   return penalty;
 }
 
+function isRawFoodPriorityQuery(normalizedQuery: string) {
+  return RAW_FOOD_PRIORITY_QUERIES.some(
+    (keyword) => normalizeSearchText(keyword) === normalizedQuery,
+  );
+}
+
+function getBrandlessBaseFoodBonus(row: FoodRow, normalizedQuery: string) {
+  const primaryName = getPrimaryDisplayName(row);
+  const normalizedName = normalizeSearchText(primaryName);
+  const hasBrand = Boolean(row.brand?.trim());
+
+  if (hasBrand || !normalizedName) return 0;
+  if (normalizedName === normalizedQuery) return 18;
+  if (normalizedName.startsWith(normalizedQuery)) return 8;
+  return 0;
+}
+
+function getRawFoodPriorityAdjustments(row: FoodRow, normalizedQuery: string) {
+  if (!isRawFoodPriorityQuery(normalizedQuery)) return 0;
+
+  let bonus = 0;
+  bonus += getBrandlessBaseFoodBonus(row, normalizedQuery);
+
+  const primaryName = getPrimaryDisplayName(row);
+  const normalizedName = normalizeSearchText(primaryName);
+
+  if (normalizedName === normalizedQuery) bonus += 22;
+  if (normalizedName.startsWith(normalizedQuery)) bonus += 8;
+  bonus -= getProcessedFoodPenalty(row, normalizedQuery);
+
+  return bonus;
+}
+
 function getRawFoodBonus(row: FoodRow, normalizedQuery: string) {
   const primaryName = getPrimaryDisplayName(row);
   const normalizedName = normalizeSearchText(primaryName);
@@ -240,7 +287,7 @@ function scoreFieldMatch(value: string | null | undefined, normalizedQuery: stri
   if (!normalized) return 0;
 
   if (normalized === normalizedQuery) return weight + 120;
-  if (startsWithWordBoundary(normalized, normalizedQuery)) return weight + 75;
+  if (hasWordBoundaryPrefixMatch(value, normalizedQuery)) return weight + 75;
   if (normalized.startsWith(normalizedQuery)) return weight + 60;
   if (normalized.includes(normalizedQuery)) return weight + 30;
 
@@ -268,6 +315,8 @@ function scoreFoodRow(row: FoodRow, normalizedQuery: string) {
   }
 
   score -= getProcessedFoodPenalty(row, normalizedQuery);
+  score += getBrandlessBaseFoodBonus(row, normalizedQuery);
+  score += getRawFoodPriorityAdjustments(row, normalizedQuery);
 
   if (row.source === 'user') score += 6;
   else if (row.source === 'mfds') score += 4;
@@ -320,6 +369,9 @@ async function searchDb(query: string): Promise<FoodRow[]> {
       const bName = normalizeSearchText(getPrimaryDisplayName(b));
       const lengthDiff = aName.length - bName.length;
       if (lengthDiff !== 0) return lengthDiff;
+
+      const brandlessDiff = Number(Boolean(a.brand?.trim())) - Number(Boolean(b.brand?.trim()));
+      if (brandlessDiff !== 0) return brandlessDiff;
 
       return a.product_name.localeCompare(b.product_name, 'ko');
     });
