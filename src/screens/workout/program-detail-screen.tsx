@@ -18,6 +18,7 @@ import { isNsunsProgram } from '../../lib/nsuns';
 import { useProgramStore } from '../../stores/program-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { useWorkoutStore } from '../../stores/workout-store';
+import ExerciseVisualGuide from '../../components/workout/ExerciseVisualGuide';
 import { useAppTheme } from '../../theme';
 import { WorkoutStackParamList } from '../../types/navigation';
 import { Program, ProgramDayWithExercises, ProgramReview } from '../../types/program';
@@ -540,9 +541,34 @@ export default function ProgramDetailScreen({ navigation, route }: Props) {
               day.program_exercises.map((pe) => (
                 <View key={pe.id} style={[styles.exRow, { borderTopColor: colors.border }]}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.sm, fontWeight: typography.weight.medium, color: colors.text }}>
-                      {pe.exercises?.name_ko ?? '알 수 없는 종목'}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text
+                        style={{
+                          flexShrink: 1,
+                          fontFamily: typography.fontFamily,
+                          fontSize: typography.size.sm,
+                          fontWeight: typography.weight.medium,
+                          color: colors.text,
+                        }}
+                      >
+                        {pe.exercises?.name_ko ?? '알 수 없는 종목'}
+                      </Text>
+                      <View style={{ marginLeft: 8 }}>
+                        <ExerciseVisualGuide
+                          exerciseId={pe.exercises?.id}
+                          visualGuideUrl={pe.exercises?.visual_guide_url}
+                          description={pe.exercises?.description_ko ?? pe.exercises?.description_en}
+                          exerciseName={pe.exercises?.name_ko ?? undefined}
+                          overview={pe.exercises?.overview_ko ?? pe.exercises?.overview_en}
+                          why={pe.exercises?.why_ko ?? pe.exercises?.why_en}
+                          how={pe.exercises?.how_ko ?? pe.exercises?.how_en}
+                          triggerVariant="icon"
+                          iconColor={colors.textSecondary}
+                          iconBackgroundColor={colors.background}
+                          iconBorderColor={colors.border}
+                        />
+                      </View>
+                    </View>
                     {pe.exercises?.category ? (
                       <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.xs, color: colors.textTertiary, marginTop: 1 }}>
                         {pe.exercises.category}

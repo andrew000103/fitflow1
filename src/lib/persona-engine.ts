@@ -1,27 +1,24 @@
-import type { GoalType, ProfileGender } from '../types/profile';
+import type { GoalType } from '../types/profile';
 
-export type PersonaStage = 'starter' | 'learning' | 'established';
 export type PersonaDailyState = 'ACTIVE' | 'RESTING' | 'HUNGRY' | 'FULL' | 'TIRED';
-export type PersonaGoal = 'gain' | 'maintain' | 'loss';
-export type PersonaFrequency = 'hardcore' | 'steady' | 'sporadic';
-export type PersonaDiet = 'protein' | 'balanced' | 'cheater';
-export type PersonaId =
-  | 'gorilla'
-  | 'bull'
-  | 'bear'
-  | 'fox'
-  | 'cheetah'
-  | 'hawk'
-  | 'deer'
-  | 'rabbit'
-  | 'wolf'
-  | 'retriever'
-  | 'otter'
-  | 'sloth';
+
+export type HamsterLevelId =
+  | 'beginner'
+  | 'novice'
+  | 'intermediate'
+  | 'upper_intermediate'
+  | 'advanced'
+  | 'veteran'
+  | 'artisan'
+  | 'master'
+  | 'grandmaster'
+  | 'challenger'
+  | 'ranker'
+  | 'god';
 
 export interface PersonaOnboardingInput {
   goal?: 'weight_loss' | 'muscle_gain' | 'lean_bulk' | 'strength_gain' | 'maintenance' | 'health' | null;
-  experience?: 'beginner' | 'intermediate' | 'advanced' | null;
+  experience?: 'beginner' | 'novice' | 'intermediate' | 'upper_intermediate' | 'advanced' | null;
   workoutDaysPerWeek?: number | null;
   dietaryRestrictions?: string[] | null;
   overeatingHabit?: 'rarely' | 'sometimes' | 'often' | null;
@@ -42,18 +39,15 @@ export interface PersonaMealDaySummary {
 }
 
 export interface PersonaWorkoutSummary {
+  totalCompletedSessions: number;
   sessionCount14d: number;
+  sessionCount28d: number;
+  sessionCount56d: number;
   activeDays14d: number;
+  activeDays28d: number;
+  activeDays56d: number;
   completedToday: boolean;
   latestCompletedAt: string | null;
-}
-
-export interface PersonaProfileSnapshot {
-  createdAt?: string | null;
-  age?: number | null;
-  heightCm?: number | null;
-  weightKg?: number | null;
-  gender?: ProfileGender | null;
 }
 
 export interface PersonaGoalSnapshot {
@@ -64,90 +58,219 @@ export interface PersonaGoalSnapshot {
   fatTargetG?: number | null;
 }
 
-export interface PersonaSourceWeights {
-  onboardingWeight: number;
-  behaviorWeight: number;
-}
-
-export interface PersonaSourceBreakdown {
-  overall: PersonaSourceWeights;
-  frequency: PersonaSourceWeights;
-  diet: PersonaSourceWeights;
-  goalSource: 'onboarding' | 'user_goal' | 'default';
-  workoutSessions14d: number;
-  dietDays7d: number;
-  aiOnboardingUsed: boolean;
-}
-
-export interface PersonaDataCompleteness {
-  hasProfile: boolean;
-  hasGoal: boolean;
-  hasOnboarding: boolean;
-  accountAgeDays: number | null;
-  workoutSessions14d: number;
-  workoutDays14d: number;
-  dietDays7d: number;
-  todayMealCount: number;
-  score: number;
-}
-
-export interface PersonaTargets {
-  caloriesTarget: number | null;
-  proteinTargetG: number | null;
-  carbsTargetG: number | null;
-  fatTargetG: number | null;
+export interface EvolutionChecklistItem {
+  id: string;
+  label: string;
+  current: number;
+  target: number;
+  complete: boolean;
 }
 
 export interface PersonaCalculationInput {
-  profile: PersonaProfileSnapshot | null;
   goal: PersonaGoalSnapshot | null;
   onboarding: PersonaOnboardingInput | null;
   workouts: PersonaWorkoutSummary;
-  meals7d: PersonaMealDaySummary[];
+  meals14d: PersonaMealDaySummary[];
+  meals28d: PersonaMealDaySummary[];
+  meals56d: PersonaMealDaySummary[];
   todayMeals: PersonaMealDaySummary | null;
-  now?: Date;
 }
 
 export interface PersonaCalculationResult {
-  personaId: PersonaId;
-  personaStage: PersonaStage;
-  confidence: number;
-  dailyState: PersonaDailyState;
+  levelId: HamsterLevelId;
+  levelName: string;
+  nextLevelId: HamsterLevelId | null;
+  nextLevelName: string | null;
+  progressToNext: number;
   headlineMessage: string;
-  nickname: string;
-  sourceBreakdown: PersonaSourceBreakdown;
-  dataCompleteness: PersonaDataCompleteness;
-  resolvedGoal: PersonaGoal;
-  resolvedFrequency: PersonaFrequency;
-  resolvedDiet: PersonaDiet;
-  targets: PersonaTargets;
+  progressMessage: string;
+  checklist: EvolutionChecklistItem[];
+  dailyState: PersonaDailyState;
 }
 
-interface RawScore {
-  score: number;
-  available: boolean;
+interface LevelRequirement {
+  metric: MetricId;
+  target: number;
+  label: string;
 }
 
-interface PersonaMeta {
-  id: PersonaId;
-  nickname: string;
+interface LevelMeta {
+  id: HamsterLevelId;
+  name: string;
+  vibe: string;
+  description: string;
+  requirements: LevelRequirement[];
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+type MetricId =
+  | 'total_workouts'
+  | 'workouts_14d'
+  | 'workouts_28d'
+  | 'workouts_56d'
+  | 'active_days_14d'
+  | 'active_days_28d'
+  | 'active_days_56d'
+  | 'diet_logs_14d'
+  | 'diet_logs_28d'
+  | 'protein_hits_14d'
+  | 'nutrition_hits_14d'
+  | 'nutrition_hits_28d';
 
-const PERSONA_META: Record<PersonaId, PersonaMeta> = {
-  gorilla: { id: 'gorilla', nickname: '정진하는 고릴라' },
-  bull: { id: 'bull', nickname: '돌진하는 황소' },
-  bear: { id: 'bear', nickname: '묵직한 불곰' },
-  fox: { id: 'fox', nickname: '영리한 여우' },
-  cheetah: { id: 'cheetah', nickname: '날카로운 치타' },
-  hawk: { id: 'hawk', nickname: '집중하는 매' },
-  deer: { id: 'deer', nickname: '우아한 사슴' },
-  rabbit: { id: 'rabbit', nickname: '가벼운 토끼' },
-  wolf: { id: 'wolf', nickname: '절제된 늑대' },
-  retriever: { id: 'retriever', nickname: '활기찬 리트리버' },
-  otter: { id: 'otter', nickname: '균형 잡힌 수달' },
-  sloth: { id: 'sloth', nickname: '여유로운 나무늘보' },
+interface ProgressMetrics {
+  total_workouts: number;
+  workouts_14d: number;
+  workouts_28d: number;
+  workouts_56d: number;
+  active_days_14d: number;
+  active_days_28d: number;
+  active_days_56d: number;
+  diet_logs_14d: number;
+  diet_logs_28d: number;
+  protein_hits_14d: number;
+  nutrition_hits_14d: number;
+  nutrition_hits_28d: number;
+}
+
+const LEVELS: LevelMeta[] = [
+  {
+    id: 'beginner',
+    name: '초심자',
+    vibe: '첫 루틴을 시작한 햄식이',
+    description: '오늘 처음으로 운동화 끈을 묶었습니다. 러닝머신 버튼이 어디 있는지도 모르고, 덤벨은 왜 이렇게 종류가 많은지도 모르겠어요. 근데 있잖아요, 모르면서도 여기까지 온 것 자체가 이미 대단한 거예요. 이 햄식이, 분명히 뭔가 됩니다.',
+    requirements: [],
+  },
+  {
+    id: 'novice',
+    name: '초급자',
+    vibe: '몸이 운동 리듬을 익히는 햄식이',
+    description: '헬스장 가는 길이 이제 조금 익숙해졌어요. 줄넘기가 가끔 발에 걸리고, 다음 날 계단이 무서워지는 날도 있지만, 그게 다 성장통이라는 걸 이 햄식이는 이미 알고 있어요. 포기 안 하는 것, 그게 제일 어려운 스킬인데 이미 장착 완료입니다.',
+    requirements: [{ metric: 'total_workouts', target: 3, label: '누적 운동' }],
+  },
+  {
+    id: 'intermediate',
+    name: '중급자',
+    vibe: '운동이 일상에 들어온 햄식이',
+    description: '슬슬 보입니다. 3개월 전 나랑 지금 나 사이의 차이가. 거울 속 햄식이가 달라졌고, 들고 있는 무게도 달라졌어요. 남들한테 보여주려고 시작했든, 건강 때문에 시작했든, 이제는 그냥 하고 싶어서 하게 됩니다. 이게 진짜 운동러의 시작이에요.',
+    requirements: [
+      { metric: 'total_workouts', target: 8, label: '누적 운동' },
+      { metric: 'active_days_14d', target: 4, label: '최근 14일 운동한 날' },
+    ],
+  },
+  {
+    id: 'upper_intermediate',
+    name: '중상급자',
+    vibe: '루틴이 꽤 안정된 햄식이',
+    description: '루틴이 생겼습니다. 어떤 날은 하기 싫어도 몸이 먼저 헬스장 방향으로 걸어가고 있어요. 기구 세팅도 척척, 세트 사이 쉬는 시간도 대충 맞아 들어가는 수준. 주변 햄식이들이 슬쩍 따라 하기 시작했지만, 이 햄식이는 이미 다음 동작으로 넘어간 뒤예요.',
+    requirements: [
+      { metric: 'total_workouts', target: 15, label: '누적 운동' },
+      { metric: 'active_days_14d', target: 6, label: '최근 14일 운동한 날' },
+      { metric: 'diet_logs_14d', target: 3, label: '최근 14일 식단 기록' },
+    ],
+  },
+  {
+    id: 'advanced',
+    name: '상급자',
+    vibe: '운동과 식단을 함께 챙기는 햄식이',
+    description: '운동이 숙제에서 언어가 된 햄식이입니다. 몸으로 대화하고, 무게로 표현하고, 루틴으로 하루를 설계해요. 쉬는 날도 스트레칭은 하고 있고, 밥 먹을 때도 단백질 계산이 자동으로 돌아가는 뇌 구조. 이쯤 되면 운동이 삶의 일부가 아니라, 삶 자체가 운동 중심으로 재편된 겁니다.',
+    requirements: [
+      { metric: 'total_workouts', target: 25, label: '누적 운동' },
+      { metric: 'active_days_28d', target: 10, label: '최근 28일 운동한 날' },
+      { metric: 'diet_logs_14d', target: 5, label: '최근 14일 식단 기록' },
+    ],
+  },
+  {
+    id: 'veteran',
+    name: '고인물',
+    vibe: '운동 냄새만 맡아도 몸이 반응하는 햄식이',
+    description: '몇 년째 같은 자리, 같은 시간, 같은 기구. 근데 이 햄식이의 몸은 매년 달라지고 있어요. 변화 없어 보이는 루틴 안에서 조금씩, 꾸준히, 묵묵히 쌓아온 것들이 있거든요. 헬스장 직원보다 이 공간을 더 잘 아는 존재. 전설은 갑자기 나타나는 게 아니라 이렇게 만들어집니다.',
+    requirements: [
+      { metric: 'total_workouts', target: 40, label: '누적 운동' },
+      { metric: 'active_days_28d', target: 12, label: '최근 28일 운동한 날' },
+      { metric: 'protein_hits_14d', target: 4, label: '최근 14일 단백질 목표 달성' },
+    ],
+  },
+  {
+    id: 'artisan',
+    name: '달인',
+    vibe: '꾸준함이 묵직해진 햄식이',
+    description: '더 이상 무게가 목표가 아니에요. 완성도가 목표입니다. 1kg 차이도 폼이 무너지면 의미 없다는 걸 몸으로 아는 경지예요. 기록보다 감각을 믿고, 숫자보다 질을 쫓는 햄식이. 옆에서 보면 조용한데, 자세히 보면 모든 동작이 정교하게 설계되어 있어요. 장인이란 게 바로 이런 거죠.',
+    requirements: [
+      { metric: 'total_workouts', target: 60, label: '누적 운동' },
+      { metric: 'active_days_28d', target: 14, label: '최근 28일 운동한 날' },
+      { metric: 'diet_logs_14d', target: 7, label: '최근 14일 식단 기록' },
+    ],
+  },
+  {
+    id: 'master',
+    name: '마스터',
+    vibe: '루틴을 통제하는 햄식이',
+    description: '헬스장에서 이 햄식이가 운동을 시작하면, 주변 소음이 줄어드는 것 같은 느낌이 납니다. 실제로는 아무것도 안 바뀌었는데, 분위기가 바뀌어요. 오랜 시간이 만들어낸 집중력과 무게감이 공간을 채우는 거예요. 말 한마디 없어도 존경받는 햄식이, 마스터는 그런 존재입니다.',
+    requirements: [
+      { metric: 'total_workouts', target: 85, label: '누적 운동' },
+      { metric: 'active_days_28d', target: 16, label: '최근 28일 운동한 날' },
+      { metric: 'protein_hits_14d', target: 6, label: '최근 14일 단백질 목표 달성' },
+    ],
+  },
+  {
+    id: 'grandmaster',
+    name: '그랜드마스터',
+    vibe: '기록이 쌓여 존재감이 생긴 햄식이',
+    description: '이미 증명할 게 없는 햄식이에요. 남한테 보여줄 필요도, 기록을 자랑할 필요도 없어요. 그냥 하면 됩니다. 오늘도 어제처럼, 내일도 오늘처럼. 그 반복이 쌓여서 이 경지까지 온 거니까요. 누가 쳐다봐도, 안 쳐다봐도 똑같은 루틴. 그게 그랜드마스터의 힘입니다.',
+    requirements: [
+      { metric: 'total_workouts', target: 115, label: '누적 운동' },
+      { metric: 'active_days_28d', target: 18, label: '최근 28일 운동한 날' },
+      { metric: 'nutrition_hits_14d', target: 8, label: '최근 14일 영양 목표 달성' },
+    ],
+  },
+  {
+    id: 'challenger',
+    name: '챌린저',
+    vibe: '상위권 진입을 노리는 햄식이',
+    description: '최정상이 어떤 곳인지 알면서도, 오늘의 세트에 집중하는 햄식이에요. 욕심보다 정확함을 택하고, 속도보다 방향을 믿는 단계입니다. 이미 충분히 강하지만 여전히 배우는 자세를 잃지 않았어요. 강한 척 안 해도 강한 게 느껴지는 것, 그게 챌린저의 진짜 무기예요.',
+    requirements: [
+      { metric: 'total_workouts', target: 150, label: '누적 운동' },
+      { metric: 'active_days_28d', target: 20, label: '최근 28일 운동한 날' },
+      { metric: 'diet_logs_28d', target: 14, label: '최근 28일 식단 기록' },
+    ],
+  },
+  {
+    id: 'ranker',
+    name: '랭커',
+    vibe: '누가 봐도 강해 보이는 햄식이',
+    description: '이 햄식이 앞에서는 괜히 자세를 고치게 됩니다. 특별히 뭘 하는 것도 아닌데, 그냥 존재 자체에서 "나 좀 해봤어"가 느껴지거든요. 오랜 시간이 만들어낸 아우라는 어떤 무게도, 어떤 기록도 대신할 수 없어요. 랭커는 태어나는 게 아니라 쌓여서 완성되는 겁니다.',
+    requirements: [
+      { metric: 'total_workouts', target: 190, label: '누적 운동' },
+      { metric: 'active_days_28d', target: 22, label: '최근 28일 운동한 날' },
+      { metric: 'nutrition_hits_28d', target: 12, label: '최근 28일 영양 목표 달성' },
+    ],
+  },
+  {
+    id: 'god',
+    name: '신',
+    vibe: '루틴의 끝에 도달한 햄식이',
+    description: '월계관, 날개, 지구 한 알. 이 햄식이한테 운동 몇 년 했냐고 물어보는 건 실례입니다. 시간을 초월한 존재니까요. 무게를 드는 게 아니라 중력이 이 햄식이한테 협조하는 거예요. 말이 필요 없고, 설명이 필요 없고, 그냥 빛납니다. 그게 다예요.',
+    requirements: [
+      { metric: 'total_workouts', target: 240, label: '누적 운동' },
+      { metric: 'workouts_56d', target: 40, label: '최근 56일 운동' },
+      { metric: 'active_days_56d', target: 28, label: '최근 56일 활동일' },
+      { metric: 'nutrition_hits_28d', target: 16, label: '최근 28일 영양 목표 달성' },
+    ],
+  },
+];
+
+export const HAMSTER_LEVEL_META = LEVELS.map((level) => ({
+  id: level.id,
+  name: level.name,
+  vibe: level.vibe,
+  description: level.description,
+}));
+
+const START_LEVEL_BY_EXPERIENCE: Record<NonNullable<PersonaOnboardingInput['experience']>, HamsterLevelId> = {
+  beginner: 'beginner',
+  novice: 'novice',
+  intermediate: 'intermediate',
+  upper_intermediate: 'upper_intermediate',
+  advanced: 'advanced',
 };
 
 function clamp(value: number, min = 0, max = 1) {
@@ -159,509 +282,215 @@ function round(value: number, digits = 2) {
   return Math.round(value * factor) / factor;
 }
 
-function average(values: number[]) {
-  if (values.length === 0) return 0;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+function countLoggedDays(days: PersonaMealDaySummary[]) {
+  return days.filter((day) => day.entryCount > 0).length;
 }
 
-function coalesceNumber(...values: Array<number | null | undefined>) {
-  for (const value of values) {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      return value;
-    }
-  }
-  return null;
+function countProteinHitDays(days: PersonaMealDaySummary[], proteinTarget?: number | null) {
+  if (!proteinTarget || proteinTarget <= 0) return 0;
+  return days.filter((day) => day.entryCount > 0 && day.protein_g >= proteinTarget * 0.9).length;
 }
 
-function sanitizeNumber(value: number | null | undefined, min: number, max: number) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return null;
-  }
-  if (value < min || value > max) {
-    return null;
-  }
-  return value;
+function countNutritionHitDays(
+  days: PersonaMealDaySummary[],
+  caloriesTarget?: number | null,
+  proteinTarget?: number | null,
+) {
+  return days.filter((day) => {
+    if (day.entryCount <= 0) return false;
+
+    const calorieHit = caloriesTarget && caloriesTarget > 0
+      ? day.calories >= caloriesTarget * 0.8 && day.calories <= caloriesTarget * 1.15
+      : false;
+    const proteinHit = proteinTarget && proteinTarget > 0 ? day.protein_g >= proteinTarget * 0.9 : false;
+    return calorieHit || proteinHit;
+  }).length;
 }
 
-function getAccountAgeDays(createdAt?: string | null, now = new Date()) {
-  if (!createdAt) return null;
-  const created = new Date(createdAt);
-  if (Number.isNaN(created.getTime())) return null;
-  return Math.max(0, Math.floor((now.getTime() - created.getTime()) / DAY_MS));
-}
-
-function getStageBlend(stage: PersonaStage): PersonaSourceWeights {
-  switch (stage) {
-    case 'starter':
-      return { onboardingWeight: 0.8, behaviorWeight: 0.2 };
-    case 'learning':
-      return { onboardingWeight: 0.5, behaviorWeight: 0.5 };
-    case 'established':
-      return { onboardingWeight: 0.2, behaviorWeight: 0.8 };
-  }
-}
-
-function scoreToFrequency(score: number): PersonaFrequency {
-  if (score >= 0.85) return 'hardcore';
-  if (score >= 0.45) return 'steady';
-  return 'sporadic';
-}
-
-function scoreToDiet(score: number): PersonaDiet {
-  if (score >= 0.9) return 'protein';
-  if (score >= 0.7) return 'balanced';
-  return 'cheater';
-}
-
-function blendScore(stage: PersonaStage, onboarding: RawScore, behavior: RawScore): number {
-  if (!behavior.available) return onboarding.score;
-  const weights = getStageBlend(stage);
-  return onboarding.score * weights.onboardingWeight + behavior.score * weights.behaviorWeight;
-}
-
-export function mapOnboardingGoalToPersonaGoal(
-  goal?: PersonaOnboardingInput['goal'],
-): PersonaGoal | null {
-  if (!goal) return null;
-  if (goal === 'weight_loss') return 'loss';
-  if (goal === 'muscle_gain' || goal === 'lean_bulk' || goal === 'strength_gain') return 'gain';
-  if (goal === 'maintenance' || goal === 'health') return 'maintain';
-  return null;
-}
-
-export function resolveGoalDimension(
-  goalType?: GoalType | null,
-  onboarding?: PersonaOnboardingInput | null,
-): { goal: PersonaGoal; source: PersonaSourceBreakdown['goalSource'] } {
-  if (goalType) {
-    return { goal: goalType, source: 'user_goal' };
-  }
-
-  const onboardingGoal = mapOnboardingGoalToPersonaGoal(onboarding?.goal);
-  if (onboardingGoal) {
-    return { goal: onboardingGoal, source: 'onboarding' };
-  }
-
-  return { goal: 'maintain', source: 'default' };
-}
-
-export function derivePersonaStage(input: {
-  accountCreatedAt?: string | null;
-  workoutSessions14d: number;
-  dietDays7d: number;
-  now?: Date;
-}): PersonaStage {
-  const accountAgeDays = getAccountAgeDays(input.accountCreatedAt, input.now);
-
-  if (input.workoutSessions14d >= 10 || input.dietDays7d >= 7) {
-    return 'established';
-  }
-
-  if (accountAgeDays !== null && accountAgeDays < 7) {
-    return 'starter';
-  }
-
-  if (input.workoutSessions14d >= 3 || input.dietDays7d >= 3) {
-    return 'learning';
-  }
-
-  return 'starter';
-}
-
-export function deriveTargets(
-  profile: PersonaProfileSnapshot | null,
-  goal: PersonaGoalSnapshot | null,
-  onboarding: PersonaOnboardingInput | null,
-): PersonaTargets {
-  const resolvedGoal = resolveGoalDimension(goal?.goalType, onboarding).goal;
-  const weightKg = sanitizeNumber(coalesceNumber(profile?.weightKg, onboarding?.weight), 25, 400);
-  const age = sanitizeNumber(coalesceNumber(profile?.age, onboarding?.age), 13, 100);
-  const heightCm = sanitizeNumber(coalesceNumber(profile?.heightCm, onboarding?.height), 120, 240);
-  const gender = profile?.gender ?? (onboarding?.gender === 'undisclosed' ? 'other' : onboarding?.gender ?? null);
-  const workoutDays = sanitizeNumber(onboarding?.workoutDaysPerWeek ?? null, 0, 14);
-
-  let estimatedCalories: number | null = null;
-  if (weightKg && age && heightCm) {
-    const bmr =
-      gender === 'female'
-        ? 10 * weightKg + 6.25 * heightCm - 5 * age - 161
-        : 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
-    const activityMultiplier = workoutDays && workoutDays >= 5 ? 1.55 : workoutDays && workoutDays >= 3 ? 1.375 : 1.2;
-    const tdee = bmr * activityMultiplier;
-    estimatedCalories =
-      resolvedGoal === 'loss'
-        ? Math.max(Math.round(tdee - 500), 1200)
-        : resolvedGoal === 'gain'
-          ? onboarding?.goal === 'lean_bulk' ? Math.round(tdee + 200) : Math.round(tdee + 300)
-          : Math.round(tdee);
-  }
-
-  let estimatedProtein: number | null = null;
-  if (weightKg) {
-    const multiplier = resolvedGoal === 'loss' ? 2 : resolvedGoal === 'gain' ? 1.8 : 1.6;
-    estimatedProtein = Math.round(weightKg * multiplier);
-  }
-
+function buildMetrics(input: PersonaCalculationInput): ProgressMetrics {
   return {
-    caloriesTarget: goal?.caloriesTarget ?? estimatedCalories,
-    proteinTargetG: goal?.proteinTargetG ?? estimatedProtein,
-    carbsTargetG: goal?.carbsTargetG ?? null,
-    fatTargetG: goal?.fatTargetG ?? null,
+    total_workouts: input.workouts.totalCompletedSessions,
+    workouts_14d: input.workouts.sessionCount14d,
+    workouts_28d: input.workouts.sessionCount28d,
+    workouts_56d: input.workouts.sessionCount56d,
+    active_days_14d: input.workouts.activeDays14d,
+    active_days_28d: input.workouts.activeDays28d,
+    active_days_56d: input.workouts.activeDays56d,
+    diet_logs_14d: countLoggedDays(input.meals14d),
+    diet_logs_28d: countLoggedDays(input.meals28d),
+    protein_hits_14d: countProteinHitDays(input.meals14d, input.goal?.proteinTargetG),
+    nutrition_hits_14d: countNutritionHitDays(
+      input.meals14d,
+      input.goal?.caloriesTarget,
+      input.goal?.proteinTargetG,
+    ),
+    nutrition_hits_28d: countNutritionHitDays(
+      input.meals28d,
+      input.goal?.caloriesTarget,
+      input.goal?.proteinTargetG,
+    ),
   };
 }
 
-export function scoreWorkoutFrequencyFromBehavior(sessionCount14d: number): RawScore {
-  if (sessionCount14d >= 10) return { score: 0.95, available: true };
-  if (sessionCount14d >= 7) return { score: 0.82, available: true };
-  if (sessionCount14d >= 4) return { score: 0.64, available: true };
-  if (sessionCount14d >= 1) return { score: 0.28, available: true };
-  return { score: 0, available: false };
+function getLevelIndex(levelId: HamsterLevelId) {
+  return LEVELS.findIndex((level) => level.id === levelId);
 }
 
-export function scoreWorkoutFrequencyFromOnboarding(onboarding?: PersonaOnboardingInput | null): RawScore {
-  if (!onboarding) return { score: 0.58, available: false };
-
-  const days = onboarding.workoutDaysPerWeek ?? 3;
-  if (days >= 5 || onboarding.experience === 'advanced') {
-    return { score: 0.92, available: true };
-  }
-  if (days >= 3) {
-    return { score: 0.67, available: true };
-  }
-  if (days >= 1) {
-    return { score: onboarding.experience === 'beginner' ? 0.48 : 0.54, available: true };
-  }
-  return { score: 0.48, available: true };
+function getStartLevelId(onboarding?: PersonaOnboardingInput | null): HamsterLevelId {
+  const experience = onboarding?.experience;
+  return experience ? START_LEVEL_BY_EXPERIENCE[experience] : 'beginner';
 }
 
-function inferProteinScore(calories: number, proteinG: number) {
-  if (calories <= 0 || proteinG <= 0) return 0.45;
-  const density = (proteinG * 4) / Math.max(calories, 1);
-  if (density >= 0.3) return 0.95;
-  if (density >= 0.22) return 0.82;
-  if (density >= 0.16) return 0.72;
-  return 0.5;
+function meetsLevel(level: LevelMeta, metrics: ProgressMetrics) {
+  return level.requirements.every((requirement) => metrics[requirement.metric] >= requirement.target);
 }
 
-function inferCalorieScore(calories: number) {
-  if (calories >= 1300 && calories <= 2600) return 0.75;
-  if (calories > 0) return 0.58;
-  return 0.45;
+function getTotalWorkoutRequirement(level: LevelMeta) {
+  return level.requirements.find((requirement) => requirement.metric === 'total_workouts')?.target ?? 0;
 }
 
-export function scoreDietFromBehavior(
-  meals7d: PersonaMealDaySummary[],
-  targets: PersonaTargets,
-): RawScore {
-  const loggedDays = meals7d.filter((day) => day.entryCount > 0);
-  if (loggedDays.length === 0) {
-    return { score: 0, available: false };
-  }
+function buildChecklist(requirements: LevelRequirement[], metrics: ProgressMetrics): EvolutionChecklistItem[] {
+  return requirements.map((requirement) => ({
+    id: requirement.metric,
+    label: requirement.label,
+    current: metrics[requirement.metric],
+    target: requirement.target,
+    complete: metrics[requirement.metric] >= requirement.target,
+  }));
+}
 
-  const dayScores = loggedDays.map((day) => {
-    const proteinScore =
-      typeof targets.proteinTargetG === 'number' && targets.proteinTargetG > 0
-        ? clamp(day.protein_g / targets.proteinTargetG)
-        : inferProteinScore(day.calories, day.protein_g);
+function buildProgress(requirements: LevelRequirement[], metrics: ProgressMetrics) {
+  if (requirements.length === 0) return 1;
 
-    const calorieScore =
-      typeof targets.caloriesTarget === 'number' && targets.caloriesTarget > 0
-        ? clamp(1 - Math.abs(day.calories - targets.caloriesTarget) / targets.caloriesTarget)
-        : inferCalorieScore(day.calories);
-
-    return average([proteinScore, calorieScore]);
-  });
-
-  return {
-    score: clamp(average(dayScores), 0, 1),
-    available: true,
+  const weightByMetric: Partial<Record<MetricId, number>> = {
+    total_workouts: 0.5,
+    workouts_14d: 0.3,
+    workouts_28d: 0.3,
+    workouts_56d: 0.25,
+    active_days_14d: 0.35,
+    active_days_28d: 0.35,
+    active_days_56d: 0.15,
+    diet_logs_14d: 0.2,
+    diet_logs_28d: 0.2,
+    protein_hits_14d: 0.2,
+    nutrition_hits_14d: 0.2,
+    nutrition_hits_28d: 0.2,
   };
+
+  const weights = requirements.map((requirement) => weightByMetric[requirement.metric] ?? 0.2);
+  const totalWeight = weights.reduce((sum, value) => sum + value, 0);
+
+  const progress = requirements.reduce((sum, requirement, index) => {
+    const ratio = clamp(metrics[requirement.metric] / requirement.target);
+    return sum + ratio * weights[index];
+  }, 0);
+
+  return round(totalWeight > 0 ? progress / totalWeight : 0);
 }
 
-export function scoreDietFromOnboarding(onboarding?: PersonaOnboardingInput | null): RawScore {
-  if (!onboarding) return { score: 0.76, available: false };
+function getCurrentAndNextLevel(metrics: ProgressMetrics, onboarding?: PersonaOnboardingInput | null) {
+  const startIndex = getLevelIndex(getStartLevelId(onboarding));
+  let currentIndex = startIndex;
 
-  const restrictionCount = onboarding.dietaryRestrictions?.length ?? 0;
-  const goal = onboarding.goal ?? 'health';
-  let score =
-    goal === 'muscle_gain' || goal === 'lean_bulk' || goal === 'strength_gain'
-      ? 0.9
-      : goal === 'weight_loss'
-        ? 0.8
-        : 0.76;
-
-  if (restrictionCount >= 3) {
-    score -= 0.05;
-  } else if (restrictionCount >= 1) {
-    score -= 0.02;
-  }
-
-  if (onboarding.overeatingHabit === 'often') {
-    score -= 0.04;
-  } else if (onboarding.overeatingHabit === 'sometimes') {
-    score -= 0.02;
+  for (let index = startIndex + 1; index < LEVELS.length; index += 1) {
+    const totalWorkoutGate = getTotalWorkoutRequirement(LEVELS[index]);
+    if (metrics.total_workouts < totalWorkoutGate) break;
+    currentIndex = index;
   }
 
   return {
-    score: clamp(score, 0.72, 0.95),
-    available: true,
+    currentLevel: LEVELS[currentIndex],
+    nextLevel: LEVELS[currentIndex + 1] ?? null,
   };
 }
 
-function applyStarterGuardrails(
-  stage: PersonaStage,
-  goal: PersonaGoal,
-  frequency: PersonaFrequency,
-  diet: PersonaDiet,
-): { frequency: PersonaFrequency; diet: PersonaDiet; forcedPersonaId: PersonaId | null } {
-  if (stage !== 'starter') {
-    return { frequency, diet, forcedPersonaId: null };
+function buildDailyState(input: PersonaCalculationInput): PersonaDailyState {
+  const caloriesTarget = input.goal?.caloriesTarget ?? null;
+  const proteinTarget = input.goal?.proteinTargetG ?? null;
+  const today = input.todayMeals;
+
+  if (!today || today.entryCount === 0) {
+    return input.workouts.completedToday ? 'TIRED' : 'RESTING';
   }
 
-  return {
-    frequency: frequency === 'sporadic' ? 'steady' : frequency,
-    diet: diet === 'cheater' ? 'balanced' : diet,
-    forcedPersonaId: goal === 'gain' ? 'bear' : goal === 'loss' ? 'deer' : 'retriever',
-  };
-}
-
-function selectPersonaId(
-  stage: PersonaStage,
-  goal: PersonaGoal,
-  frequency: PersonaFrequency,
-  diet: PersonaDiet,
-): PersonaId {
-  const guarded = applyStarterGuardrails(stage, goal, frequency, diet);
-  if (guarded.forcedPersonaId) {
-    return guarded.forcedPersonaId;
-  }
-
-  if (goal === 'gain') {
-    if (frequency === 'hardcore' && diet === 'protein') return 'gorilla';
-    if (frequency === 'hardcore' || diet === 'protein') return 'bull';
-    if (frequency === 'steady' && diet === 'balanced') return 'bear';
-    return 'fox';
-  }
-
-  if (goal === 'loss') {
-    if (frequency === 'hardcore' && diet === 'protein') return 'cheetah';
-    if (frequency === 'hardcore' || diet === 'protein') return 'hawk';
-    if (frequency === 'steady' && diet === 'balanced') return 'deer';
-    return 'rabbit';
-  }
-
-  if (frequency === 'hardcore' && diet === 'protein') return 'wolf';
-  if (frequency === 'steady' && diet === 'balanced') return 'retriever';
-  if (frequency === 'hardcore' || diet === 'protein') return 'otter';
-  return 'sloth';
-}
-
-export function deriveDailyState(input: {
-  stage: PersonaStage;
-  todayWorkoutCompleted: boolean;
-  todayMeals: PersonaMealDaySummary | null;
-  targets: PersonaTargets;
-  accountAgeDays: number | null;
-}): PersonaDailyState {
-  const todayMealCount = input.todayMeals?.mealCount ?? 0;
-  const calories = input.todayMeals?.calories ?? 0;
-  const protein = input.todayMeals?.protein_g ?? 0;
-  const caloriesTarget = input.targets.caloriesTarget;
-  const proteinTarget = input.targets.proteinTargetG;
-
-  if (input.accountAgeDays !== null && input.accountAgeDays < 3) {
-    if (
-      input.todayWorkoutCompleted &&
-      typeof caloriesTarget === 'number' &&
-      caloriesTarget > 0 &&
-      calories >= caloriesTarget * 0.8 &&
-      calories <= caloriesTarget * 1.1
-    ) {
-      return 'ACTIVE';
-    }
-    return 'RESTING';
-  }
-
-  if (
-    input.todayWorkoutCompleted &&
-    typeof proteinTarget === 'number' &&
-    proteinTarget > 0 &&
-    todayMealCount >= 2 &&
-    protein < proteinTarget * 0.7
-  ) {
-    return 'TIRED';
-  }
-
-  if (
-    typeof caloriesTarget === 'number' &&
-    caloriesTarget > 0 &&
-    todayMealCount >= 2 &&
-    calories > caloriesTarget * 1.2
-  ) {
-    return 'FULL';
-  }
-
-  if (
-    typeof caloriesTarget === 'number' &&
-    caloriesTarget > 0 &&
-    todayMealCount >= 2 &&
-    calories < caloriesTarget * 0.7
-  ) {
+  if (caloriesTarget && today.calories < caloriesTarget * 0.45) {
     return 'HUNGRY';
   }
 
-  if (
-    input.todayWorkoutCompleted &&
-    typeof caloriesTarget === 'number' &&
-    caloriesTarget > 0 &&
-    calories >= caloriesTarget * 0.8 &&
-    calories <= caloriesTarget * 1.1
-  ) {
+  if (caloriesTarget && today.calories > caloriesTarget * 1.2) {
+    return 'FULL';
+  }
+
+  if (input.workouts.completedToday && proteinTarget && today.protein_g < proteinTarget * 0.75) {
+    return 'TIRED';
+  }
+
+  if (input.workouts.completedToday) {
     return 'ACTIVE';
   }
 
   return 'RESTING';
 }
 
-function buildHeadlineMessage(input: {
-  nickname: string;
-  stage: PersonaStage;
-  dailyState: PersonaDailyState;
-}) {
-  const coachingLead =
-    input.stage === 'starter'
-      ? '첫 주는 가볍게 기록만 해도 충분해요.'
-      : input.stage === 'learning'
-        ? '당신의 패턴이 조금씩 보이기 시작했어요.'
-        : '이제 당신의 루틴이 꽤 선명해졌어요.';
-
-  switch (input.dailyState) {
-    case 'ACTIVE':
-      return `${input.nickname} 님, 오늘 리듬이 잘 맞고 있어요.`;
-    case 'HUNGRY':
-      return input.stage === 'starter'
-        ? '오늘 식사를 조금 더 기록해볼까요?'
-        : `${input.nickname} 님, 에너지 보충을 조금 더 챙겨보면 좋아요.`;
-    case 'FULL':
-      return `${input.nickname} 님, 다음 끼니는 조금 가볍게 균형을 맞춰봐요.`;
-    case 'TIRED':
-      return `${input.nickname} 님, 운동 후엔 단백질과 회복을 조금 더 챙겨볼까요?`;
-    case 'RESTING':
-    default:
-      return coachingLead;
+function buildHeadlineMessage(level: LevelMeta, nextLevel: LevelMeta | null, progressToNext: number) {
+  if (!nextLevel) {
+    return `${level.name} 햄식이에 도달했어요. 지금은 완성형 루틴을 유지하는 구간이에요.`;
   }
+
+  if (progressToNext >= 1) {
+    return `${nextLevel.name} 진화 조건을 채웠어요. 이번 갱신에서 바로 진화합니다.`;
+  }
+
+  if (progressToNext >= 0.8) {
+    return `${level.name} 햄식이가 ${nextLevel.name} 진화를 코앞에 두고 있어요.`;
+  }
+
+  return `${level.name} 햄식이가 차근차근 ${nextLevel.name}을 향해 성장 중이에요.`;
 }
 
-function buildDataCompleteness(input: PersonaCalculationInput, accountAgeDays: number | null): PersonaDataCompleteness {
-  const dietDays7d = input.meals7d.filter((day) => day.entryCount > 0).length;
-  const todayMealCount = input.todayMeals?.mealCount ?? 0;
-  const score = clamp(
-    average([
-      input.workouts.sessionCount14d > 0 ? Math.min(input.workouts.sessionCount14d / 10, 1) : 0,
-      dietDays7d > 0 ? Math.min(dietDays7d / 7, 1) : 0,
-      input.profile ? 1 : 0,
-      input.goal ? 1 : 0.4,
-      input.onboarding ? 1 : 0.3,
-    ]),
-  );
+function buildProgressMessage(
+  level: LevelMeta,
+  nextLevel: LevelMeta | null,
+  checklist: EvolutionChecklistItem[],
+  progressToNext: number,
+) {
+  if (!nextLevel) {
+    return `${level.vibe}. 지금은 기록을 유지하는 것만으로도 충분해요.`;
+  }
 
-  return {
-    hasProfile: Boolean(input.profile),
-    hasGoal: Boolean(input.goal),
-    hasOnboarding: Boolean(input.onboarding),
-    accountAgeDays,
-    workoutSessions14d: input.workouts.sessionCount14d,
-    workoutDays14d: input.workouts.activeDays14d,
-    dietDays7d,
-    todayMealCount,
-    score: round(score),
-  };
-}
+  const incomplete = checklist
+    .filter((item) => !item.complete)
+    .sort((a, b) => (a.target - a.current) - (b.target - b.current))[0];
 
-function buildConfidence(stage: PersonaStage, completenessScore: number) {
-  const range =
-    stage === 'starter'
-      ? [0.28, 0.58]
-      : stage === 'learning'
-        ? [0.44, 0.76]
-        : [0.74, 0.96];
+  if (!incomplete) {
+    return `${nextLevel.name} 진화 준비가 끝났어요. 홈에 들어올 때마다 최신 상태로 반영돼요.`;
+  }
 
-  return round(range[0] + (range[1] - range[0]) * completenessScore);
+  const remaining = Math.max(incomplete.target - incomplete.current, 0);
+
+  if (progressToNext >= 0.75) {
+    return `${incomplete.label} ${remaining}${incomplete.label.includes('운동') || incomplete.label.includes('기록') || incomplete.label.includes('달성') ? '회' : ''}만 더 채우면 ${nextLevel.name}로 진화해요.`;
+  }
+
+  return `${nextLevel.name}까지 ${Math.round(progressToNext * 100)}%. 지금은 ${incomplete.label}을 ${remaining}만큼 더 쌓는 게 가장 빨라요.`;
 }
 
 export function calculatePersonaProfile(input: PersonaCalculationInput): PersonaCalculationResult {
-  const now = input.now ?? new Date();
-  const accountAgeDays = getAccountAgeDays(input.profile?.createdAt, now);
-  const targets = deriveTargets(input.profile, input.goal, input.onboarding);
-  const stage = derivePersonaStage({
-    accountCreatedAt: input.profile?.createdAt,
-    workoutSessions14d: input.workouts.sessionCount14d,
-    dietDays7d: input.meals7d.filter((day) => day.entryCount > 0).length,
-    now,
-  });
-
-  const resolvedGoal = resolveGoalDimension(input.goal?.goalType, input.onboarding);
-  const frequencyOnboarding = scoreWorkoutFrequencyFromOnboarding(input.onboarding);
-  const frequencyBehavior = scoreWorkoutFrequencyFromBehavior(input.workouts.sessionCount14d);
-  const dietOnboarding = scoreDietFromOnboarding(input.onboarding);
-  const dietBehavior = scoreDietFromBehavior(input.meals7d, targets);
-
-  const blendedFrequencyScore = blendScore(stage, frequencyOnboarding, frequencyBehavior);
-  const blendedDietScore = blendScore(stage, dietOnboarding, dietBehavior);
-
-  const guarded = applyStarterGuardrails(
-    stage,
-    resolvedGoal.goal,
-    scoreToFrequency(blendedFrequencyScore),
-    scoreToDiet(blendedDietScore),
-  );
-
-  const personaId = selectPersonaId(stage, resolvedGoal.goal, guarded.frequency, guarded.diet);
-  const nickname = PERSONA_META[personaId].nickname;
-  const dataCompleteness = buildDataCompleteness(input, accountAgeDays);
-  const confidence = buildConfidence(stage, dataCompleteness.score);
-  const dailyState = deriveDailyState({
-    stage,
-    todayWorkoutCompleted: input.workouts.completedToday,
-    todayMeals: input.todayMeals,
-    targets,
-    accountAgeDays,
-  });
-
-  const frequencyWeights = frequencyBehavior.available
-    ? getStageBlend(stage)
-    : { onboardingWeight: 1, behaviorWeight: 0 };
-  const dietWeights = dietBehavior.available
-    ? getStageBlend(stage)
-    : { onboardingWeight: 1, behaviorWeight: 0 };
+  const metrics = buildMetrics(input);
+  const { currentLevel, nextLevel } = getCurrentAndNextLevel(metrics, input.onboarding);
+  const checklist = nextLevel ? buildChecklist(nextLevel.requirements, metrics) : [];
+  const progressToNext = nextLevel ? buildProgress(nextLevel.requirements, metrics) : 1;
+  const dailyState = buildDailyState(input);
 
   return {
-    personaId,
-    personaStage: stage,
-    confidence,
+    levelId: currentLevel.id,
+    levelName: currentLevel.name,
+    nextLevelId: nextLevel?.id ?? null,
+    nextLevelName: nextLevel?.name ?? null,
+    progressToNext,
+    headlineMessage: buildHeadlineMessage(currentLevel, nextLevel, progressToNext),
+    progressMessage: buildProgressMessage(currentLevel, nextLevel, checklist, progressToNext),
+    checklist,
     dailyState,
-    headlineMessage: buildHeadlineMessage({
-      nickname,
-      stage,
-      dailyState,
-    }),
-    nickname,
-    sourceBreakdown: {
-      overall: {
-        onboardingWeight: round(average([frequencyWeights.onboardingWeight, dietWeights.onboardingWeight])),
-        behaviorWeight: round(average([frequencyWeights.behaviorWeight, dietWeights.behaviorWeight])),
-      },
-      frequency: frequencyWeights,
-      diet: dietWeights,
-      goalSource: resolvedGoal.source,
-      workoutSessions14d: input.workouts.sessionCount14d,
-      dietDays7d: input.meals7d.filter((day) => day.entryCount > 0).length,
-      aiOnboardingUsed: Boolean(input.onboarding),
-    },
-    dataCompleteness,
-    resolvedGoal: resolvedGoal.goal,
-    resolvedFrequency: guarded.frequency,
-    resolvedDiet: guarded.diet,
-    targets,
   };
 }

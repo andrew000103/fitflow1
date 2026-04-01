@@ -1,15 +1,15 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LayoutChangeEvent, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import CalorieRing from '../../components/home/calorie-ring';
+import HamsterEvolutionCard from '../../components/home/hamster-evolution-card';
 import MacroBars from '../../components/home/macro-bars';
-import PersonaSummaryCard, { type PersonaSummaryStage } from '../../components/home/persona-summary-card';
 import { AppCard } from '../../components/common/AppCard';
 import { AppHeader } from '../../components/common/AppHeader';
 import { AppButton } from '../../components/common/AppButton';
@@ -62,16 +62,27 @@ function formatAppliedSectionLabel(section: 'workout' | 'diet' | 'goals') {
   return '목표';
 }
 
-type PersonaCardState = {
-  confidence: number | null;
-  dailyState: string | null;
-  hasPersona: boolean;
-  headline: string | null;
-  message: string | null;
-  personaId: string | null;
-  personaName: string | null;
-  stage: PersonaSummaryStage | null;
-};
+function getQuickCharacterStyleCopy(
+  trainingStyle?: 'health' | 'physique' | 'performance' | null,
+  dietConsistency?: 'low' | 'medium' | 'high' | null,
+) {
+  const styleCopy = trainingStyle === 'performance'
+    ? '기록 향상 중심 루틴'
+    : trainingStyle === 'physique'
+      ? '몸만들기 중심 루틴'
+      : '건강관리 중심 루틴';
+
+  const dietCopy = dietConsistency === 'high'
+    ? '식단도 꽤 꾸준히 챙기는 편이에요.'
+    : dietConsistency === 'medium'
+      ? '식단은 가끔씩 균형을 맞추는 편이에요.'
+      : '지금은 운동 중심으로 리듬을 만드는 단계예요.';
+
+  return {
+    headline: `${styleCopy}에 맞춰 햄식이가 배정되어 있어요.`,
+    supporting: `${dietCopy} 더 정교한 운동·식단 추천이 필요하면 아래에서 AI 플랜도 만들 수 있어요.`,
+  };
+}
 
 // ─── WeeklyCalorieChart ───────────────────────────────────────────────────────
 function WeeklyCalorieChart({
@@ -378,25 +389,30 @@ const twStyles = StyleSheet.create({
 // ─── HomeScreen ───────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const { colors, typography, isDark, spacing, radius } = useAppTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuthStore();
   const toggle = useThemeStore((s) => s.toggle);
   const getDayTotals = useDietStore((s) => s.getDayTotals);
   const currentPlan = useAIPlanStore((s) => s.currentPlan);
+  const onboardingData = useAIPlanStore((s) => s.onboardingData);
+  const hasCompletedOnboarding = useAIPlanStore((s) => s.hasCompletedOnboarding);
+  const setNeedsOnboarding = useAIPlanStore((s) => s.setNeedsOnboarding);
   const syncRecurringPlanForToday = useAIPlanStore((s) => s.syncRecurringPlanForToday);
   const appliedPlan = currentPlan?.isApplied ? currentPlan : null;
   const appliedSections = currentPlan?.isApplied ? currentPlan.appliedSections ?? ['workout', 'diet', 'goals'] : [];
   const calculatePersona = usePersonaStore((s) => s.calculatePersona);
-  const personaId = usePersonaStore((s) => s.personaId);
-  const personaStage = usePersonaStore((s) => s.personaStage);
-  const personaConfidence = usePersonaStore((s) => s.confidence);
+  const quickCharacterProfile = usePersonaStore((s) => s.quickCharacterProfile);
+  const hamsterLevelId = usePersonaStore((s) => s.levelId);
+  const hamsterLevelName = usePersonaStore((s) => s.levelName);
+  const hamsterNextLevelName = usePersonaStore((s) => s.nextLevelName);
+  const hamsterProgressToNext = usePersonaStore((s) => s.progressToNext);
+  const hamsterChecklist = usePersonaStore((s) => s.checklist);
   const personaDailyState = usePersonaStore((s) => s.dailyState);
   const personaHeadline = usePersonaStore((s) => s.headlineMessage);
+  const personaProgressMessage = usePersonaStore((s) => s.progressMessage);
   const personaSupportingMessage = usePersonaStore((s) => s.supportingMessage);
   const personaReliabilityState = usePersonaStore((s) => s.reliabilityState);
-  const personaValidationWarnings = usePersonaStore((s) => s.validationWarnings);
-  const personaNickname = usePersonaStore((s) => s.nickname);
   const isPersonaLoading = usePersonaStore((s) => s.isCalculating);
-  const personaError = usePersonaStore((s) => s.error);
 
   const today = dateStr(new Date());
   const last7 = getLast7Days();
@@ -421,25 +437,6 @@ export default function HomeScreen() {
     label,
     calories: getDayTotals(date).calories,
   }));
-
-  const personaSummary: PersonaCardState = {
-    confidence: personaConfidence > 0 ? personaConfidence : null,
-    dailyState: personaDailyState,
-    hasPersona: Boolean(personaId || personaNickname || personaHeadline || personaStage),
-    headline: personaHeadline,
-    message:
-      personaReliabilityState === 'error'
-        ? '페르소나 정보를 잠시 불러오지 못했어요.'
-        : personaSupportingMessage
-          ?? (personaValidationWarnings.includes('low-data-completeness')
-            ? '기록이 아직 적어서 오늘은 가벼운 추정 기반으로 보여드리고 있어요.'
-            : personaValidationWarnings.includes('goal-derived-from-fallback')
-              ? '현재 목표 정보가 충분하지 않아 기본 목표 가정이 일부 반영됐어요.'
-              : null),
-    personaId,
-    personaName: personaNickname,
-    stage: personaStage,
-  };
 
   const fetchRemote = useCallback(async () => {
     if (!user?.id) return;
@@ -542,8 +539,55 @@ export default function HomeScreen() {
     refreshPersona();
   }, [fetchRemote, refreshPersona, syncRecurringPlanForToday, user?.id]));
 
+  useEffect(() => {
+    if (!user?.id) return;
+    calculatePersona(user.id).catch(() => {});
+  }, [
+    calculatePersona,
+    currentPlan?.id,
+    onboardingData?.experience,
+    quickCharacterProfile?.completedAt,
+    user?.id,
+  ]);
+
   const latestWeight = weightHistory.length > 0 ? weightHistory[weightHistory.length - 1].weight_kg : null;
   const displayName = homeNickname || (user?.email ? user.email.split('@')[0] : '사용자');
+  const hasAIPlan = Boolean(currentPlan);
+  const hasDetailedCharacterProfile = Boolean(currentPlan || onboardingData || hasCompletedOnboarding);
+  const activeQuickCharacterProfile = quickCharacterProfile?.userId === user?.id ? quickCharacterProfile : null;
+  const hasQuickCharacterProfile = Boolean(activeQuickCharacterProfile);
+  const hasAnyCharacterProfile = hasDetailedCharacterProfile || hasQuickCharacterProfile;
+  const quickCharacterCopy = getQuickCharacterStyleCopy(
+    activeQuickCharacterProfile?.trainingStyle,
+    activeQuickCharacterProfile?.dietConsistency ?? null,
+  );
+  const hamsterCtaLabel = hasDetailedCharacterProfile
+    ? null
+    : hasQuickCharacterProfile
+      ? 'AI 플랜으로 재판정'
+      : '내 헬스 레벨 판정받기';
+  const hamsterCtaSupportingMessage = hasDetailedCharacterProfile
+    ? personaSupportingMessage
+    : hasQuickCharacterProfile
+      ? quickCharacterCopy.supporting
+      : 'AI 플랜 없이도 괜찮아요. 짧게 답하면 지금 내 루틴 기준으로 햄식이 등급을 바로 판정해드려요.';
+  const hamsterCtaHeadline = hasDetailedCharacterProfile
+    ? personaHeadline
+    : hasQuickCharacterProfile
+      ? quickCharacterCopy.headline
+      : '몇 가지만 답하면 지금 내 헬스 레벨을 바로 판정할 수 있어요.';
+  const handleHamsterCtaPress = useCallback(() => {
+    if (hasQuickCharacterProfile) {
+      if (hasCompletedOnboarding) {
+        navigation.navigate('AIOnboarding');
+        return;
+      }
+      setNeedsOnboarding(true);
+      navigation.navigate('AIConsent');
+      return;
+    }
+    navigation.navigate('CharacterSetup');
+  }, [hasCompletedOnboarding, hasQuickCharacterProfile, navigation, setNeedsOnboarding]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
@@ -560,17 +604,25 @@ export default function HomeScreen() {
 
         <View style={styles.summaryContainer}>
           <AppCard variant="elevated" style={styles.calorieCard}>
-            <PersonaSummaryCard
-              confidence={personaSummary.confidence}
-              dailyState={personaSummary.dailyState}
-              hasPersona={personaSummary.hasPersona}
-              hasStore
-              headline={personaSummary.headline}
+            <HamsterEvolutionCard
+              ctaLabel={hamsterCtaLabel}
+              checklist={hamsterChecklist}
+              dailyState={personaDailyState}
+              headline={hamsterCtaHeadline}
+              levelId={hasAnyCharacterProfile ? hamsterLevelId : null}
+              levelName={hasAnyCharacterProfile ? hamsterLevelName : null}
               loading={isPersonaLoading}
-              message={personaSummary.message}
-              personaId={personaSummary.personaId}
-              personaName={personaSummary.personaName}
-              stage={personaSummary.stage}
+              nextLevelName={hasAnyCharacterProfile ? hamsterNextLevelName : null}
+              onPressCta={hamsterCtaLabel ? handleHamsterCtaPress : null}
+              progressMessage={
+                !hasAnyCharacterProfile
+                  ? null
+                  : personaReliabilityState === 'error'
+                  ? '햄식이 진화 정보를 잠시 불러오지 못했어요.'
+                  : personaProgressMessage
+              }
+              progressToNext={hasAnyCharacterProfile ? hamsterProgressToNext : null}
+              supportingMessage={hamsterCtaSupportingMessage}
             />
             <View style={styles.ringArea}>
               <CalorieRing current={nutrition.calories.current} goal={goals.calories} />
@@ -588,11 +640,11 @@ export default function HomeScreen() {
             </View>
           </AppCard>
 
+          <AIPlanCard />
+
           <MacroBars nutrition={nutrition} />
 
           <TodayWorkoutCard workout={todayWorkout} />
-
-          <AIPlanCard />
         </View>
 
         <View style={styles.trendSection}>

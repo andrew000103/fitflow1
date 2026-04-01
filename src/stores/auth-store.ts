@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { AuthUser } from '../types/auth';
 import { useAIPlanStore } from './ai-plan-store';
+import { usePersonaStore } from './persona-store';
 
 interface AuthStore {
   user: AuthUser | null;
@@ -41,6 +42,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       // 다른 유저로 로그인 시 AI 플랜 스토어 리셋 (이전 유저 데이터 격리)
       if (newUser?.id && currentUserId && currentUserId !== newUser.id) {
         useAIPlanStore.getState().reset();
+        usePersonaStore.getState().reset();
       }
       set({ user: newUser });
     });
@@ -79,6 +81,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   signOut: async () => {
     await supabase.auth.signOut();
     useAIPlanStore.getState().reset();
+    usePersonaStore.getState().reset();
     set({ user: null });
   },
 }));

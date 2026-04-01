@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { AI_GOAL_LABEL, AIPlan, GymType, OnboardingData } from '../stores/ai-plan-store';
+import { AI_EXPERIENCE_LABEL, AI_GOAL_LABEL, AIPlan, GymType, OnboardingData } from '../stores/ai-plan-store';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -175,7 +175,7 @@ export async function fetchRecentWorkoutPerformance(
   }
 }
 
-const COMPOUND_NAMES = ['스쿼트', '데드리프트', '벤치프레스', '오버헤드프레스', '바벨로우', '풀업'];
+const COMPOUND_NAMES = ['바벨 스쿼트', '컨벤셔널 데드리프트', '벤치프레스', '오버헤드프레스', '바벨로우', '풀업'];
 
 function isCompoundExercise(name: string): boolean {
   return COMPOUND_NAMES.some((c) => name.includes(c));
@@ -336,12 +336,6 @@ function buildPrompt(
   history: UserHistorySummary | null,
   workoutHistorySection: string = ''
 ): string {
-  const experienceLabel: Record<string, string> = {
-    beginner: '입문 (0~6개월)',
-    intermediate: '초급~중급 (6개월~2년)',
-    advanced: '중급 이상 (2년+)',
-  };
-
   const genderLabel: Record<string, string> = {
     male: '남성',
     female: '여성',
@@ -355,9 +349,9 @@ function buildPrompt(
   };
 
   const primaryStrengthFocusLabel: Record<NonNullable<OnboardingData['primaryStrengthFocus']>, string> = {
-    squat: '스쿼트',
+    squat: '바벨 스쿼트',
     bench: '벤치프레스',
-    deadlift: '데드리프트',
+    deadlift: '컨벤셔널 데드리프트',
     balanced: '전신 균형',
   };
 
@@ -397,7 +391,7 @@ function buildPrompt(
       '- 무분별한 벌크업보다 린한 체성분 변화를 우선하세요.',
     ].join('\n'),
     strength_gain: [
-      '- 운동은 스쿼트, 벤치프레스, 데드리프트, 오버헤드프레스 같은 메인 리프트 중심으로 설계하세요.',
+      '- 운동은 바벨 스쿼트, 벤치프레스, 컨벤셔널 데드리프트, 오버헤드프레스 같은 메인 리프트 중심으로 설계하세요.',
       '- 주요 리프트는 3~6회 반복의 저반복·고중량 성향 세트를 적극 활용하세요.',
       '- 머신 위주의 보디빌딩식 분할보다 복합 리프트와 기술 연습 우선으로 구성하세요.',
       '- 보조 운동은 기록 향상과 약점 보완에 필요한 범위로만 최소화하세요.',
@@ -423,10 +417,10 @@ ${data.strengthProfile.map(e => `- ${e.exercise}: ${e.weightKg}kg`).join('\n')}
 `;
   } else if (Array.isArray(data.strengthProfile) && data.strengthProfile.length === 0) {
     strengthSection = data.goal === 'strength_gain'
-      ? `\n→ 사용자가 현재 중량을 입력하지 않았습니다. 운동 경험(${experienceLabel[data.experience]})과 강화 우선 리프트를 고려해 메인 리프트의 weight_kg를 매우 보수적으로 설정하고, 무리한 추정 중량은 피해주세요.\n`
+      ? `\n→ 사용자가 현재 중량을 입력하지 않았습니다. 운동 경험(${AI_EXPERIENCE_LABEL[data.experience]})과 강화 우선 리프트를 고려해 메인 리프트의 weight_kg를 매우 보수적으로 설정하고, 무리한 추정 중량은 피해주세요.\n`
       : data.goal === 'lean_bulk'
-      ? `\n→ 사용자가 현재 중량을 입력하지 않았습니다. 운동 경험(${experienceLabel[data.experience]})을 고려하여 주요 복합 운동의 weight_kg를 보수적으로 설정하고, 8~12회 반복이 가능한 수준으로 설정해주세요.\n`
-      : `\n→ 사용자가 운동 중량을 입력하지 않았습니다. 운동 경험(${experienceLabel[data.experience]})을 고려하여 weight_kg를 맨몸 또는 매우 가벼운 중량(0~10kg)으로 보수적으로 설정해주세요.\n`;
+      ? `\n→ 사용자가 현재 중량을 입력하지 않았습니다. 운동 경험(${AI_EXPERIENCE_LABEL[data.experience]})을 고려하여 주요 복합 운동의 weight_kg를 보수적으로 설정하고, 8~12회 반복이 가능한 수준으로 설정해주세요.\n`
+      : `\n→ 사용자가 운동 중량을 입력하지 않았습니다. 운동 경험(${AI_EXPERIENCE_LABEL[data.experience]})을 고려하여 weight_kg를 맨몸 또는 매우 가벼운 중량(0~10kg)으로 보수적으로 설정해주세요.\n`;
   }
 
   let historySection = '';
@@ -475,7 +469,7 @@ ${history.avgDailyCalories > 0 ? `- 평균 일일 칼로리 섭취: ${history.av
 - 성별: ${genderLabel[data.gender]}
 - 나이: ${data.age}세
 - 키: ${data.height}cm / 체중: ${data.weight}kg
-- 운동 경험: ${experienceLabel[data.experience]}
+- 운동 경험: ${AI_EXPERIENCE_LABEL[data.experience]}
 - 주당 운동 가능 일수: ${data.workoutDaysPerWeek}일
 - 식이 제한: ${restrictions}
 ${gymSection}
@@ -574,7 +568,7 @@ function parseRepsRangeForValidation(repsRange: string): { min: number; max: num
 }
 
 function isMainLift(name: string): boolean {
-  return ['스쿼트', '벤치프레스', '데드리프트', '오버헤드프레스'].some((lift) => name.includes(lift));
+  return ['바벨 스쿼트', '벤치프레스', '컨벤셔널 데드리프트', '오버헤드프레스'].some((lift) => name.includes(lift));
 }
 
 function validateGeneratedPlanForGoal(
@@ -628,9 +622,9 @@ function validateGeneratedPlanForGoal(
 
   if (data.primaryStrengthFocus && data.primaryStrengthFocus !== 'balanced') {
     const focusMap: Record<Exclude<NonNullable<OnboardingData['primaryStrengthFocus']>, 'balanced'>, string> = {
-      squat: '스쿼트',
+      squat: '바벨 스쿼트',
       bench: '벤치프레스',
-      deadlift: '데드리프트',
+      deadlift: '컨벤셔널 데드리프트',
     };
     const focusLiftName = focusMap[data.primaryStrengthFocus];
     const hasFocusLift = mainLiftExercises.some((exercise) => exercise.name.includes(focusLiftName));
@@ -794,5 +788,5 @@ export async function saveOnboardingDataToSupabase(
   await supabase
     .from('user_profiles')
     .update({ ai_onboarding_data: data })
-    .eq('id', userId);
+    .eq('user_id', userId);
 }

@@ -13,7 +13,15 @@ export default function RootNavigator() {
   const { user, initialized, initialize } = useAuthStore();
   const setDietCurrentUser = useDietStore((state) => state.setCurrentUser);
   const hydrateFromSupabase = useDietStore((state) => state.hydrateFromSupabase);
-  const { setNeedsOnboarding, markOnboardingComplete, hasCompletedOnboarding, currentPlan, setCurrentPlan } = useAIPlanStore();
+  const {
+    onboardingData,
+    setNeedsOnboarding,
+    markOnboardingComplete,
+    hasCompletedOnboarding,
+    currentPlan,
+    setCurrentPlan,
+    setOnboardingData,
+  } = useAIPlanStore();
 
   useEffect(() => {
     initialize();
@@ -40,19 +48,56 @@ export default function RootNavigator() {
       try {
         const { data } = await supabase
           .from('ai_plans')
-          .select('plan_json')
+          .select('plan_json, generation_context')
           .eq('user_id', user.id)
           .eq('is_active', true)
           .maybeSingle();
         if (data?.plan_json) {
           setCurrentPlan(data.plan_json);
+          if (!onboardingData && data.generation_context) {
+            setOnboardingData(data.generation_context);
+          }
         }
       } catch {
         // 네트워크 오류 시 무시
       }
     };
     loadPlan();
-  }, [user?.id]);
+  }, [onboardingData, setCurrentPlan, setOnboardingData, user?.id, currentPlan]);
+
+  useEffect(() => {
+    if (!user?.id || onboardingData) return;
+
+    const loadOnboardingData = async () => {
+      try {
+        const { data } = await supabase
+          .from('user_profiles')
+          .select('ai_onboarding_data')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (data?.ai_onboarding_data) {
+          setOnboardingData(data.ai_onboarding_data);
+          return;
+        }
+
+        const { data: activePlan } = await supabase
+          .from('ai_plans')
+          .select('generation_context')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (activePlan?.generation_context) {
+          setOnboardingData(activePlan.generation_context);
+        }
+      } catch {
+        // 네트워크 오류 시 무시
+      }
+    };
+
+    loadOnboardingData();
+  }, [onboardingData, setOnboardingData, user?.id]);
 
   // AI 온보딩 체크: 로그인 후 최초 1회, 로컬 온보딩 완료 전에만
   // 기존 플랜이 있는 사용자는 온보딩 스킵 (재설정 시에만 다시 진행)

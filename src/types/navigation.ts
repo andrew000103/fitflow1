@@ -14,7 +14,13 @@ export type WorkoutStackParamList = {
   WorkoutList: undefined;
   WorkoutHistory: undefined;
   WorkoutSession: undefined;
-  ExerciseSearch: undefined;
+  ExerciseSearch:
+    | {
+        mode?: 'add' | 'replace';
+        exerciseIndex?: number;
+        initialQuery?: string;
+      }
+    | undefined;
   WorkoutSummary: {
     totalVolumeKg: number;
     setCount: number;
@@ -71,6 +77,7 @@ export type AIModalParamList = {
 
 export type RootStackParamList = {
   Main: undefined;
+  CharacterSetup: undefined;
   AIConsent: undefined;
   AIOnboarding: undefined;
   AIPlanResult: { planId?: string };

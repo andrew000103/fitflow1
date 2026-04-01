@@ -14,7 +14,7 @@ export const BUILT_IN_EXERCISES: Omit<Exercise, 'id'>[] = [
   { name_ko: '펙덱 플라이',           name_en: 'Pec Deck Fly',               category: '가슴', default_rest_seconds: 60,  is_custom: false },
 
   // ── 등 ────────────────────────────────────────────────────────────────────
-  { name_ko: '데드리프트',            name_en: 'Deadlift',                   category: '등',   default_rest_seconds: 180, is_custom: false },
+  { name_ko: '컨벤셔널 데드리프트',   name_en: 'Conventional Deadlift',      category: '등',   default_rest_seconds: 180, is_custom: false },
   { name_ko: '스모 데드리프트',       name_en: 'Sumo Deadlift',              category: '등',   default_rest_seconds: 180, is_custom: false },
   { name_ko: '루마니안 데드리프트',   name_en: 'Romanian Deadlift',          category: '등',   default_rest_seconds: 120, is_custom: false },
   { name_ko: '바벨 로우',             name_en: 'Barbell Row',                category: '등',   default_rest_seconds: 90,  is_custom: false },
@@ -37,7 +37,7 @@ export const BUILT_IN_EXERCISES: Omit<Exercise, 'id'>[] = [
   { name_ko: '업라이트 로우',          name_en: 'Upright Row',                category: '어깨', default_rest_seconds: 90,  is_custom: false },
 
   // ── 하체 ──────────────────────────────────────────────────────────────────
-  { name_ko: '스쿼트',                 name_en: 'Squat',                      category: '하체', default_rest_seconds: 180, is_custom: false },
+  { name_ko: '바벨 스쿼트',            name_en: 'Barbell Squat',              category: '하체', default_rest_seconds: 180, is_custom: false },
   { name_ko: '프론트 스쿼트',          name_en: 'Front Squat',                category: '하체', default_rest_seconds: 180, is_custom: false },
   { name_ko: '불가리안 스플릿 스쿼트', name_en: 'Bulgarian Split Squat',      category: '하체', default_rest_seconds: 120, is_custom: false },
   { name_ko: '레그 프레스',            name_en: 'Leg Press',                  category: '하체', default_rest_seconds: 120, is_custom: false },

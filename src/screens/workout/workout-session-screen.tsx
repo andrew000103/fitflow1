@@ -18,6 +18,7 @@ import { useAppTheme } from '../../theme';
 import { WorkoutStackParamList } from '../../types/navigation';
 import { LocalSet, SessionExercise } from '../../types/workout';
 import { SwapExerciseSheet } from '../../components/ai/SwapExerciseSheet';
+import ExerciseVisualGuide from '../../components/workout/ExerciseVisualGuide';
 
 type Props = {
   navigation: NativeStackNavigationProp<WorkoutStackParamList, 'WorkoutSession'>;
@@ -27,7 +28,7 @@ type Props = {
 
 type SheetAction = {
   text: string;
-  style?: 'default' | 'destructive' | 'cancel';
+  style?: 'default' | 'destructive' | 'cancel' | 'highlight';
   onPress?: () => void;
 };
 
@@ -35,6 +36,13 @@ type SheetConfig = {
   title: string;
   message?: string;
   actions: SheetAction[];
+};
+
+type RestTimerSheetState = {
+  exerciseIndex: number;
+  exerciseName: string;
+  currentSeconds: number;
+  recommendedSeconds: number;
 };
 
 const webBottomShadow = Platform.OS === 'web' ? { boxShadow: '0 -4px 12px rgba(0,0,0,0.15)' } : {};
@@ -68,6 +76,11 @@ function formatSeconds(totalSeconds: number): string {
   const s = totalSeconds % 60;
   if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function formatRestLabel(totalSeconds: number): string {
+  if (totalSeconds < 60) return `${totalSeconds}초`;
+  return formatSeconds(totalSeconds);
 }
 
 // ─── BottomSheet ──────────────────────────────────────────────────────────────
@@ -113,18 +126,194 @@ function BottomSheet({ config, onDismiss }: BottomSheetProps) {
             activeOpacity={0.7}
           >
             <Text
-              style={[
-                sheetStyles.actionText,
-                { fontFamily: typography.fontFamily },
-                action.style === 'destructive' && { color: '#FF3B30', fontWeight: '600' },
-                action.style === 'cancel' && { color: colors.textSecondary },
-                action.style !== 'destructive' && action.style !== 'cancel' && { color: colors.accent, fontWeight: '600' },
-              ]}
-            >
-              {action.text}
+            style={[
+              sheetStyles.actionText,
+              { fontFamily: typography.fontFamily },
+              action.style === 'destructive' && { color: '#FF3B30', fontWeight: '600' },
+              action.style === 'cancel' && { color: colors.textSecondary },
+              action.style === 'highlight' && { color: colors.text, fontWeight: '700' },
+              action.style !== 'destructive' &&
+                action.style !== 'cancel' &&
+                action.style !== 'highlight' && { color: colors.accent, fontWeight: '600' },
+            ]}
+          >
+            {action.text}
             </Text>
           </TouchableOpacity>
         ))}
+      </View>
+    </View>
+  );
+}
+
+interface RestTimerSheetProps {
+  state: RestTimerSheetState | null;
+  onClose: () => void;
+  onSave: (seconds: number) => void;
+  onReset: () => void;
+}
+
+function RestTimerSheet({ state, onClose, onSave, onReset }: RestTimerSheetProps) {
+  const { colors, typography } = useAppTheme();
+  const [customSecondsText, setCustomSecondsText] = useState('');
+
+  useEffect(() => {
+    setCustomSecondsText(state ? String(state.currentSeconds) : '');
+  }, [state]);
+
+  if (!state) return null;
+
+  const presetOptions = [60, 120, 180, 300];
+  const parsedCustomSeconds = parseInt(customSecondsText, 10);
+  const canApplyCustom = Number.isFinite(parsedCustomSeconds) && parsedCustomSeconds > 0;
+
+  return (
+    <View style={sheetStyles.overlay}>
+      <TouchableOpacity style={sheetStyles.backdrop} onPress={onClose} activeOpacity={1} />
+      <View style={[sheetStyles.sheet, { backgroundColor: colors.card }]}>
+        <View style={styles.restSheetHeader}>
+          <View style={styles.restSheetHeaderSpacer} />
+          <Text
+            style={[
+              styles.restSheetTitle,
+              { color: colors.text, fontFamily: typography.fontFamily },
+            ]}
+          >
+            휴식 타이머
+          </Text>
+          <TouchableOpacity onPress={onClose} style={styles.restSheetCloseBtn} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="close" size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+
+        <Text
+          style={[
+            styles.restSheetExerciseName,
+            { color: colors.textSecondary, fontFamily: typography.fontFamily },
+          ]}
+        >
+          {state.exerciseName}
+        </Text>
+
+        <Text
+          style={[
+            styles.restSheetCurrent,
+            { color: colors.text, fontFamily: typography.fontFamily },
+          ]}
+        >
+          현재 휴식 {formatRestLabel(state.currentSeconds)}
+        </Text>
+        <Text
+          style={[
+            styles.restSheetRecommended,
+            { color: colors.textSecondary, fontFamily: typography.fontFamily },
+          ]}
+        >
+          추천 휴식 {formatRestLabel(state.recommendedSeconds)}
+        </Text>
+
+        <View style={styles.restPresetGrid}>
+          {presetOptions.map((seconds) => {
+            const selected = seconds === state.currentSeconds;
+            return (
+              <TouchableOpacity
+                key={seconds}
+                style={[
+                  styles.restPresetButton,
+                  {
+                    backgroundColor: selected ? colors.accent : colors.background,
+                    borderColor: selected ? colors.accent : colors.border,
+                  },
+                ]}
+                onPress={() => {
+                  onSave(seconds);
+                  onClose();
+                }}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.restPresetText,
+                    {
+                      color: selected ? '#fff' : colors.text,
+                      fontFamily: typography.fontFamily,
+                    },
+                  ]}
+                >
+                  {formatRestLabel(seconds)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={[styles.restCustomCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
+          <Text
+            style={[
+              styles.restCustomLabel,
+              { color: colors.text, fontFamily: typography.fontFamily },
+            ]}
+          >
+            직접 입력
+          </Text>
+          <View style={styles.restCustomRow}>
+            <TextInput
+              style={[
+                styles.restCustomInput,
+                {
+                  color: colors.text,
+                  fontFamily: typography.fontFamily,
+                  borderColor: colors.border,
+                  backgroundColor: colors.card,
+                },
+              ]}
+              keyboardType="number-pad"
+              value={customSecondsText}
+              onChangeText={setCustomSecondsText}
+              placeholder="초"
+              placeholderTextColor={colors.textTertiary}
+            />
+            <TouchableOpacity
+              style={[
+                styles.restApplyBtn,
+                { backgroundColor: canApplyCustom ? colors.accent : colors.border },
+              ]}
+              onPress={() => {
+                if (!canApplyCustom) return;
+                onSave(parsedCustomSeconds);
+                onClose();
+              }}
+              activeOpacity={0.8}
+              disabled={!canApplyCustom}
+            >
+              <Text
+                style={[
+                  styles.restApplyBtnText,
+                  { fontFamily: typography.fontFamily },
+                ]}
+              >
+                적용
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.restSheetFooter}>
+          <TouchableOpacity
+            style={[styles.restSecondaryBtn, { borderColor: colors.border }]}
+            onPress={onReset}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.restSecondaryBtnText,
+                { color: colors.textSecondary, fontFamily: typography.fontFamily },
+              ]}
+            >
+              추천값으로 복원
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -375,6 +564,7 @@ interface ExerciseBlockProps {
   onSetExerciseNote: (note: string) => void;
   showSheet: (config: SheetConfig) => void;
   onSwap: () => void;
+  onOpenRestTimer: () => void;
 }
 
 function ExerciseBlock({
@@ -389,10 +579,12 @@ function ExerciseBlock({
   onSetExerciseNote,
   showSheet,
   onSwap,
+  onOpenRestTimer,
 }: ExerciseBlockProps) {
   const { colors, typography } = useAppTheme();
   const [editingNote, setEditingNote] = useState(false);
   const [noteText, setNoteText] = useState(item.note ?? '');
+  const currentRestSeconds = item.custom_rest_seconds ?? item.exercise.default_rest_seconds;
 
   useEffect(() => {
     setNoteText(item.note ?? '');
@@ -402,6 +594,11 @@ function ExerciseBlock({
     showSheet({
       title: item.exercise.name_ko,
       actions: [
+        {
+          text: '종목 교체',
+          style: 'highlight',
+          onPress: onSwap,
+        },
         {
           text: '종목 삭제',
           style: 'destructive',
@@ -439,53 +636,93 @@ function ExerciseBlock({
     >
       {/* Exercise header */}
       <View style={styles.exHeader}>
-        <Text
-          style={{
-            fontFamily: typography.fontFamily,
-            fontSize: typography.size.md,
-            fontWeight: typography.weight.semibold,
-            color: colors.textTertiary,
-            marginRight: 4,
-          }}
-        >
-          {exerciseIndex + 1}.
-        </Text>
-        <Text
-          style={{
-            fontFamily: typography.fontFamily,
-            fontSize: typography.size.lg,
-            fontWeight: typography.weight.bold,
-            color: colors.accent,
-            flex: 1,
-          }}
-        >
-          {item.exercise.name_ko}
-        </Text>
-        <TouchableOpacity onPress={onSwap} style={{ padding: 6 }}>
-          <Text style={{ fontSize: 12, color: colors.accent }}>교체</Text>
-        </TouchableOpacity>
-        <Text
-          style={{
-            fontFamily: typography.fontFamily,
-            fontSize: typography.size.xs,
-            color: colors.textTertiary,
-            marginRight: 4,
-          }}
-        >
-          휴식 {item.exercise.default_rest_seconds}초
-        </Text>
-        <TouchableOpacity
-          onPress={handleMenuPress}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          style={{ padding: 6 }}
-          activeOpacity={0.6}
-        >
-          <MaterialCommunityIcons
-            name="dots-horizontal"
-            size={22}
-            color={colors.textSecondary}
-          />
-        </TouchableOpacity>
+        <View style={styles.exHeaderMainRow}>
+          <View style={styles.exHeaderTitleWrap}>
+            <Text
+              style={{
+                fontFamily: typography.fontFamily,
+                fontSize: typography.size.md,
+                fontWeight: typography.weight.semibold,
+                color: colors.textTertiary,
+                marginRight: 4,
+              }}
+            >
+              {exerciseIndex + 1}.
+            </Text>
+            <Text
+              style={{
+                fontFamily: typography.fontFamily,
+                fontSize: typography.size.lg,
+                fontWeight: typography.weight.bold,
+                color: colors.accent,
+              }}
+              numberOfLines={1}
+            >
+              {item.exercise.name_ko}
+            </Text>
+            <View style={{ marginLeft: 8 }}>
+              <ExerciseVisualGuide
+                exerciseId={item.exercise.id}
+                visualGuideUrl={item.exercise.visual_guide_url}
+                description={item.exercise.description_ko ?? item.exercise.description_en}
+                exerciseName={item.exercise.name_ko}
+                overview={item.exercise.overview_ko ?? item.exercise.overview_en}
+                why={item.exercise.why_ko ?? item.exercise.why_en}
+                how={item.exercise.how_ko ?? item.exercise.how_en}
+                triggerVariant="icon"
+                iconColor={colors.textSecondary}
+                iconBackgroundColor={colors.background}
+                iconBorderColor={colors.border}
+              />
+            </View>
+          </View>
+
+          <View style={styles.exHeaderActions}>
+            <TouchableOpacity onPress={onSwap} style={styles.swapBtn} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="swap-horizontal" size={18} color={colors.accent} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onOpenRestTimer}
+              style={[styles.restTimerButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="timer-outline" size={18} color={colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleMenuPress}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={{ padding: 6 }}
+              activeOpacity={0.6}
+            >
+              <MaterialCommunityIcons
+                name="dots-horizontal"
+                size={22}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.exHeaderMetaRow}>
+          <Text
+            style={{
+              fontFamily: typography.fontFamily,
+              fontSize: typography.size.xs,
+              color: colors.textSecondary,
+            }}
+          >
+            현재 휴식 {formatRestLabel(currentRestSeconds)}
+          </Text>
+          <Text
+            style={{
+              fontFamily: typography.fontFamily,
+              fontSize: typography.size.xs,
+              color: colors.textTertiary,
+            }}
+          >
+            추천 {formatRestLabel(item.exercise.default_rest_seconds)}
+          </Text>
+        </View>
       </View>
 
       {/* Exercise note */}
@@ -811,6 +1048,7 @@ export default function WorkoutSessionScreen({ navigation }: Props) {
     removeExercise,
     removeSet,
     setExerciseNote,
+    setExerciseRestSeconds,
     updateExerciseName,
   } = useWorkoutStore();
 
@@ -824,6 +1062,7 @@ export default function WorkoutSessionScreen({ navigation }: Props) {
     exIdx: number;
     exerciseName: string;
   } | null>(null);
+  const [restTimerSheet, setRestTimerSheet] = useState<RestTimerSheetState | null>(null);
 
   const handleSessionSwap = (newName: string) => {
     if (!swapSheet) return;
@@ -852,6 +1091,49 @@ export default function WorkoutSessionScreen({ navigation }: Props) {
   }, []);
 
   const dismissSheet = useCallback(() => setActiveSheet(null), []);
+
+  const openRestTimerSheet = useCallback((exerciseIndex: number) => {
+    Keyboard.dismiss();
+    const exercise = useWorkoutStore.getState().sessionExercises[exerciseIndex];
+    if (!exercise) return;
+    setRestTimerSheet({
+      exerciseIndex,
+      exerciseName: exercise.exercise.name_ko,
+      currentSeconds: exercise.custom_rest_seconds ?? exercise.exercise.default_rest_seconds,
+      recommendedSeconds: exercise.exercise.default_rest_seconds,
+    });
+  }, []);
+
+  const closeRestTimerSheet = useCallback(() => setRestTimerSheet(null), []);
+
+  const handleSaveRestSeconds = useCallback(
+    (seconds: number) => {
+      if (!restTimerSheet) return;
+      setExerciseRestSeconds(restTimerSheet.exerciseIndex, seconds);
+      setRestTimerSheet((prev) =>
+        prev
+          ? {
+              ...prev,
+              currentSeconds: seconds,
+            }
+          : prev,
+      );
+    },
+    [restTimerSheet, setExerciseRestSeconds],
+  );
+
+  const handleResetRestSeconds = useCallback(() => {
+    if (!restTimerSheet) return;
+    setExerciseRestSeconds(restTimerSheet.exerciseIndex, null);
+    setRestTimerSheet((prev) =>
+      prev
+        ? {
+            ...prev,
+            currentSeconds: prev.recommendedSeconds,
+          }
+        : prev,
+    );
+  }, [restTimerSheet, setExerciseRestSeconds]);
 
   const handleCompleteSet = useCallback(
     async (exerciseIndex: number, setIndex: number) => {
@@ -1024,6 +1306,7 @@ export default function WorkoutSessionScreen({ navigation }: Props) {
               onSetExerciseNote={(note) => setExerciseNote(ei, note)}
               showSheet={showSheet}
               onSwap={() => setSwapSheet({ visible: true, exIdx: ei, exerciseName: ex.exercise.name_ko })}
+              onOpenRestTimer={() => openRestTimerSheet(ei)}
             />
           ))
         )}
@@ -1043,12 +1326,27 @@ export default function WorkoutSessionScreen({ navigation }: Props) {
 
       {/* ── Custom Bottom Sheet (replaces Alert) ── */}
       <BottomSheet config={activeSheet} onDismiss={dismissSheet} />
+      <RestTimerSheet
+        state={restTimerSheet}
+        onClose={closeRestTimerSheet}
+        onSave={handleSaveRestSeconds}
+        onReset={handleResetRestSeconds}
+      />
 
       {swapSheet && (
         <SwapExerciseSheet
           exerciseName={swapSheet.exerciseName}
           visible={swapSheet.visible}
           onSelect={handleSessionSwap}
+          onPressCustomSelect={() => {
+            const currentSwapSheet = swapSheet;
+            setSwapSheet(null);
+            navigation.navigate('ExerciseSearch', {
+              mode: 'replace',
+              exerciseIndex: currentSwapSheet.exIdx,
+              initialQuery: currentSwapSheet.exerciseName,
+            });
+          }}
           onClose={() => setSwapSheet(null)}
           colors={colors}
         />
@@ -1177,11 +1475,151 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   exHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 10,
+    gap: 8,
+  },
+  exHeaderMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  exHeaderTitleWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+    minWidth: 0,
+  },
+  exHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  exHeaderMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: 24,
+    gap: 8,
+  },
+  swapBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  restTimerButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  restSheetHeaderSpacer: {
+    width: 36,
+    height: 36,
+  },
+  restSheetTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+    flex: 1,
+  },
+  restSheetCloseBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restSheetExerciseName: {
+    marginTop: 4,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  restSheetCurrent: {
+    marginTop: 20,
+    fontSize: 26,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  restSheetRecommended: {
+    marginTop: 6,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  restPresetGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 24,
+  },
+  restPresetButton: {
+    width: 94,
+    height: 94,
+    borderRadius: 47,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restPresetText: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  restCustomCard: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 24,
+  },
+  restCustomLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  restCustomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  restCustomInput: {
+    flex: 1,
+    height: 46,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    fontSize: 16,
+  },
+  restApplyBtn: {
+    height: 46,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restApplyBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  restSheetFooter: {
+    marginTop: 16,
+  },
+  restSecondaryBtn: {
+    height: 46,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restSecondaryBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   noteRow: {
     paddingHorizontal: 16,

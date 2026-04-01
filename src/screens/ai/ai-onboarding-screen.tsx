@@ -24,7 +24,15 @@ import {
   saveOnboardingDataToSupabase,
   validateSafety,
 } from '../../lib/ai-planner';
-import { AIGoal, GymType, OnboardingData, StrengthEntry, useAIPlanStore } from '../../stores/ai-plan-store';
+import {
+  AI_EXPERIENCE_LABEL,
+  AIGoal,
+  GymType,
+  OnboardingData,
+  StrengthEntry,
+  normalizeExperience,
+  useAIPlanStore,
+} from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { supabase } from '../../lib/supabase';
 import { useAppTheme } from '../../theme';
@@ -247,9 +255,9 @@ const QUESTIONS: Question[] = [
     phase: 1,
     showWhen: (answers) => answers.goal === 'strength_gain',
     options: [
-      { label: '스쿼트', value: 'squat' },
+      { label: '바벨 스쿼트', value: 'squat' },
       { label: '벤치프레스', value: 'bench' },
-      { label: '데드리프트', value: 'deadlift' },
+      { label: '컨벤셔널 데드리프트', value: 'deadlift' },
       { label: '전신 균형', value: 'balanced' },
     ],
   },
@@ -294,9 +302,11 @@ const QUESTIONS: Question[] = [
     type: 'single',
     phase: 1,
     options: [
-      { label: '입문 (0~6개월)', value: 'beginner' },
-      { label: '초급~중급 (6개월~2년)', value: 'intermediate' },
-      { label: '중급 이상 (2년+)', value: 'advanced' },
+      { label: AI_EXPERIENCE_LABEL.beginner, value: 'beginner' },
+      { label: AI_EXPERIENCE_LABEL.novice, value: 'novice' },
+      { label: AI_EXPERIENCE_LABEL.intermediate, value: 'intermediate' },
+      { label: AI_EXPERIENCE_LABEL.upper_intermediate, value: 'upper_intermediate' },
+      { label: AI_EXPERIENCE_LABEL.advanced, value: 'advanced' },
     ],
   },
   {
@@ -391,9 +401,9 @@ function getVisibleQuestions(
 }
 
 const MAIN_EXERCISES = [
-  { id: 'squat', label: '스쿼트' },
+  { id: 'squat', label: '바벨 스쿼트' },
   { id: 'bench', label: '벤치프레스' },
-  { id: 'deadlift', label: '데드리프트' },
+  { id: 'deadlift', label: '컨벤셔널 데드리프트' },
   { id: 'ohp', label: '오버헤드프레스' },
   { id: 'row', label: '바벨로우' },
 ];
@@ -542,7 +552,7 @@ export default function AIOnboardingScreen() {
       age: parseInt(String(raw.age ?? '0'), 10),
       height: parseFloat(String(raw.height ?? '0')),
       weight: parseFloat(String(raw.weight ?? '0')),
-      experience: (raw.experience as OnboardingData['experience']) ?? 'beginner',
+      experience: normalizeExperience(raw.experience),
       workoutDaysPerWeek: parseInt(String(raw.workoutDaysPerWeek ?? '3'), 10),
       gymType: (raw.gymType as GymType) ?? 'full_gym',
       ...(selectedEquipment.length > 0 ? { equipmentList: selectedEquipment } : {}),

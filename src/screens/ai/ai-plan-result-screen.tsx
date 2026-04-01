@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
@@ -73,9 +74,9 @@ function GoalSummaryCard({
   const isCompact = width < 380;
 
   const primaryStrengthFocusLabel: Record<NonNullable<OnboardingData['primaryStrengthFocus']>, string> = {
-    squat: '스쿼트',
+    squat: '바벨 스쿼트',
     bench: '벤치프레스',
-    deadlift: '데드리프트',
+    deadlift: '컨벤셔널 데드리프트',
     balanced: '전신 균형',
   };
 
@@ -203,7 +204,7 @@ function WorkoutDayCard({
               style={{ padding: 8 }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Text style={{ fontSize: 12, color: colors.accent }}>교체</Text>
+              <MaterialCommunityIcons name="swap-horizontal" size={18} color={colors.accent} />
             </TouchableOpacity>
           )}
         </View>

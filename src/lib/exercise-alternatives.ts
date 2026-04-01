@@ -9,11 +9,11 @@ export const EXERCISE_ALTERNATIVES: Record<string, ExerciseAlternatives> = {
     similar: ['덤벨 벤치프레스', '푸쉬업'],
     alternatives: ['인클라인 덤벨 프레스', '체스트 플라이', '딥스'],
   },
-  '스쿼트': {
+  '바벨 스쿼트': {
     similar: ['고블릿 스쿼트', '박스 스쿼트'],
     alternatives: ['렉프레스', '불가리안 스플릿 스쿼트', '런지'],
   },
-  '데드리프트': {
+  '컨벤셔널 데드리프트': {
     similar: ['루마니안 데드리프트', '스티프레그 데드리프트'],
     alternatives: ['힙힌지 머신', '케이블 풀스루', '굿모닝'],
   },
@@ -43,11 +43,11 @@ export const EXERCISE_ALTERNATIVES: Record<string, ExerciseAlternatives> = {
   },
   '레그프레스': {
     similar: ['해크 스쿼트', '불가리안 스플릿 스쿼트'],
-    alternatives: ['스쿼트', '런지', '레그 익스텐션'],
+    alternatives: ['바벨 스쿼트', '런지', '레그 익스텐션'],
   },
   '레그 익스텐션': {
     similar: ['머신 레그 익스텐션'],
-    alternatives: ['스쿼트', '런지', '불가리안 스플릿 스쿼트'],
+    alternatives: ['바벨 스쿼트', '런지', '불가리안 스플릿 스쿼트'],
   },
   '레그 컬': {
     similar: ['라잉 레그컬', '시티드 레그컬'],
@@ -99,11 +99,11 @@ export const EXERCISE_ALTERNATIVES: Record<string, ExerciseAlternatives> = {
   },
   '힙힌지': {
     similar: ['케이블 풀스루', '굿모닝'],
-    alternatives: ['루마니안 데드리프트', '힙 쓰러스트', '데드리프트'],
+    alternatives: ['루마니안 데드리프트', '힙 쓰러스트', '컨벤셔널 데드리프트'],
   },
   '불가리안 스플릿 스쿼트': {
     similar: ['덤벨 스플릿 스쿼트'],
-    alternatives: ['런지', '레그프레스', '스쿼트'],
+    alternatives: ['런지', '레그프레스', '바벨 스쿼트'],
   },
   '체스트 플라이': {
     similar: ['덤벨 플라이', '인클라인 플라이'],
@@ -111,7 +111,7 @@ export const EXERCISE_ALTERNATIVES: Record<string, ExerciseAlternatives> = {
   },
   '바벨 힙 쓰러스트': {
     similar: ['힙 쓰러스트', '글루트 브릿지'],
-    alternatives: ['데드리프트', '루마니안 데드리프트', '케이블 킥백'],
+    alternatives: ['컨벤셔널 데드리프트', '루마니안 데드리프트', '케이블 킥백'],
   },
 };
 

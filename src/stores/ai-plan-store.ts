@@ -6,8 +6,16 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 export type AIGoal = 'weight_loss' | 'muscle_gain' | 'lean_bulk' | 'strength_gain' | 'maintenance' | 'health';
 export type AIGender = 'male' | 'female' | 'undisclosed';
-export type AIExperience = 'beginner' | 'intermediate' | 'advanced';
+export type AIExperience = 'beginner' | 'novice' | 'intermediate' | 'upper_intermediate' | 'advanced';
 export type GymType = 'full_gym' | 'garage_gym' | 'dumbbell_only' | 'bodyweight';
+
+export const AI_EXPERIENCE_LABEL: Record<AIExperience, string> = {
+  beginner: '입문 (0~3개월)',
+  novice: '초급 (3개월~1년)',
+  intermediate: '중급 (1~2년)',
+  upper_intermediate: '중상급 (2~4년)',
+  advanced: '상급 (4년+)',
+};
 
 export const AI_GOAL_LABEL: Record<AIGoal, string> = {
   weight_loss: '체중 감량',
@@ -93,6 +101,7 @@ export interface AIPlan {
 }
 
 type LegacyDayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+type LegacyAIExperience = 'beginner' | 'intermediate' | 'advanced';
 
 type LegacyWorkoutDay = Omit<WorkoutDay, 'dayLabel'> & {
   dayLabel?: WorkoutDay['dayLabel'];
@@ -103,6 +112,44 @@ type LegacyAIPlan = Omit<AIPlan, 'weeklyWorkout'> & {
   weeklyWorkout: LegacyWorkoutDay[];
 };
 
+function normalizeExerciseDisplayName(name: string): string {
+  if (name === '데드리프트') return '컨벤셔널 데드리프트';
+  if (name === '스쿼트') return '바벨 스쿼트';
+  return name;
+}
+
+function normalizeStrengthEntries(entries?: StrengthEntry[]): StrengthEntry[] | undefined {
+  return entries?.map((entry) => ({
+    ...entry,
+    exercise: normalizeExerciseDisplayName(entry.exercise),
+  }));
+}
+
+export function normalizeExperience(value: unknown): AIExperience {
+  switch (value) {
+    case 'beginner':
+    case 'novice':
+    case 'intermediate':
+    case 'upper_intermediate':
+    case 'advanced':
+      return value;
+    default:
+      return 'beginner';
+  }
+}
+
+function normalizeOnboardingData(
+  data?: Partial<OnboardingData> | (Omit<OnboardingData, 'experience'> & { experience?: AIExperience | LegacyAIExperience }) | null,
+): OnboardingData | null {
+  if (!data) return null;
+
+  return {
+    ...data,
+    experience: normalizeExperience(data.experience),
+    strengthProfile: normalizeStrengthEntries(data.strengthProfile),
+  } as OnboardingData;
+}
+
 const LEGACY_DAY_ORDER: LegacyDayOfWeek[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
 function normalizeWorkoutDay(day: LegacyWorkoutDay, index: number): WorkoutDay {
@@ -110,6 +157,10 @@ function normalizeWorkoutDay(day: LegacyWorkoutDay, index: number): WorkoutDay {
     return {
       ...day,
       dayLabel: day.dayLabel,
+      exercises: (day.exercises ?? []).map((exercise) => ({
+        ...exercise,
+        name: normalizeExerciseDisplayName(exercise.name),
+      })),
     };
   }
 
@@ -119,6 +170,10 @@ function normalizeWorkoutDay(day: LegacyWorkoutDay, index: number): WorkoutDay {
       return {
         ...day,
         dayLabel: `day${legacyIndex + 1}` as WorkoutDay['dayLabel'],
+        exercises: (day.exercises ?? []).map((exercise) => ({
+          ...exercise,
+          name: normalizeExerciseDisplayName(exercise.name),
+        })),
       };
     }
   }
@@ -127,6 +182,10 @@ function normalizeWorkoutDay(day: LegacyWorkoutDay, index: number): WorkoutDay {
   return {
     ...day,
     dayLabel: `day${fallbackIndex}` as WorkoutDay['dayLabel'],
+    exercises: (day.exercises ?? []).map((exercise) => ({
+      ...exercise,
+      name: normalizeExerciseDisplayName(exercise.name),
+    })),
   };
 }
 
@@ -192,7 +251,10 @@ export const useAIPlanStore = create<AIPlanState>()(
       markOnboardingComplete: () => set({ hasCompletedOnboarding: true, needsOnboarding: false }),
 
       setOnboardingData: (data) =>
-        set({ onboardingData: data, hasCompletedOnboarding: true }),
+        set({
+          onboardingData: normalizeOnboardingData(data),
+          hasCompletedOnboarding: true,
+        }),
 
       setCurrentPlan: (plan) =>
         set((state) => ({
@@ -408,13 +470,14 @@ export const useAIPlanStore = create<AIPlanState>()(
     {
       name: 'ai-plan-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 3,
+      version: 4,
       migrate: (persistedState) => {
         const state = persistedState as Partial<AIPlanState> | undefined;
         if (!state) return persistedState as AIPlanState;
 
         return {
           ...state,
+          onboardingData: normalizeOnboardingData(state.onboardingData),
           currentPlan: normalizeAIPlan(state.currentPlan as AIPlan | LegacyAIPlan | null),
           previousPlan: normalizeAIPlan(state.previousPlan as AIPlan | LegacyAIPlan | null),
         } as AIPlanState;

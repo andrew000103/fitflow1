@@ -1,21 +1,38 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { getLatestUserGoal, getUserProfile } from '../lib/profile';
-import { supabase } from '../lib/supabase';
+import { createJSONStorage, persist } from 'zustand/middleware';
+
+import { getLatestUserGoal } from '../lib/profile';
 import {
-  PersonaCalculationResult,
-  PersonaGoalSnapshot,
-  PersonaMealDaySummary,
-  PersonaOnboardingInput,
-  PersonaProfileSnapshot,
-  PersonaSourceBreakdown,
-  PersonaStage,
-  PersonaDailyState,
-  PersonaDataCompleteness,
   calculatePersonaProfile,
+  type EvolutionChecklistItem,
+  type HamsterLevelId,
+  type PersonaCalculationResult,
+  type PersonaDailyState,
+  type PersonaGoalSnapshot,
+  type PersonaMealDaySummary,
+  type PersonaOnboardingInput,
 } from '../lib/persona-engine';
+import { supabase } from '../lib/supabase';
+import { type AIPlan } from './ai-plan-store';
 import { useAIPlanStore } from './ai-plan-store';
+import { useAuthStore } from './auth-store';
 import { useDietStore } from './diet-store';
 import type { MealEntry } from '../types/food';
+
+export type QuickCharacterWorkoutFrequency = '1_2' | '3_4' | '5_plus';
+export type QuickCharacterTrainingStyle = 'health' | 'physique' | 'performance';
+export type QuickCharacterDietConsistency = 'low' | 'medium' | 'high';
+
+export interface QuickCharacterProfile {
+  userId: string;
+  experience: NonNullable<PersonaOnboardingInput['experience']>;
+  workoutFrequency: QuickCharacterWorkoutFrequency;
+  trainingStyle: QuickCharacterTrainingStyle;
+  dietConsistency?: QuickCharacterDietConsistency | null;
+  completedAt: string;
+  source: 'quick_character_setup';
+}
 
 interface WorkoutSessionRow {
   id: string;
@@ -24,22 +41,37 @@ interface WorkoutSessionRow {
 }
 
 interface PersonaStoreState {
-  personaId: PersonaCalculationResult['personaId'] | null;
-  personaStage: PersonaStage | null;
-  confidence: number;
+  quickCharacterProfile: QuickCharacterProfile | null;
+  levelId: HamsterLevelId | null;
+  levelName: string | null;
+  nextLevelId: HamsterLevelId | null;
+  nextLevelName: string | null;
+  progressToNext: number;
+  checklist: EvolutionChecklistItem[];
   dailyState: PersonaDailyState | null;
   headlineMessage: string | null;
+  progressMessage: string | null;
   supportingMessage: string | null;
   reliabilityState: 'idle' | 'loading' | 'temporary' | 'ready' | 'error';
-  validationWarnings: string[];
-  sourceBreakdown: PersonaSourceBreakdown | null;
-  dataCompleteness: PersonaDataCompleteness | null;
-  nickname: string | null;
   lastUpdated: string | null;
   isCalculating: boolean;
   error: string | null;
+  setQuickCharacterProfile: (profile: Omit<QuickCharacterProfile, 'completedAt' | 'source'>) => void;
+  clearQuickCharacterProfile: () => void;
   calculatePersona: (userId: string) => Promise<PersonaCalculationResult | null>;
   reset: () => void;
+}
+
+interface WorkoutProgressSummary {
+  totalCompletedSessions: number;
+  sessionCount14d: number;
+  sessionCount28d: number;
+  sessionCount56d: number;
+  activeDays14d: number;
+  activeDays28d: number;
+  activeDays56d: number;
+  completedToday: boolean;
+  latestCompletedAt: string | null;
 }
 
 let latestPersonaRequestId = 0;
@@ -85,51 +117,49 @@ function summarizeMealEntries(entries: MealEntry[], date: string): PersonaMealDa
   );
 }
 
-function buildMealSummariesForRecentWeek(userId: string, now = new Date()) {
+function buildMealSummaries(userId: string, windowDays: number, now = new Date()) {
   const { allEntriesByUser, currentUserId } = useDietStore.getState();
   const userEntriesByDate = allEntriesByUser[userId] ?? {};
   const knownDates = Object.keys(userEntriesByDate);
+  const dates = Array.from({ length: windowDays }, (_, index) => formatDateKey(addDays(now, index - (windowDays - 1))));
+  const summaries = dates.map((date) => summarizeMealEntries(userEntriesByDate[date] ?? [], date));
 
-  const days = Array.from({ length: 7 }, (_, index) => {
-    const date = formatDateKey(addDays(now, index - 6));
-    return summarizeMealEntries(userEntriesByDate[date] ?? [], date);
-  });
-
-  const todayKey = formatDateKey(now);
   return {
-    meals7d: days,
-    todayMeals: days.find((day) => day.date === todayKey) ?? summarizeMealEntries(userEntriesByDate[todayKey] ?? [], todayKey),
+    summaries,
+    hasAnyEntries: summaries.some((day) => day.entryCount > 0),
     isReady: currentUserId === userId && knownDates.length > 0,
-    hasAnyEntries: days.some((day) => day.entryCount > 0),
   };
 }
 
 function mapOnboardingData(): PersonaOnboardingInput | null {
   const onboarding = useAIPlanStore.getState().onboardingData;
-  if (!onboarding) return null;
+  if (onboarding) {
+    return {
+      goal: onboarding.goal,
+      experience: onboarding.experience,
+      workoutDaysPerWeek: onboarding.workoutDaysPerWeek,
+      dietaryRestrictions: onboarding.dietaryRestrictions,
+      overeatingHabit: onboarding.overeatingHabit,
+      age: onboarding.age,
+      height: onboarding.height,
+      weight: onboarding.weight,
+      gender: onboarding.gender,
+    };
+  }
+
+  const quickProfile = usePersonaStore.getState().quickCharacterProfile;
+  const currentUserId = useAuthStore.getState().user?.id;
+  if (!quickProfile || !currentUserId || quickProfile.userId !== currentUserId) return null;
+
+  const workoutDaysPerWeek = quickProfile.workoutFrequency === '1_2'
+    ? 2
+    : quickProfile.workoutFrequency === '3_4'
+      ? 4
+      : 5;
 
   return {
-    goal: onboarding.goal,
-    experience: onboarding.experience,
-    workoutDaysPerWeek: onboarding.workoutDaysPerWeek,
-    dietaryRestrictions: onboarding.dietaryRestrictions,
-    overeatingHabit: onboarding.overeatingHabit,
-    age: onboarding.age,
-    height: onboarding.height,
-    weight: onboarding.weight,
-    gender: onboarding.gender,
-  };
-}
-
-function mapProfile(profile: Awaited<ReturnType<typeof getUserProfile>>): PersonaProfileSnapshot | null {
-  if (!profile) return null;
-
-  return {
-    createdAt: profile.created_at,
-    age: profile.age,
-    heightCm: profile.height_cm,
-    weightKg: profile.weight_kg,
-    gender: profile.gender,
+    experience: quickProfile.experience,
+    workoutDaysPerWeek,
   };
 }
 
@@ -145,59 +175,109 @@ function mapGoal(goal: Awaited<ReturnType<typeof getLatestUserGoal>>): PersonaGo
   };
 }
 
-async function fetchRecentWorkoutSummary(userId: string, now = new Date()) {
-  const since = startOfDay(addDays(now, -13)).toISOString();
+function mapAppliedPlanGoal(plan: AIPlan | null): PersonaGoalSnapshot | null {
+  if (!plan?.isApplied) return null;
+
+  return {
+    caloriesTarget: plan.targetCalories,
+    proteinTargetG: plan.targetMacros.protein,
+    carbsTargetG: plan.targetMacros.carbs,
+    fatTargetG: plan.targetMacros.fat,
+  };
+}
+
+function buildActiveDayCount(sessions: WorkoutSessionRow[], windowStart: number) {
+  return new Set(
+    sessions
+      .map((session) => session.ended_at ?? session.started_at)
+      .filter((basis): basis is string => Boolean(basis))
+      .filter((basis) => new Date(basis).getTime() >= windowStart)
+      .map((basis) => formatDateKey(new Date(basis))),
+  ).size;
+}
+
+async function fetchWorkoutProgressSummary(userId: string, now = new Date()): Promise<WorkoutProgressSummary> {
+  const since56d = startOfDay(addDays(now, -55)).toISOString();
+  const since28dMs = startOfDay(addDays(now, -27)).getTime();
+  const since14dMs = startOfDay(addDays(now, -13)).getTime();
+  const since56dMs = startOfDay(addDays(now, -55)).getTime();
   const todayStart = startOfDay(now).getTime();
   const todayEnd = endOfDay(now).getTime();
 
-  const { data, error } = await supabase
-    .from('workout_sessions')
-    .select('id, started_at, ended_at')
-    .eq('user_id', userId)
-    .gte('started_at', since)
-    .order('started_at', { ascending: false });
+  const [{ data, error }, { count, error: countError }] = await Promise.all([
+    supabase
+      .from('workout_sessions')
+      .select('id, started_at, ended_at')
+      .eq('user_id', userId)
+      .gte('started_at', since56d)
+      .order('started_at', { ascending: false }),
+    supabase
+      .from('workout_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .not('ended_at', 'is', null),
+  ]);
 
   if (error) throw error;
+  if (countError) throw countError;
 
   const completedSessions = ((data ?? []) as WorkoutSessionRow[]).filter((session) => session.ended_at);
-  const activeDays = new Set(
-    completedSessions
-      .map((session) => {
-        const basis = session.ended_at ?? session.started_at;
-        if (!basis) return null;
-        return formatDateKey(new Date(basis));
-      })
-      .filter(Boolean) as string[],
-  );
+  const sessionCount14d = completedSessions.filter((session) => {
+    const basis = session.ended_at ?? session.started_at;
+    return basis ? new Date(basis).getTime() >= since14dMs : false;
+  }).length;
+  const sessionCount28d = completedSessions.filter((session) => {
+    const basis = session.ended_at ?? session.started_at;
+    return basis ? new Date(basis).getTime() >= since28dMs : false;
+  }).length;
+  const latestCompletedAt = completedSessions[0]?.ended_at ?? null;
 
   return {
-    sessionCount14d: completedSessions.length,
-    activeDays14d: activeDays.size,
+    totalCompletedSessions: count ?? completedSessions.length,
+    sessionCount14d,
+    sessionCount28d,
+    sessionCount56d: completedSessions.length,
+    activeDays14d: buildActiveDayCount(completedSessions, since14dMs),
+    activeDays28d: buildActiveDayCount(completedSessions, since28dMs),
+    activeDays56d: buildActiveDayCount(completedSessions, since56dMs),
     completedToday: completedSessions.some((session) => {
       const basis = session.ended_at ?? session.started_at;
       if (!basis) return false;
       const timestamp = new Date(basis).getTime();
       return timestamp >= todayStart && timestamp <= todayEnd;
     }),
-    latestCompletedAt: completedSessions[0]?.ended_at ?? null,
+    latestCompletedAt,
   };
 }
 
-export const usePersonaStore = create<PersonaStoreState>((set) => ({
-  personaId: null,
-  personaStage: null,
-  confidence: 0,
+export const usePersonaStore = create<PersonaStoreState>()(
+  persist((set) => ({
+  quickCharacterProfile: null,
+  levelId: null,
+  levelName: null,
+  nextLevelId: null,
+  nextLevelName: null,
+  progressToNext: 0,
+  checklist: [],
   dailyState: null,
   headlineMessage: null,
+  progressMessage: null,
   supportingMessage: null,
   reliabilityState: 'idle',
-  validationWarnings: [],
-  sourceBreakdown: null,
-  dataCompleteness: null,
-  nickname: null,
   lastUpdated: null,
   isCalculating: false,
   error: null,
+
+  setQuickCharacterProfile: (profile) =>
+    set({
+      quickCharacterProfile: {
+        ...profile,
+        completedAt: new Date().toISOString(),
+        source: 'quick_character_setup',
+      },
+    }),
+
+  clearQuickCharacterProfile: () => set({ quickCharacterProfile: null }),
 
   calculatePersona: async (userId) => {
     const requestId = ++latestPersonaRequestId;
@@ -206,64 +286,54 @@ export const usePersonaStore = create<PersonaStoreState>((set) => ({
     try {
       const now = new Date();
       const onboarding = mapOnboardingData();
-      const mealContext = buildMealSummariesForRecentWeek(userId, now);
-      const { meals7d, todayMeals } = mealContext;
+      const currentPlan = useAIPlanStore.getState().currentPlan;
+      const mealContext56d = buildMealSummaries(userId, 56, now);
+      const meals56d = mealContext56d.summaries;
+      const meals28d = meals56d.slice(-28);
+      const meals14d = meals56d.slice(-14);
+      const todayMeals = meals56d[meals56d.length - 1] ?? summarizeMealEntries([], formatDateKey(now));
 
-      const [profileRecord, goalRecord, workouts] = await Promise.all([
-        getUserProfile(userId),
+      const [goalRecord, workouts] = await Promise.all([
         getLatestUserGoal(userId),
-        fetchRecentWorkoutSummary(userId, now),
+        fetchWorkoutProgressSummary(userId, now),
       ]);
 
+      const resolvedGoal = mapAppliedPlanGoal(currentPlan) ?? mapGoal(goalRecord);
+
       const result = calculatePersonaProfile({
-        profile: mapProfile(profileRecord),
-        goal: mapGoal(goalRecord),
+        goal: resolvedGoal,
         onboarding,
         workouts,
-        meals7d,
+        meals14d,
+        meals28d,
+        meals56d,
         todayMeals,
-        now,
       });
-
-      const isMealDataReady = mealContext.isReady;
-      const confidence = isMealDataReady ? result.confidence : Math.min(result.confidence, 0.45);
-      const validationWarnings: string[] = [];
-
-      if (!isMealDataReady) {
-        validationWarnings.push('meal-data-not-ready');
-      }
-      if (!mealContext.hasAnyEntries) {
-        validationWarnings.push('meal-history-empty');
-      }
-      if (result.sourceBreakdown.goalSource !== 'user_goal') {
-        validationWarnings.push('goal-derived-from-fallback');
-      }
-      if (result.dataCompleteness.score < 0.55) {
-        validationWarnings.push('low-data-completeness');
-      }
-
-      const supportingMessage = !isMealDataReady
-        ? '최근 식단 기록을 아직 모두 불러오지 못해 임시 페르소나를 보여주고 있어요.'
-        : !mealContext.hasAnyEntries
-          ? '식단 기록이 더 쌓이면 페르소나가 더 정확해져요.'
-          : null;
 
       if (requestId !== latestPersonaRequestId) {
         return result;
       }
 
+      const hasMealData = mealContext56d.hasAnyEntries;
+      const isMealDataReady = mealContext56d.isReady;
+      const supportingMessage = !isMealDataReady
+        ? '식단 기록을 아직 다 불러오지 못해 운동 기록 중심으로 진화도를 보여주고 있어요.'
+        : !hasMealData
+          ? '식단 기록까지 쌓이면 진화 진행도가 더 빨리 올라가요.'
+          : null;
+
       set({
-        personaId: result.personaId,
-        personaStage: result.personaStage,
-        confidence,
+        levelId: result.levelId,
+        levelName: result.levelName,
+        nextLevelId: result.nextLevelId,
+        nextLevelName: result.nextLevelName,
+        progressToNext: result.progressToNext,
+        checklist: result.checklist,
         dailyState: result.dailyState,
         headlineMessage: result.headlineMessage,
+        progressMessage: result.progressMessage,
         supportingMessage,
-        reliabilityState: isMealDataReady && validationWarnings.length === 0 ? 'ready' : 'temporary',
-        validationWarnings,
-        sourceBreakdown: result.sourceBreakdown,
-        dataCompleteness: result.dataCompleteness,
-        nickname: result.nickname,
+        reliabilityState: isMealDataReady ? 'ready' : 'temporary',
         lastUpdated: now.toISOString(),
         isCalculating: false,
         error: null,
@@ -274,19 +344,20 @@ export const usePersonaStore = create<PersonaStoreState>((set) => ({
       if (requestId !== latestPersonaRequestId) {
         return null;
       }
-      const message = error instanceof Error ? error.message : 'Failed to calculate persona';
+
+      const message = error instanceof Error ? error.message : 'Failed to calculate hamster evolution';
       set({
-        personaId: null,
-        personaStage: null,
-        confidence: 0,
+        levelId: null,
+        levelName: null,
+        nextLevelId: null,
+        nextLevelName: null,
+        progressToNext: 0,
+        checklist: [],
         dailyState: null,
         headlineMessage: null,
-        supportingMessage: '페르소나를 다시 계산하지 못했어요. 잠시 후 다시 불러올게요.',
+        progressMessage: null,
+        supportingMessage: '햄식이 진화 상태를 다시 계산하지 못했어요. 잠시 후 다시 불러올게요.',
         reliabilityState: 'error',
-        validationWarnings: ['calculation-failed'],
-        sourceBreakdown: null,
-        dataCompleteness: null,
-        nickname: null,
         lastUpdated: null,
         isCalculating: false,
         error: message,
@@ -297,19 +368,28 @@ export const usePersonaStore = create<PersonaStoreState>((set) => ({
 
   reset: () =>
     set({
-      personaId: null,
-      personaStage: null,
-      confidence: 0,
+      quickCharacterProfile: null,
+      levelId: null,
+      levelName: null,
+      nextLevelId: null,
+      nextLevelName: null,
+      progressToNext: 0,
+      checklist: [],
       dailyState: null,
       headlineMessage: null,
+      progressMessage: null,
       supportingMessage: null,
       reliabilityState: 'idle',
-      validationWarnings: [],
-      sourceBreakdown: null,
-      dataCompleteness: null,
-      nickname: null,
       lastUpdated: null,
       isCalculating: false,
       error: null,
     }),
-}));
+}),
+    {
+      name: 'persona-store',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        quickCharacterProfile: state.quickCharacterProfile,
+      }),
+    })
+);

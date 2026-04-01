@@ -32,6 +32,15 @@ export interface ProgramExerciseRow {
     category: string | null;
     default_rest_seconds: number;
     is_custom: boolean;
+    visual_guide_url?: string;
+    description_en?: string;
+    description_ko?: string;
+    overview_en?: string;
+    overview_ko?: string;
+    why_en?: string;
+    why_ko?: string;
+    how_en?: string;
+    how_ko?: string;
   } | null;
 }
 

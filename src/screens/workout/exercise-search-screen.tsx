@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -10,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import ExerciseVisualGuide from '../../components/workout/ExerciseVisualGuide';
 import { Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BUILT_IN_EXERCISES } from '../../constants/exercises';
@@ -23,16 +25,19 @@ import { Exercise } from '../../types/workout';
 
 type Props = {
   navigation: NativeStackNavigationProp<WorkoutStackParamList, 'ExerciseSearch'>;
+  route: RouteProp<WorkoutStackParamList, 'ExerciseSearch'>;
 };
 
 
-export default function ExerciseSearchScreen({ navigation }: Props) {
+export default function ExerciseSearchScreen({ navigation, route }: Props) {
   const { colors, typography } = useAppTheme();
-  const { addExercise } = useWorkoutStore();
+  const { addExercise, updateExerciseName } = useWorkoutStore();
   const { user } = useAuthStore();
   const userId = user?.id;
+  const mode = route.params?.mode ?? 'add';
+  const replaceExerciseIndex = route.params?.exerciseIndex;
 
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(route.params?.initialQuery ?? '');
   const [dbExercises, setDbExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -102,11 +107,15 @@ export default function ExerciseSearchScreen({ navigation }: Props) {
           ? exercise
           : { ...exercise, id: `local::${exercise.name_ko}` };
 
-      addExercise(resolved);
+      if (mode === 'replace' && typeof replaceExerciseIndex === 'number') {
+        updateExerciseName(replaceExerciseIndex, resolved.name_ko);
+      } else {
+        addExercise(resolved);
+      }
       navigation.goBack();
       setAdding(false);
     },
-    [adding, addExercise, navigation],
+    [adding, addExercise, mode, navigation, replaceExerciseIndex, updateExerciseName],
   );
 
   const handleAddCustom = () => {
@@ -116,10 +125,10 @@ export default function ExerciseSearchScreen({ navigation }: Props) {
       return;
     }
 
-    Alert.alert('커스텀 종목 추가', `"${query.trim()}"를 종목으로 추가할까요?`, [
+    Alert.alert(mode === 'replace' ? '커스텀 종목으로 교체' : '커스텀 종목 추가', `"${query.trim()}"${mode === 'replace' ? '로 종목을 교체할까요?' : '를 종목으로 추가할까요?'}`, [
       { text: '취소', style: 'cancel' },
       {
-        text: '추가',
+        text: mode === 'replace' ? '교체' : '추가',
         onPress: () =>
           handleSelect({
             name_ko: query.trim(),
@@ -132,25 +141,59 @@ export default function ExerciseSearchScreen({ navigation }: Props) {
     ]);
   };
 
-  const renderItem = ({ item }: { item: Exercise | Omit<Exercise, 'id'> }) => (
-    <TouchableOpacity
-      style={[styles.item, { borderBottomColor: colors.border }]}
-      onPress={() => handleSelect(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.itemContent}>
-        <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.md, fontWeight: typography.weight.medium, color: colors.text }}>
-          {item.name_ko}
-        </Text>
-        {item.category && (
-          <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.sm, color: colors.textSecondary, marginTop: 2 }}>
-            {item.category} · 휴식 {item.default_rest_seconds}초
-          </Text>
-        )}
-      </View>
-      <MaterialCommunityIcons name="plus-circle-outline" size={22} color={colors.accent} />
-    </TouchableOpacity>
-  );
+  const renderItem = ({ item }: { item: Exercise | Omit<Exercise, 'id'> }) => {
+    const fallback = BUILT_IN_EXERCISES.find(
+      (exercise) => normalizeExerciseName(exercise.name_ko) === normalizeExerciseName(item.name_ko),
+    );
+    const category = item.category ?? fallback?.category ?? null;
+    const restSeconds = item.default_rest_seconds ?? fallback?.default_rest_seconds ?? null;
+
+    return (
+      <TouchableOpacity
+        style={[styles.item, { borderBottomColor: colors.border }]}
+        onPress={() => handleSelect(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.itemContent}>
+          <View style={styles.itemNameRow}>
+            <Text
+              style={{
+                flexShrink: 1,
+                fontFamily: typography.fontFamily,
+                fontSize: typography.size.md,
+                fontWeight: typography.weight.medium,
+                color: colors.text,
+              }}
+              numberOfLines={1}
+            >
+              {item.name_ko}
+            </Text>
+            <View style={{ marginLeft: 4, alignSelf: 'center' }}>
+              <ExerciseVisualGuide
+                exerciseId={'id' in item ? item.id : undefined}
+                visualGuideUrl={'visual_guide_url' in item ? item.visual_guide_url : undefined}
+                description={'description_ko' in item ? item.description_ko ?? item.description_en : undefined}
+                exerciseName={item.name_ko}
+                overview={'overview_ko' in item ? item.overview_ko ?? item.overview_en : undefined}
+                why={'why_ko' in item ? item.why_ko ?? item.why_en : undefined}
+                how={'how_ko' in item ? item.how_ko ?? item.how_en : undefined}
+                triggerVariant="icon"
+                iconColor={colors.textSecondary}
+                iconBackgroundColor={colors.background}
+                iconBorderColor={colors.border}
+              />
+            </View>
+          </View>
+          {category && restSeconds != null && (
+            <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.sm, color: colors.textSecondary, marginTop: 2 }}>
+              {category} · 휴식 {restSeconds}초
+            </Text>
+          )}
+        </View>
+        <MaterialCommunityIcons name="plus-circle-outline" size={22} color={colors.accent} />
+      </TouchableOpacity>
+    );
+  };
 
   const sections = [
     ...(filteredDb.length > 0 ? [{ type: 'header', label: '내 종목' }, ...filteredDb.map((e) => ({ type: 'item', data: e }))] : []),
@@ -165,7 +208,7 @@ export default function ExerciseSearchScreen({ navigation }: Props) {
           <MaterialCommunityIcons name="close" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.lg, fontWeight: typography.weight.semibold, color: colors.text }}>
-          종목 추가
+          {mode === 'replace' ? '종목 교체' : '종목 추가'}
         </Text>
         <View style={{ width: 36 }} />
       </View>
@@ -273,7 +316,14 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  itemContent: { flex: 1 },
+  itemContent: { flex: 1, minWidth: 0, paddingRight: 8 },
+  itemNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0, alignSelf: 'flex-start' },
+  searchThumbnail: {
+    width: 40,
+    height: 40,
+    borderRadius: 6,
+    marginRight: 8,
+  },
   empty: { alignItems: 'center', paddingTop: 48 },
   customBtn: {
     flexDirection: 'row',

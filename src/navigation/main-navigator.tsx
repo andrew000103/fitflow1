@@ -9,6 +9,7 @@ import AIConsentScreen from '../screens/ai/ai-consent-screen';
 import AIExerciseSearchScreen from '../screens/ai/ai-exercise-search-screen';
 import AIOnboardingScreen from '../screens/ai/ai-onboarding-screen';
 import HomeScreen from '../screens/home/home-screen';
+import CharacterSetupScreen from '../screens/persona/character-setup-screen';
 import ProfileScreen from '../screens/profile/profile-screen';
 import { useAIPlanStore } from '../stores/ai-plan-store';
 import { useAppTheme } from '../theme';
@@ -100,6 +101,11 @@ export default function MainNavigator() {
           </>
         )}
       </RootStack.Screen>
+      <RootStack.Screen
+        name="CharacterSetup"
+        component={CharacterSetupScreen}
+        options={{ presentation: 'modal' }}
+      />
       <RootStack.Screen
         name="AIConsent"
         component={AIConsentScreen}

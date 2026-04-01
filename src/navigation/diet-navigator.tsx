@@ -5,8 +5,6 @@ import DietScreen from '../screens/diet/diet-screen';
 import FoodSearchScreen from '../screens/diet/food-search-screen';
 import { DietStackParamList } from '../types/navigation';
 import { useAppTheme } from '../theme';
-import { TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 const Stack = createNativeStackNavigator<DietStackParamList>();
 
@@ -26,20 +24,6 @@ export default function DietNavigator() {
         },
         headerShadowVisible: false,
         headerTintColor: colors.accent,
-        headerBackTitleVisible: false,
-        headerLeft: ({ canGoBack, onPress }) => {
-          if (!canGoBack) {
-            return null;
-          }
-          return (
-            <TouchableOpacity
-              onPress={onPress}
-              style={{ marginLeft: 10, paddingVertical: 5, paddingRight: 10 }}
-            >
-              <Ionicons name="chevron-back" size={24} color={colors.accent} />
-            </TouchableOpacity>
-          );
-        },
       }}
     >
       <Stack.Screen name="DietMain" component={DietScreen} options={{ headerShown: false }} />

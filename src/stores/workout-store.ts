@@ -29,6 +29,7 @@ interface WorkoutStore {
   sessionExercises: SessionExercise[];
   startedAt: number | null;
   restEndsAt: number | null;
+  activeRestExerciseIndex: number | null;
   saving: boolean;
   title: string;
   notes: string;
@@ -59,6 +60,7 @@ interface WorkoutStore {
   setTitle: (t: string) => void;
   setNotes: (n: string) => void;
   setExerciseNote: (exerciseIndex: number, note: string) => void;
+  setExerciseRestSeconds: (exerciseIndex: number, seconds: number | null) => void;
   updateExerciseName: (exerciseIndex: number, newName: string) => void;
 }
 
@@ -74,6 +76,7 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
   sessionExercises: [],
   startedAt: null,
   restEndsAt: null,
+  activeRestExerciseIndex: null,
   saving: false,
   title: makeDefaultTitle(),
   notes: '',
@@ -113,6 +116,15 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
         category: pe.exercises.category,
         default_rest_seconds: pe.exercises.default_rest_seconds,
         is_custom: pe.exercises.is_custom,
+        visual_guide_url: pe.exercises.visual_guide_url,
+        description_en: pe.exercises.description_en,
+        description_ko: pe.exercises.description_ko,
+        overview_en: pe.exercises.overview_en,
+        overview_ko: pe.exercises.overview_ko,
+        why_en: pe.exercises.why_en,
+        why_ko: pe.exercises.why_ko,
+        how_en: pe.exercises.how_en,
+        how_ko: pe.exercises.how_ko,
       };
 
       if (tms) {
@@ -327,6 +339,7 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
     const ex = sessionExercises[exerciseIndex];
     const s = ex?.sets[setIndex];
     if (!s || s.is_done) return;
+    const appliedRestSeconds = ex.custom_rest_seconds ?? ex.exercise.default_rest_seconds;
 
     set((state) => {
       const exercises = [...state.sessionExercises];
@@ -336,7 +349,8 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
       exercises[exerciseIndex] = { ...exercise, sets };
       return {
         sessionExercises: exercises,
-        restEndsAt: Date.now() + ex.exercise.default_rest_seconds * 1000,
+        restEndsAt: Date.now() + appliedRestSeconds * 1000,
+        activeRestExerciseIndex: exerciseIndex,
       };
     });
 
@@ -391,7 +405,7 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
           set_number: s.set_number,
           reps: s.reps,
           weight_kg: s.weight_kg,
-          rest_seconds: ex.exercise.default_rest_seconds,
+          rest_seconds: appliedRestSeconds,
           is_pr,
         })
         .select('id')
@@ -426,7 +440,7 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
     });
   },
 
-  skipRest: () => set({ restEndsAt: null }),
+  skipRest: () => set({ restEndsAt: null, activeRestExerciseIndex: null }),
 
   adjustRest: (delta) =>
     set((state) => ({
@@ -506,6 +520,7 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
       sessionExercises: [],
       startedAt: null,
       restEndsAt: null,
+      activeRestExerciseIndex: null,
       saving: false,
       title: makeDefaultTitle(),
       notes: '',
@@ -559,6 +574,26 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
       if (!ex) return state;
       exercises[exerciseIndex] = { ...ex, note };
       return { sessionExercises: exercises };
+    });
+  },
+
+  setExerciseRestSeconds: (exerciseIndex, seconds) => {
+    set((state) => {
+      const exercises = [...state.sessionExercises];
+      const ex = exercises[exerciseIndex];
+      if (!ex) return state;
+      const appliedSeconds = seconds ?? ex.exercise.default_rest_seconds;
+      exercises[exerciseIndex] = {
+        ...ex,
+        custom_rest_seconds: seconds ?? undefined,
+      };
+      return {
+        sessionExercises: exercises,
+        restEndsAt:
+          state.restEndsAt && state.activeRestExerciseIndex === exerciseIndex
+            ? Date.now() + appliedSeconds * 1000
+            : state.restEndsAt,
+      };
     });
   },
 

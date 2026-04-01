@@ -88,7 +88,7 @@ export function suggestTmIncrease(amrapReps: number, upperBody: boolean): number
 
 export const TM_KEY_LABELS: Record<TmKey, string> = {
   bench: '벤치프레스',
-  squat: '스쿼트',
-  deadlift: '데드리프트',
+  squat: '바벨 스쿼트',
+  deadlift: '컨벤셔널 데드리프트',
   ohp: '오버헤드프레스',
 };

@@ -5,6 +5,15 @@ export interface Exercise {
   category: string | null;
   default_rest_seconds: number;
   is_custom: boolean;
+  visual_guide_url?: string;
+  description_en?: string;
+  description_ko?: string;
+  overview_en?: string;
+  overview_ko?: string;
+  why_en?: string;
+  why_ko?: string;
+  how_en?: string;
+  how_ko?: string;
 }
 
 export interface LocalSet {
@@ -27,6 +36,7 @@ export interface SessionExercise {
   sets: LocalSet[];
   prevSets: Array<{ weight_kg: number; reps: number }> | null;
   note?: string;
+  custom_rest_seconds?: number;
 }
 
 export interface NsunsAmrapResult {
@@ -52,4 +62,34 @@ export interface WorkoutSummary {
   completed: boolean;
   total_volume_kg: number;
   set_count: number;
+}
+
+export interface ExerciseHistorySet {
+  id: string;
+  setNumber: number;
+  weightKg: number;
+  reps: number;
+  volumeKg: number;
+}
+
+export interface ExerciseHistorySession {
+  sessionId: string;
+  startedAt: string;
+  endedAt: string;
+  sets: ExerciseHistorySet[];
+  totalVolumeKg: number;
+  topWeightKg: number;
+  estimatedOneRmKg: number;
+  totalReps: number;
+}
+
+export interface ExerciseTrendSummary {
+  sessionCount: number;
+  frequency30d: number;
+  avgTopWeightKg: number;
+  avgVolumeKg: number;
+  avgEstimatedOneRmKg: number;
+  topWeightDeltaKg: number | null;
+  volumeDeltaKg: number | null;
+  estimatedOneRmDeltaKg: number | null;
 }
