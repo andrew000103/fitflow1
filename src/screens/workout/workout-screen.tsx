@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,7 +19,7 @@ import { useAppTheme } from '../../theme';
 import { getPlanCycleInfo } from '../../lib/ai-plan-schedule';
 import { isNsunsProgram, getTmKey } from '../../lib/nsuns';
 import { WorkoutStackParamList } from '../../types/navigation';
-import { ProgramExerciseRow } from '../../types/program';
+import { ActiveUserProgram, ProgramExerciseRow } from '../../types/program';
 
 type Props = {
   navigation: NativeStackNavigationProp<WorkoutStackParamList, 'WorkoutList'>;
@@ -33,7 +33,7 @@ function getNsunsWeightLabel(ex: ProgramExerciseRow, tms: Record<string, number>
 }
 
 function WeeklyStrip({ daysPerWeek, currentDay, selectedDay, onDayPress }: { daysPerWeek: number; currentDay: number; selectedDay: number; onDayPress: (day: number) => void }) {
-  const { colors, typography, spacing, radius } = useAppTheme();
+  const { colors, typography } = useAppTheme();
   const days = Array.from({ length: daysPerWeek }, (_, i) => i + 1);
 
   return (
@@ -74,16 +74,23 @@ const wStyles = StyleSheet.create({
 });
 
 export default function WorkoutScreen({ navigation }: Props) {
-  const { colors, typography, spacing, radius } = useAppTheme();
+  const { colors, typography } = useAppTheme();
   const { user } = useAuthStore();
-  const { activeUserProgram, fetchActiveProgram, fetchProgramDayExercises, fetchUserTMs } = useProgramStore();
+  const {
+    activeUserPrograms,
+    selectedActiveProgramId,
+    fetchActiveProgram,
+    fetchProgramDayExercises,
+    fetchUserTMs,
+    setSelectedActiveProgramId,
+  } = useProgramStore();
   const workoutStore = useWorkoutStore();
 
-  const [startingProgram, setStartingProgram] = useState(false);
-  const [previewExercises, setPreviewExercises] = useState<ProgramExerciseRow[]>([]);
-  const [previewDay, setPreviewDay] = useState(1);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [userTMs, setUserTMs] = useState<Record<string, number>>({});
+  const [startingProgramId, setStartingProgramId] = useState<string | null>(null);
+  const [previewExercisesByProgram, setPreviewExercisesByProgram] = useState<Record<string, ProgramExerciseRow[]>>({});
+  const [previewDayByProgram, setPreviewDayByProgram] = useState<Record<string, number>>({});
+  const [previewLoadingByProgram, setPreviewLoadingByProgram] = useState<Record<string, boolean>>({});
+  const [userTMsByProgram, setUserTMsByProgram] = useState<Record<string, Record<string, number>>>({});
 
   const currentPlan = useAIPlanStore((s) => s.currentPlan);
   const syncRecurringPlanForToday = useAIPlanStore((s) => s.syncRecurringPlanForToday);
@@ -98,54 +105,133 @@ export default function WorkoutScreen({ navigation }: Props) {
       : undefined;
   })();
 
-  const isNsuns = activeUserProgram ? isNsunsProgram(activeUserProgram.program.creator_name, activeUserProgram.program.name) : false;
+  const selectedProgram = useMemo(() => {
+    if (activeUserPrograms.length === 0) return null;
+    return (
+      activeUserPrograms.find((program) => program.id === selectedActiveProgramId) ??
+      activeUserPrograms[0]
+    );
+  }, [activeUserPrograms, selectedActiveProgramId]);
+  const selectedProgramIndex = selectedProgram
+    ? activeUserPrograms.findIndex((program) => program.id === selectedProgram.id)
+    : -1;
+
+  const selectProgram = useCallback((userProgramId: string) => {
+    setSelectedActiveProgramId(userProgramId);
+  }, [setSelectedActiveProgramId]);
 
   const loadPreview = useCallback(async (programId: string, userProgramId: string, dayNum: number, programName: string) => {
-    setPreviewLoading(true);
-    setPreviewDay(dayNum);
+    setPreviewLoadingByProgram((prev) => ({ ...prev, [userProgramId]: true }));
+    setPreviewDayByProgram((prev) => ({ ...prev, [userProgramId]: dayNum }));
     try {
       const exercises = await fetchProgramDayExercises(programId, dayNum);
-      setPreviewExercises(exercises);
+      setPreviewExercisesByProgram((prev) => ({ ...prev, [userProgramId]: exercises }));
       if (isNsunsProgram(null, programName)) {
-        setUserTMs(await fetchUserTMs(userProgramId));
+        const userTMs = await fetchUserTMs(userProgramId);
+        setUserTMsByProgram((prev) => ({ ...prev, [userProgramId]: userTMs }));
       } else {
-        setUserTMs({});
+        setUserTMsByProgram((prev) => ({ ...prev, [userProgramId]: {} }));
       }
     } finally {
-      setPreviewLoading(false);
+      setPreviewLoadingByProgram((prev) => ({ ...prev, [userProgramId]: false }));
     }
   }, [fetchProgramDayExercises, fetchUserTMs]);
 
   useFocusEffect(useCallback(() => {
     const init = async () => {
-      if (!user) return;
+      if (!user) {
+        await fetchActiveProgram();
+        setPreviewExercisesByProgram({});
+        setPreviewDayByProgram({});
+        setPreviewLoadingByProgram({});
+        setUserTMsByProgram({});
+        return;
+      }
       await syncRecurringPlanForToday(user.id).catch(() => {});
       await fetchActiveProgram();
-      const active = useProgramStore.getState().activeUserProgram;
-      if (active) await loadPreview(active.program_id, active.id, active.current_day, active.program.name);
+      const activePrograms = useProgramStore.getState().activeUserPrograms;
+      if (activePrograms.length > 0) {
+        const selectedProgramId = useProgramStore.getState().selectedActiveProgramId;
+        const initialProgram =
+          activePrograms.find((program) => program.id === selectedProgramId) ?? activePrograms[0];
+        await loadPreview(
+          initialProgram.program_id,
+          initialProgram.id,
+          initialProgram.current_day,
+          initialProgram.program.name,
+        );
+      } else {
+        setPreviewExercisesByProgram({});
+        setPreviewDayByProgram({});
+        setPreviewLoadingByProgram({});
+        setUserTMsByProgram({});
+      }
     };
     init();
   }, [user, fetchActiveProgram, loadPreview, syncRecurringPlanForToday]));
 
-  const handleStartProgramWorkout = async () => {
-    if (!activeUserProgram || !user) return;
-    setStartingProgram(true);
+  useEffect(() => {
+    if (!selectedProgram) return;
+    if (previewExercisesByProgram[selectedProgram.id] || previewLoadingByProgram[selectedProgram.id]) {
+      return;
+    }
+    loadPreview(
+      selectedProgram.program_id,
+      selectedProgram.id,
+      previewDayByProgram[selectedProgram.id] ?? selectedProgram.current_day,
+      selectedProgram.program.name,
+    );
+  }, [
+    loadPreview,
+    previewDayByProgram,
+    previewExercisesByProgram,
+    previewLoadingByProgram,
+    selectedProgram,
+  ]);
+
+  const goToAdjacentProgram = useCallback((direction: 'prev' | 'next') => {
+    if (activeUserPrograms.length <= 1 || selectedProgramIndex < 0) return;
+    const delta = direction === 'next' ? 1 : -1;
+    const nextIndex = (selectedProgramIndex + delta + activeUserPrograms.length) % activeUserPrograms.length;
+    const nextProgram = activeUserPrograms[nextIndex];
+    if (nextProgram) {
+      selectProgram(nextProgram.id);
+    }
+  }, [activeUserPrograms, selectProgram, selectedProgramIndex]);
+
+  const handleStartProgramWorkout = async (programEntry: ActiveUserProgram) => {
+    if (!user) return;
+    setStartingProgramId(programEntry.id);
     try {
-      const program = activeUserProgram.program;
+      const program = programEntry.program;
       if (isNsunsProgram(program.creator_name, program.name)) {
-        const tms = await fetchUserTMs(activeUserProgram.id);
+        const tms = await fetchUserTMs(programEntry.id);
         if (Object.keys(tms).length === 0) {
-          navigation.navigate('TrainingMaxSetup', { userProgramId: activeUserProgram.id, programName: program.name, autoStartWorkout: true, programId: activeUserProgram.program_id, currentDay: activeUserProgram.current_day, daysPerWeek: program.days_per_week });
+          navigation.navigate('TrainingMaxSetup', {
+            userProgramId: programEntry.id,
+            programName: program.name,
+            autoStartWorkout: true,
+            programId: programEntry.program_id,
+            currentDay: programEntry.current_day,
+            daysPerWeek: program.days_per_week,
+          });
           return;
         }
       }
-      const exercises = await fetchProgramDayExercises(activeUserProgram.program_id, activeUserProgram.current_day);
-      await workoutStore.startFromProgram(exercises, activeUserProgram.id, activeUserProgram.program.days_per_week, activeUserProgram.current_day, isNsuns ? await fetchUserTMs(activeUserProgram.id) : undefined);
+      const exercises = await fetchProgramDayExercises(programEntry.program_id, programEntry.current_day);
+      const isNsuns = isNsunsProgram(program.creator_name, program.name);
+      await workoutStore.startFromProgram(
+        exercises,
+        programEntry.id,
+        program.days_per_week,
+        programEntry.current_day,
+        isNsuns ? await fetchUserTMs(programEntry.id) : undefined,
+      );
       navigation.navigate('WorkoutSession');
     } catch (e: any) {
       Alert.alert('오류', e.message);
     } finally {
-      setStartingProgram(false);
+      setStartingProgramId(null);
     }
   };
 
@@ -156,37 +242,154 @@ export default function WorkoutScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <AppButton variant="primary" label="빈 운동 시작" icon={<MaterialCommunityIcons name="plus" size={22} color="#fff" />} onPress={() => { workoutStore.startSession(); navigation.navigate('WorkoutSession'); }} style={styles.quickStartBtn} />
 
-        {activeUserProgram && (
+        {selectedProgram && (
           <>
-            <Text style={[styles.sectionTitle, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>진행 중인 프로그램</Text>
-            <AppCard variant="elevated" style={styles.programCard}>
-              <View style={styles.programHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.programName, { color: colors.text, fontFamily: typography.fontFamily }]} numberOfLines={1}>{activeUserProgram.program.name}</Text>
-                  <Text style={[styles.programSub, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>Day {activeUserProgram.current_day} / {activeUserProgram.program.days_per_week} · {activeUserProgram.completed_sessions}회 완료</Text>
+            <View style={styles.programSectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary, fontFamily: typography.fontFamily, marginBottom: 0 }]}>
+                진행 중인 프로그램
+              </Text>
+              {activeUserPrograms.length > 1 && (
+                <View style={styles.programSwitchControls}>
+                  <TouchableOpacity
+                    style={[styles.programSwitchBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => goToAdjacentProgram('prev')}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialCommunityIcons name="chevron-left" size={18} color={colors.text} />
+                  </TouchableOpacity>
+                  <Text style={[styles.programCount, { color: colors.textTertiary, fontFamily: typography.fontFamily }]}>
+                    {selectedProgramIndex + 1} / {activeUserPrograms.length}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.programSwitchBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => goToAdjacentProgram('next')}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialCommunityIcons name="chevron-right" size={18} color={colors.text} />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => navigation.navigate('ProgramDetail', { programId: activeUserProgram.program_id })}>
-                  <MaterialCommunityIcons name="information-outline" size={22} color={colors.textTertiary} />
-                </TouchableOpacity>
-              </View>
+              )}
+            </View>
 
-              <AppProgressBar progress={activeUserProgram.current_day / activeUserProgram.program.days_per_week} color={colors.accent} height={4} style={{ marginVertical: 12 }} />
+            {(() => {
+              const programEntry = selectedProgram;
+              const isNsuns = isNsunsProgram(
+                programEntry.program.creator_name,
+                programEntry.program.name,
+              );
+              const previewExercises = previewExercisesByProgram[programEntry.id] ?? [];
+              const previewDay = previewDayByProgram[programEntry.id] ?? programEntry.current_day;
+              const previewLoading = previewLoadingByProgram[programEntry.id] ?? false;
+              const userTMs = userTMsByProgram[programEntry.id] ?? {};
 
-              <WeeklyStrip daysPerWeek={activeUserProgram.program.days_per_week} currentDay={activeUserProgram.current_day} selectedDay={previewDay} onDayPress={d => loadPreview(activeUserProgram.program_id, activeUserProgram.id, d, activeUserProgram.program.name)} />
-
-              <View style={[styles.previewBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                {previewLoading ? <ActivityIndicator size="small" color={colors.accent} style={{ padding: 20 }} /> : (
-                  previewExercises.map((ex, idx) => (
-                    <View key={ex.id} style={[styles.exRow, idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
-                      <Text style={[styles.exName, { color: colors.text }]} numberOfLines={1}>{ex.exercises?.name_ko}</Text>
-                      <Text style={[styles.exDetail, { color: colors.textSecondary }]}>{isNsuns ? getNsunsWeightLabel(ex, userTMs).text : `${ex.target_sets}세트 × ${ex.target_reps}회`}</Text>
+              return (
+                <AppCard
+                  variant="elevated"
+                  style={[
+                    styles.programCard,
+                    { borderColor: colors.border, borderWidth: 1 },
+                  ]}
+                >
+                  <View style={styles.programHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.programName, { color: colors.text, fontFamily: typography.fontFamily }]} numberOfLines={1}>
+                        {programEntry.program.name}
+                      </Text>
+                      <Text style={[styles.programSub, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
+                        Day {programEntry.current_day} / {programEntry.program.days_per_week} · {programEntry.completed_sessions}회 완료
+                      </Text>
                     </View>
-                  ))
-                )}
-              </View>
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('ProgramDetail', { programId: programEntry.program_id })}
+                    >
+                      <MaterialCommunityIcons name="information-outline" size={22} color={colors.textTertiary} />
+                    </TouchableOpacity>
+                  </View>
 
-              <AppButton variant="primary" label={`Day ${activeUserProgram.current_day} 시작`} icon={<MaterialCommunityIcons name="play" size={18} color="#fff" />} onPress={handleStartProgramWorkout} loading={startingProgram} style={{ marginTop: 16 }} />
-            </AppCard>
+                  <AppProgressBar
+                    progress={programEntry.current_day / programEntry.program.days_per_week}
+                    color={colors.accent}
+                    height={4}
+                    style={{ marginVertical: 12 }}
+                  />
+
+                  <WeeklyStrip
+                    daysPerWeek={programEntry.program.days_per_week}
+                    currentDay={programEntry.current_day}
+                    selectedDay={previewDay}
+                    onDayPress={(day) => {
+                      loadPreview(
+                        programEntry.program_id,
+                        programEntry.id,
+                        day,
+                        programEntry.program.name,
+                      );
+                    }}
+                  />
+
+                  <View style={[styles.previewBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    {previewLoading ? (
+                      <ActivityIndicator size="small" color={colors.accent} style={{ padding: 20 }} />
+                    ) : previewExercises.length > 0 ? (
+                      previewExercises.map((ex, idx) => (
+                        <View
+                          key={ex.id}
+                          style={[styles.exRow, idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
+                        >
+                          <Text style={[styles.exName, { color: colors.text }]} numberOfLines={1}>
+                            {ex.exercises?.name_ko}
+                          </Text>
+                          <Text style={[styles.exDetail, { color: colors.textSecondary }]}>
+                            {isNsuns
+                              ? getNsunsWeightLabel(ex, userTMs).text
+                              : `${ex.target_sets}세트 × ${ex.target_reps}회`}
+                          </Text>
+                        </View>
+                      ))
+                    ) : (
+                      <Text style={[styles.emptyPreviewText, { color: colors.textTertiary, fontFamily: typography.fontFamily }]}>
+                        미리볼 운동이 없습니다
+                      </Text>
+                    )}
+                  </View>
+
+                  <AppButton
+                    variant="primary"
+                    label={`Day ${programEntry.current_day} 시작`}
+                    icon={<MaterialCommunityIcons name="play" size={18} color="#fff" />}
+                    onPress={() => handleStartProgramWorkout(programEntry)}
+                    loading={startingProgramId === programEntry.id}
+                    style={{ marginTop: 16 }}
+                  />
+                </AppCard>
+              );
+            })()}
+
+            {activeUserPrograms.length > 1 && (
+              <View style={styles.programPager}>
+                {activeUserPrograms.map((programEntry, index) => {
+                  const active = selectedProgram?.id === programEntry.id;
+                  return (
+                    <TouchableOpacity
+                      key={programEntry.id}
+                      style={[
+                        styles.programPagerDot,
+                        {
+                          backgroundColor: active ? colors.accent : colors.border,
+                          width: 10,
+                          height: 10,
+                          opacity: active ? 1 : 0.9,
+                        },
+                      ]}
+                      onPress={() => selectProgram(programEntry.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${index + 1}번째 진행 중 프로그램 보기`}
+                      activeOpacity={0.8}
+                    />
+                  );
+                })}
+              </View>
+            )}
           </>
         )}
 
@@ -279,6 +482,19 @@ const styles = StyleSheet.create({
   scroll: { padding: 16, paddingBottom: 40 },
   quickStartBtn: { paddingVertical: 18, marginBottom: 24 },
   sectionTitle: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, marginLeft: 4 },
+  programSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  programSwitchControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  programSwitchBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  programCount: { fontSize: 12, fontWeight: '600' },
+  programPager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: -6, marginBottom: 16 },
+  programPagerDot: { borderRadius: 999 },
   programCard: { padding: 16, marginBottom: 20 },
   appliedMetaRow: { paddingBottom: 12, marginBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   appliedMetaTitle: { fontSize: 15, fontWeight: '700' },
@@ -290,6 +506,7 @@ const styles = StyleSheet.create({
   exRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
   exName: { fontSize: 14, fontWeight: '600', flex: 1 },
   exDetail: { fontSize: 13 },
+  emptyPreviewText: { fontSize: 13, textAlign: 'center', paddingVertical: 16 },
   browseBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 20, borderWidth: 1 },
   browseIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   browseTitle: { fontSize: 16, fontWeight: '700' },

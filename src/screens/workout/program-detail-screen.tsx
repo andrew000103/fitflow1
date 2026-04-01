@@ -236,7 +236,7 @@ export default function ProgramDetailScreen({ navigation, route }: Props) {
   const { colors, typography } = useAppTheme();
   const { user } = useAuthStore();
   const {
-    activeUserProgram,
+    activeUserPrograms,
     fetchActiveProgram,
     fetchProgramDays,
     fetchProgramDayExercises,
@@ -256,7 +256,9 @@ export default function ProgramDetailScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const isActive = activeUserProgram?.program_id === programId;
+  const currentEnrollment =
+    activeUserPrograms.find((entry) => entry.program_id === programId) ?? null;
+  const isActive = Boolean(currentEnrollment);
   const isOwn = program?.user_id === user?.id;
   const isNsuns = program ? isNsunsProgram(program.creator_name ?? null, program.name) : false;
 
@@ -291,7 +293,7 @@ export default function ProgramDetailScreen({ navigation, route }: Props) {
     setDays(dayData);
     setReviews((revData ?? []) as ProgramReview[]);
     setReviewsAvailable(!reviewsMissing);
-    setUserCompletedSessions((enrollResult.data as any)?.completed_sessions ?? 0);
+    setUserCompletedSessions((enrollResult.data as { completed_sessions?: number } | null)?.completed_sessions ?? 0);
 
     if (user?.id && revData) {
       setHasReviewed(revData.some((r: any) => r.user_id === user.id));
@@ -321,10 +323,10 @@ export default function ProgramDetailScreen({ navigation, route }: Props) {
   };
 
   const handleUnenroll = async () => {
-    if (!activeUserProgram) return;
+    if (!currentEnrollment) return;
     if (Platform.OS === 'web') {
       if (!window.confirm('정말 이 프로그램을 중단할까요?')) return;
-      await unenrollProgram(activeUserProgram.id);
+      await unenrollProgram(currentEnrollment.id);
       navigation.goBack();
     } else {
       Alert.alert('프로그램 중단', '정말 이 프로그램을 중단할까요?', [
@@ -333,7 +335,7 @@ export default function ProgramDetailScreen({ navigation, route }: Props) {
           text: '중단',
           style: 'destructive',
           onPress: async () => {
-            await unenrollProgram(activeUserProgram.id);
+            await unenrollProgram(currentEnrollment.id);
             navigation.goBack();
           },
         },
@@ -362,24 +364,24 @@ export default function ProgramDetailScreen({ navigation, route }: Props) {
   };
 
   const handleStartTodaysWorkout = async () => {
-    if (!activeUserProgram || !program) return;
+    if (!currentEnrollment || !program) return;
     setActionLoading(true);
     try {
       const exercises = await fetchProgramDayExercises(
         programId,
-        activeUserProgram.current_day,
+        currentEnrollment.current_day,
       );
 
       let tms: Record<string, number> | undefined;
       if (isNsuns) {
-        const fetched = await fetchUserTMs(activeUserProgram.id);
+        const fetched = await fetchUserTMs(currentEnrollment.id);
         if (!fetched || Object.keys(fetched).length === 0) {
           navigation.navigate('TrainingMaxSetup', {
-            userProgramId: activeUserProgram.id,
+            userProgramId: currentEnrollment.id,
             programName: program.name,
             autoStartWorkout: true,
             programId,
-            currentDay: activeUserProgram.current_day,
+            currentDay: currentEnrollment.current_day,
             daysPerWeek: program.days_per_week,
           });
           setActionLoading(false);
@@ -390,9 +392,9 @@ export default function ProgramDetailScreen({ navigation, route }: Props) {
 
       await workoutStore.startFromProgram(
         exercises,
-        activeUserProgram.id,
+        currentEnrollment.id,
         program.days_per_week,
-        activeUserProgram.current_day,
+        currentEnrollment.current_day,
         tms,
       );
       navigation.navigate('WorkoutSession');
@@ -505,14 +507,14 @@ export default function ProgramDetailScreen({ navigation, route }: Props) {
         ) : null}
 
         {/* Active status */}
-        {isActive && activeUserProgram && (
+        {isActive && currentEnrollment && (
           <View style={[styles.activeBox, { backgroundColor: colors.accent + '18', borderColor: colors.accent + '44' }]}>
             <MaterialCommunityIcons name="play-circle" size={18} color={colors.accent} />
             <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: colors.accent, marginLeft: 6 }}>
-              진행 중 — Day {activeUserProgram.current_day} / {program.days_per_week}
+              진행 중 — Day {currentEnrollment.current_day} / {program.days_per_week}
             </Text>
             <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.xs, color: colors.accent, marginLeft: 'auto' }}>
-              {activeUserProgram.completed_sessions}회 완료
+              {currentEnrollment.completed_sessions}회 완료
             </Text>
           </View>
         )}

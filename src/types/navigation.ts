@@ -75,4 +75,9 @@ export type RootStackParamList = {
   AIOnboarding: undefined;
   AIPlanResult: { planId?: string };
   AIPlanWeekly: { weekStart: string };
+  AIExerciseSearch: {
+    dayLabel: 'day1' | 'day2' | 'day3' | 'day4' | 'day5' | 'day6' | 'day7';
+    exerciseIndex: number;
+    exerciseName: string;
+  };
 };

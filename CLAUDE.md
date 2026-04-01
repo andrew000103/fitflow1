@@ -654,3 +654,115 @@ src/
    - `오버헤드프레스` 계산기 입력
    - `바벨로우` 직접 입력
    - `strength_gain + bench/squat/balanced` 생성
+
+---
+
+## AI 플랜 반복 주기 / 적용 UX 개선 업데이트 (2026-03-30)
+
+### 요약
+- AI 플랜을 더 이상 “이번 주 1회성”으로만 해석하지 않고, `weekStart`를 Day 1 anchor로 삼아 7일 주기로 반복되도록 보완했음
+- 결과 화면에서 시작일 변경 진입을 더 명시적으로 바꾸고, 적용 전/적용 후 CTA를 분리했음
+- 전주 기록 기반 자동 조정이 실제로는 rolling 7일을 보던 문제를 수정해서, 이제 직전 cycle 범위만 기준으로 반영하게 했음
+- 적용 상태, 시작일 변경, 자동 조정 메타데이터가 재실행 후에도 유지되도록 `plan_json` 스냅샷 저장을 보완했음
+- 이후 헤더 보조 문구는 사용성 피드백에 따라 최종적으로 제거했음
+
+### 1. 반복형 AI 플랜 스케줄 도입
+- `src/lib/ai-plan-schedule.ts` 신규 추가
+  - `getPlanCycleInfo(plan, targetDate)`
+  - `getRecurringDayLabel(plan, targetDate)`
+  - `isPlanStarted(plan, targetDate)`
+  - `getCycleStartDate(plan, targetDate)`
+  - `getCycleDateRange(plan, cycle)`
+- 의미:
+  - `weekStart`는 “이번 주 범위”가 아니라 Day 1 기준점
+  - 오늘 날짜는 `diffDays % 7`로 day1~day7에 매핑
+  - 자동 조정용 직전 cycle 날짜 범위도 공용 helper로 계산
+
+### 2. 적용 전/후 UX 분리
+- `src/screens/ai/ai-plan-result-screen.tsx`
+  - 헤더 타이틀을 `이번 주 AI 플랜` → `내 AI 플랜`으로 변경
+  - 시작일 변경을 날짜 텍스트 편집이 아니라 명시적 액션 `플랜 시작일 변경`으로 노출
+  - 적용 전:
+    - `이 플랜 적용하기`
+    - `다른 플랜 받아보기`
+  - 적용 후:
+    - `플랜 시작일 변경`
+    - `플랜 재설정`
+  - 적용 확인 시트도 최초 적용 / 재설정 문구를 분리
+  - 헤더 하단 보조 설명은 최종적으로 삭제
+
+### 3. 홈/운동 화면의 반복 주기 반영
+- `src/screens/home/home-screen.tsx`
+  - 적용된 AI 플랜 카드가 7일이 지나도 끊기지 않고 반복 주기로 오늘 계획을 계산하도록 변경
+  - `검토 중인 AI 플랜` / `반복 중인 AI 플랜` 상태를 구분
+- `src/screens/workout/workout-screen.tsx`
+  - 오늘의 AI 플랜이 2주차, 3주차에도 계속 정상 표시되도록 변경
+  - 적용된 workout 섹션이 있는 플랜만 운동 탭에 노출
+
+### 4. 전주 기록 기반 자동 조정 보완
+- `src/stores/ai-plan-store.ts`
+  - `lastAutoAdjustedCycle`
+  - `lastAutoAdjustedAt`
+  - `syncRecurringPlanForToday(userId, today?)`
+    추가
+- `src/lib/ai-planner.ts`
+  - `adjustRepsRange()` 추가
+  - weighted 운동은 `weight_kg`
+  - 무중량 운동은 `repsRange`
+    기준으로 보수적 조정
+- 초기 구현에서는 최근 7일 rolling window를 사용했지만,
+  이후 보완으로 `getCycleDateRange(plan, cycle - 1)` 범위만 조회하도록 수정
+- 결과:
+  - “전주 기록 반영”이 문구뿐 아니라 실제 데이터 범위도 직전 cycle 기준이 됨
+
+### 5. Supabase 스냅샷 저장 일관성 보완
+- `src/lib/ai-planner.ts`
+  - `updateAIPlanSnapshotInSupabase(plan)` 추가
+- `src/screens/ai/ai-plan-result-screen.tsx`
+  - 플랜 적용 시 `plan_json`에 `isApplied`, `appliedAt`, `appliedSections`까지 저장
+  - 시작일 변경 시 optimistic update를 제거하고, 서버 저장 성공 후 로컬 반영하도록 변경
+  - 시작일 변경 실패 시 `Alert.alert('오류', ...)` 표시
+- `src/stores/ai-plan-store.ts`
+  - 수동 조정 / 자동 조정 후 변경된 플랜 스냅샷을 Supabase에도 저장
+- 의미:
+  - 앱 재시작 후에도 적용 상태와 조정 메타데이터가 유지됨
+  - 시작일 변경 실패가 조용히 묻히지 않음
+
+### 6. 비교 화면 문구 정리
+- `src/screens/ai/ai-plan-weekly-screen.tsx`
+  - `새로운 주간 플랜` → `새 플랜 비교`
+  - `지난 주 vs 이번 주 변경사항` → `기존 플랜 vs 새 플랜`
+  - `중량 자동 조정 (지난 주 기반)` → `전주 기록 반영하기`
+  - `이번 주 플랜 적용하기` → `이 플랜으로 교체하기`
+
+### 검증 결과
+- `npx tsc --noEmit`: 통과
+- 구현 후 분석에서 발견된 2개 문제 추가 보완 완료
+  - 직전 cycle 대신 최근 7일을 보던 문제 수정
+  - 시작일 변경 실패를 무시하던 문제 수정
+- 최종 설계안 대비 일치도 판단:
+  - 보완 전: 약 **85~90%**
+  - 보완 후: 약 **99%**
+
+### Git 반영 정보
+- GitHub push 완료
+- 브랜치: `main`
+- 관련 커밋: `2cf23c5` `feat: refine recurring ai plan flow`
+
+### 이번 작업의 핵심 파일
+- `src/lib/ai-plan-schedule.ts`
+- `src/lib/ai-planner.ts`
+- `src/stores/ai-plan-store.ts`
+- `src/screens/ai/ai-plan-result-screen.tsx`
+- `src/screens/ai/ai-plan-weekly-screen.tsx`
+- `src/screens/workout/workout-screen.tsx`
+
+### 다음 AI가 이어받을 때 먼저 알 것
+1. AI 플랜은 이제 `weekStart` 기준 Day 1~Day 7이 반복되는 구조임
+2. 자동 조정은 “최근 7일”이 아니라 “직전 cycle” 범위만 사용함
+3. 적용 상태와 시작일 변경은 `plan_json` 스냅샷까지 저장되므로, 관련 수정 시 Supabase 반영 경로를 같이 봐야 함
+4. 결과 화면 헤더 보조 문구는 사용자 피드백으로 최종 삭제된 상태임
+5. 남은 확인 포인트는 타입체크보다 실제 디바이스에서의 UX 확인
+   - 적용 후 재진입 시 `플랜 적용하기`가 다시 보이지 않는지
+   - 2주차/3주차에도 운동 탭의 오늘 AI 플랜이 정상 노출되는지
+   - 시작일 변경 실패 시 오류 알림이 자연스러운지

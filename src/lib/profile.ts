@@ -114,13 +114,51 @@ export async function addBodyWeight(userId: string, input: BodyWeightInput) {
   const { data, error } = await supabase.from('body_weights').insert(payload).select('*').single();
   if (error) throw error;
 
-  await supabase
-    .from('user_profiles')
-    .upsert({ id: userId, weight_kg: input.weight_kg })
+  await trySyncUserProfileWeight(userId, input.weight_kg);
+
+  return data as BodyWeightRecord;
+}
+
+export async function updateBodyWeight(userId: string, recordId: string, input: BodyWeightInput) {
+  const payload = {
+    measured_at: input.measured_at,
+    weight_kg: input.weight_kg,
+    body_fat_pct: toNullableNumber(input.body_fat_pct),
+    muscle_mass_kg: toNullableNumber(input.muscle_mass_kg),
+    notes: toNullableText(input.notes),
+  };
+
+  const { data, error } = await supabase
+    .from('body_weights')
+    .update(payload)
+    .eq('id', recordId)
+    .select('*')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) {
+    throw new Error('수정할 기록을 찾지 못했습니다.');
+  }
+
+  await trySyncUserProfileWeightFromLatest(userId);
+
+  return data as BodyWeightRecord;
+}
+
+export async function deleteBodyWeight(userId: string, recordId: string) {
+  const { data, error } = await supabase
+    .from('body_weights')
+    .delete()
+    .eq('id', recordId)
     .select('id')
     .maybeSingle();
 
-  return data as BodyWeightRecord;
+  if (error) throw error;
+  if (!data) {
+    throw new Error('삭제할 기록을 찾지 못했거나 권한이 없습니다.');
+  }
+
+  await trySyncUserProfileWeightFromLatest(userId);
 }
 
 async function syncLatestBodyWeight(userId: string, weightKg: number) {
@@ -148,4 +186,44 @@ async function syncLatestBodyWeight(userId: string, weightKg: number) {
     weight_kg: weightKg,
     measured_at: new Date().toISOString(),
   });
+}
+
+async function syncUserProfileWeight(userId: string, weightKg: number | null) {
+  await supabase
+    .from('user_profiles')
+    .upsert({ id: userId, weight_kg: weightKg })
+    .select('id')
+    .maybeSingle();
+}
+
+async function syncUserProfileWeightFromLatest(userId: string) {
+  const { data: latest, error } = await supabase
+    .from('body_weights')
+    .select('weight_kg')
+    .eq('user_id', userId)
+    .order('measured_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') {
+    throw error;
+  }
+
+  await syncUserProfileWeight(userId, latest?.weight_kg ?? null);
+}
+
+async function trySyncUserProfileWeight(userId: string, weightKg: number | null) {
+  try {
+    await syncUserProfileWeight(userId, weightKg);
+  } catch (error) {
+    console.warn('Failed to sync user_profiles weight after body_weights change.', error);
+  }
+}
+
+async function trySyncUserProfileWeightFromLatest(userId: string) {
+  try {
+    await syncUserProfileWeightFromLatest(userId);
+  } catch (error) {
+    console.warn('Failed to sync latest body weight into user_profiles.', error);
+  }
 }

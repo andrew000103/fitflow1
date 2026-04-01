@@ -29,6 +29,19 @@ type Props = {
 
 const TM_KEYS: TmKey[] = ['bench', 'squat', 'deadlift', 'ohp'];
 
+function sanitizeDecimalInput(value: string, maxIntegerDigits = 4, maxDecimalDigits = 1) {
+  const normalized = value.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+  if (!normalized) return '';
+
+  const startsWithDot = normalized.startsWith('.');
+  const [integerRaw, ...decimalParts] = normalized.split('.');
+  const integerPart = (startsWithDot ? '0' : integerRaw).slice(0, maxIntegerDigits);
+  const hasDecimal = normalized.includes('.');
+  const decimalPart = decimalParts.join('').slice(0, maxDecimalDigits);
+
+  return hasDecimal ? `${integerPart}.${decimalPart}` : integerPart;
+}
+
 /** Epley formula: 1RM ≈ weight × (1 + reps / 30) */
 function epley1RM(weightKg: number, reps: number): number {
   if (reps === 1) return weightKg;
@@ -221,12 +234,14 @@ export default function TrainingMaxScreen({ navigation, route }: Props) {
                 <View style={[styles.inputRow, { borderColor: colors.border }]}>
                   <TextInput
                     style={[styles.input, { color: colors.text, fontFamily: ff, fontSize: sz.xl, fontWeight: fw.bold }]}
-                    keyboardType="decimal-pad"
+                    keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                    inputMode="decimal"
                     value={oneRMs[key]}
-                    onChangeText={(t) => setOneRMs((prev) => ({ ...prev, [key]: t }))}
+                    onChangeText={(t) => setOneRMs((prev) => ({ ...prev, [key]: sanitizeDecimalInput(t) }))}
                     placeholder="0"
                     placeholderTextColor={colors.textTertiary}
                     returnKeyType="next"
+                    maxLength={6}
                   />
                   <Text style={{ fontFamily: ff, fontSize: sz.md, color: colors.textSecondary }}>kg (1RM)</Text>
                 </View>
@@ -245,11 +260,13 @@ export default function TrainingMaxScreen({ navigation, route }: Props) {
                         <View style={[styles.calcInputRow, { borderColor: colors.border }]}>
                           <TextInput
                             style={[styles.calcInput, { color: colors.text, fontFamily: ff, fontSize: sz.lg, fontWeight: fw.semibold }]}
-                            keyboardType="decimal-pad"
+                            keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                            inputMode="decimal"
                             value={calcWeight[key]}
-                            onChangeText={(t) => setCalcWeight((prev) => ({ ...prev, [key]: t }))}
+                            onChangeText={(t) => setCalcWeight((prev) => ({ ...prev, [key]: sanitizeDecimalInput(t) }))}
                             placeholder="0"
                             placeholderTextColor={colors.textTertiary}
+                            maxLength={6}
                           />
                           <Text style={{ fontFamily: ff, fontSize: sz.xs, color: colors.textSecondary }}>kg</Text>
                         </View>

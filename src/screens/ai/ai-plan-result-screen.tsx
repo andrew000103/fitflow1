@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AIFlowScreen } from '../../components/ai/AIFlowScreen';
+import { SwapExerciseSheet } from '../../components/ai/SwapExerciseSheet';
 import { getLatestUserGoal, saveUserGoal } from '../../lib/profile';
 import {
   buildWorkoutHistorySection,
@@ -22,7 +23,6 @@ import {
 } from '../../lib/ai-planner';
 import { AI_GOAL_LABEL, AIPlan, OnboardingData, WorkoutDay, useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
-import { supabase } from '../../lib/supabase';
 import { useAppTheme } from '../../theme';
 import { RootStackParamList } from '../../types/navigation';
 import { GoalType } from '../../types/profile';
@@ -146,7 +146,17 @@ const cardStyles = StyleSheet.create({
 });
 
 // ─── WorkoutDayCard ───────────────────────────────────────────────────────────
-function WorkoutDayCard({ day, weekStart, colors }: { day: WorkoutDay; weekStart: string; colors: any }) {
+function WorkoutDayCard({
+  day,
+  weekStart,
+  colors,
+  onSwap,
+}: {
+  day: WorkoutDay;
+  weekStart: string;
+  colors: any;
+  onSwap?: (exIdx: number, exerciseName: string) => void;
+}) {
   const { width } = useWindowDimensions();
   const isCompact = width < 380;
   const dayNum = day.dayLabel.replace('day', '');
@@ -181,11 +191,21 @@ function WorkoutDayCard({ day, weekStart, colors }: { day: WorkoutDay; weekStart
       </View>
       {day.exercises.map((ex, i) => (
         <View key={i} style={[wdStyles.exRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator }]}>
-          <Text style={[wdStyles.exName, { color: colors.text }]}>{ex.name}</Text>
-          <Text style={[wdStyles.exDetail, { color: colors.textSecondary }]}>
-            {ex.sets}세트 × {ex.repsRange}회
-            {ex.note ? `  · ${ex.note}` : ''}
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[wdStyles.exName, { color: colors.text }]}>{ex.name}</Text>
+            <Text style={[wdStyles.exDetail, { color: colors.textSecondary }]}>
+              {ex.sets}세트 × {ex.repsRange}회{ex.note ? `  · ${ex.note}` : ''}
+            </Text>
+          </View>
+          {onSwap && (
+            <TouchableOpacity
+              onPress={() => onSwap(i, ex.name)}
+              style={{ padding: 8 }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={{ fontSize: 12, color: colors.accent }}>교체</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ))}
     </View>
@@ -208,7 +228,7 @@ const wdStyles = StyleSheet.create({
 
 // ─── ExplanationCard ──────────────────────────────────────────────────────────
 function ExplanationCard({ plan, colors }: { plan: AIPlan; colors: any }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
   return (
     <View style={[exStyles.wrap, { backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.accent + '60' }]}>
@@ -350,6 +370,127 @@ const dtStyles = StyleSheet.create({
   macroLine: { fontSize: 12, marginTop: 8 },
   disclaimerBox: { borderRadius: 14, padding: 14, marginBottom: 10 },
   disclaimerText: { fontSize: 13, lineHeight: 20 },
+});
+
+const sheetStyles = StyleSheet.create({
+  container: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 24,
+  },
+  containerCompact: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
+  handle: {
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 18,
+  },
+  weekNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    gap: 8,
+  },
+  weekLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  weekLabelCompact: {
+    fontSize: 14,
+  },
+  dayGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  dayGridCompact: {
+    justifyContent: 'space-between',
+  },
+  selectionBox: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  primaryButton: {
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  secondaryAction: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  sectionRow: {
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 6,
+  },
+  sectionTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  sectionCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionCheckText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sectionDescription: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  applyPrimaryButton: {
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  applyPrimaryButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
 });
 
 // ─── 시작일 선택 시트 ────────────────────────────────────────────────────────────
@@ -715,14 +856,136 @@ function ApplyConfirmSheet({
   );
 }
 
+const resultStyles = StyleSheet.create({
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  emptyText: {
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+  },
+  backBtn: {
+    paddingVertical: 8,
+    paddingRight: 8,
+  },
+  backText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  regenBtn: {
+    paddingVertical: 8,
+    paddingLeft: 8,
+    minWidth: 44,
+    alignItems: 'flex-end',
+  },
+  completeText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  tabCompact: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  tabTextCompact: {
+    fontSize: 13,
+  },
+  content: {
+    padding: 16,
+    paddingBottom: 28,
+  },
+  footerActions: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 20,
+    gap: 10,
+  },
+  footerSecondaryBtn: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerSecondaryText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  footerPrimaryBtn: {
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerPrimaryText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  planMetaCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+  planMetaTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  planMetaBody: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  planMetaHint: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
+  },
+});
+
 // ─── AIPlanResultScreen ───────────────────────────────────────────────────────
 export default function AIPlanResultScreen() {
   const { colors } = useAppTheme();
   const { width } = useWindowDimensions();
   const isCompact = width < 380;
+  const s = resultStyles;
   const navigation = useNavigation<NavProp>();
   const user = useAuthStore((s) => s.user);
-  const { currentPlan, onboardingData, setCurrentPlan, setGenerating, setError, updateWeekStart } =
+  const { currentPlan, onboardingData, setCurrentPlan, setGenerating, setError, updateWeekStart, swapExercise } =
     useAIPlanStore();
   const markCurrentPlanApplied = useAIPlanStore((s) => s.markCurrentPlanApplied);
 
@@ -737,6 +1000,38 @@ export default function AIPlanResultScreen() {
     diet: true,
     goals: true,
   });
+
+  const [swapSheet, setSwapSheet] = useState<{
+    visible: boolean;
+    dayLabel: string;
+    exIdx: number;
+    exerciseName: string;
+  } | null>(null);
+
+  const handleSwapOpen = (dayLabel: string, exIdx: number, exerciseName: string) => {
+    setSwapSheet({ visible: true, dayLabel, exIdx, exerciseName });
+  };
+
+  const handleSwapSelect = async (newName: string) => {
+    if (!swapSheet || !currentPlan) return;
+    swapExercise(swapSheet.dayLabel as WorkoutDay['dayLabel'], swapSheet.exIdx, newName);
+    setSwapSheet(null);
+    const updatedPlan = useAIPlanStore.getState().currentPlan;
+    if (updatedPlan) {
+      updateAIPlanSnapshotInSupabase(updatedPlan).catch(() => {});
+    }
+  };
+
+  const handleOpenCustomExerciseSearch = () => {
+    if (!swapSheet) return;
+    const nextSwapTarget = { ...swapSheet };
+    setSwapSheet(null);
+    navigation.navigate('AIExerciseSearch', {
+      dayLabel: nextSwapTarget.dayLabel as WorkoutDay['dayLabel'],
+      exerciseIndex: nextSwapTarget.exIdx,
+      exerciseName: nextSwapTarget.exerciseName,
+    });
+  };
 
   const openApplySheet = () => {
     if (regenerating || !currentPlan) return;
@@ -881,9 +1176,6 @@ export default function AIPlanResultScreen() {
     return `Day1 ${fmt(start)} ~ Day7 ${fmt(end)}`;
   })();
   const isAppliedPlan = Boolean(currentPlan.isApplied);
-  const appliedSectionsLabel = currentPlan.isApplied
-    ? ((currentPlan.appliedSections ?? ['workout', 'diet', 'goals']) as PlanApplySection[]).map(formatAppliedSectionLabel).join(', ')
-    : null;
 
   return (
     <AIFlowScreen
@@ -1008,6 +1300,17 @@ export default function AIPlanResultScreen() {
         colors={colors}
       />
 
+      {swapSheet && (
+        <SwapExerciseSheet
+          exerciseName={swapSheet.exerciseName}
+          visible={swapSheet.visible}
+          onSelect={handleSwapSelect}
+          onPressCustomSelect={handleOpenCustomExerciseSearch}
+          onClose={() => setSwapSheet(null)}
+          colors={colors}
+        />
+      )}
+
       {/* 컨텐츠 */}
       <GoalSummaryCard plan={currentPlan} onboardingData={onboardingData} colors={colors} />
 
@@ -1015,204 +1318,20 @@ export default function AIPlanResultScreen() {
         <>
           <ExplanationCard plan={currentPlan} colors={colors} />
           {sortedWorkout.map((day) => (
-            <WorkoutDayCard key={day.dayLabel} day={day} weekStart={currentPlan.weekStart} colors={colors} />
+            <WorkoutDayCard
+              key={day.dayLabel}
+              day={day}
+              weekStart={currentPlan.weekStart}
+              colors={colors}
+              onSwap={(exIdx, exerciseName) => handleSwapOpen(day.dayLabel, exIdx, exerciseName)}
+            />
           ))}
         </>
       ) : (
         <DietTab plan={currentPlan} colors={colors} />
-        )}
+      )}
 
       <View style={{ height: 12 }} />
     </AIFlowScreen>
   );
 }
-
-const s = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  backBtn: { minWidth: 56 },
-  backText: { fontSize: 15 },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerTitle: { fontSize: 16, fontWeight: '600' },
-  headerSub: { fontSize: 12, marginTop: 1, textAlign: 'center' },
-  regenBtn: { minWidth: 56, alignItems: 'flex-end' },
-  completeText: { fontSize: 14, fontWeight: '600' },
-  tabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabCompact: { paddingHorizontal: 8 },
-  tabText: { fontSize: 14, fontWeight: '500' },
-  tabTextCompact: { fontSize: 13, textAlign: 'center' },
-  content: { padding: 16, paddingBottom: 24 },
-  footerActions: {
-    gap: 10,
-  },
-  planMetaCard: {
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-  },
-  planMetaTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  planMetaBody: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  planMetaHint: {
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 6,
-  },
-  footerPrimaryBtn: {
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  footerPrimaryText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  footerSecondaryBtn: {
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  footerSecondaryText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { fontSize: 16 },
-});
-
-const sheetStyles = StyleSheet.create({
-  container: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 44,
-  },
-  containerCompact: {
-    paddingHorizontal: 16,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 13,
-    marginBottom: 20,
-  },
-  weekNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  weekLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  weekLabelCompact: {
-    fontSize: 14,
-  },
-  dayGrid: {
-    flexDirection: 'row',
-    gap: 5,
-    marginBottom: 20,
-  },
-  dayGridCompact: {
-    flexWrap: 'wrap',
-    rowGap: 8,
-  },
-  selectionBox: {
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-  },
-  primaryButton: {
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  secondaryAction: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  sectionRow: {
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 6,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    flex: 1,
-  },
-  sectionDescription: {
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  sectionCheck: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sectionCheckText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  applyBox: {
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-  },
-  applyBoxText: {
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  applyPrimaryButton: {
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  applyPrimaryButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-});

@@ -32,6 +32,19 @@ import { RootStackParamList } from '../../types/navigation';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
+function sanitizeDecimalInput(value: string, maxIntegerDigits = 4, maxDecimalDigits = 1) {
+  const normalized = value.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+  if (!normalized) return '';
+
+  const startsWithDot = normalized.startsWith('.');
+  const [integerRaw, ...decimalParts] = normalized.split('.');
+  const integerPart = (startsWithDot ? '0' : integerRaw).slice(0, maxIntegerDigits);
+  const hasDecimal = normalized.includes('.');
+  const decimalPart = decimalParts.join('').slice(0, maxDecimalDigits);
+
+  return hasDecimal ? `${integerPart}.${decimalPart}` : integerPart;
+}
+
 // ─── 1RM 계산기 모달 ────────────────────────────────────────────────────────────
 
 function OneRMCalcModal({
@@ -123,12 +136,13 @@ function OneRMCalcModal({
                       width: '100%',
                       paddingVertical: 6,
                     }}
-                    keyboardType="numeric"
+                    keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                    inputMode="decimal"
                     placeholder="무게"
                     placeholderTextColor={colors.textSecondary}
                     value={rmWeight}
-                    onChangeText={t => setRmWeight(t.replace(/[^0-9.]/g, ''))}
-                    maxLength={5}
+                    onChangeText={t => setRmWeight(sanitizeDecimalInput(t))}
+                    maxLength={6}
                   />
                   <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>kg</Text>
                 </View>
@@ -220,6 +234,7 @@ const QUESTIONS: Question[] = [
     options: [
       { label: '체중 감량', value: 'weight_loss' },
       { label: '근육 증가 (벌크업)', value: 'muscle_gain' },
+      { label: '린매스업 (체지방 최소화 + 근육 증가)', value: 'lean_bulk' },
       { label: '근력 강화 (파워리프팅/힘 증가)', value: 'strength_gain' },
       { label: '체형 유지', value: 'maintenance' },
       { label: '건강 개선', value: 'health' },
@@ -290,10 +305,11 @@ const QUESTIONS: Question[] = [
     type: 'single',
     phase: 1,
     options: [
-      { label: '1~2일', value: '2' },
-      { label: '3일', value: '3' },
-      { label: '4일', value: '4' },
-      { label: '5일 이상', value: '5' },
+      { label: '주 2일', value: '2' },
+      { label: '주 3일', value: '3' },
+      { label: '주 4일', value: '4' },
+      { label: '주 5일', value: '5' },
+      { label: '주 6일', value: '6' },
     ],
   },
   {
@@ -722,16 +738,16 @@ export default function AIOnboardingScreen() {
                 <View style={s.strengthValueGroup}>
                   <TextInput
                     style={[s.strengthInputCompact, { color: colors.text, borderColor: colors.border }]}
-                    keyboardType="numeric"
+                    keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                    inputMode="decimal"
                     placeholder="0"
                     placeholderTextColor={colors.textSecondary}
                     value={strengthInputs[ex.id] ?? ''}
                     onChangeText={text => {
-                      const numeric = text.replace(/[^0-9]/g, '');
-                      setStrengthInputs(prev => ({ ...prev, [ex.id]: numeric }));
+                      setStrengthInputs(prev => ({ ...prev, [ex.id]: sanitizeDecimalInput(text) }));
                     }}
                     onFocus={() => scrollToFocusedInput((strengthCardOffsets.current[ex.id] ?? 0) - 24)}
-                    maxLength={4}
+                    maxLength={6}
                   />
                   <Text style={s.strengthUnitCompact}>kg</Text>
                 </View>

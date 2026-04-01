@@ -20,7 +20,7 @@ export type PersonaId =
   | 'sloth';
 
 export interface PersonaOnboardingInput {
-  goal?: 'weight_loss' | 'muscle_gain' | 'strength_gain' | 'maintenance' | 'health' | null;
+  goal?: 'weight_loss' | 'muscle_gain' | 'lean_bulk' | 'strength_gain' | 'maintenance' | 'health' | null;
   experience?: 'beginner' | 'intermediate' | 'advanced' | null;
   workoutDaysPerWeek?: number | null;
   dietaryRestrictions?: string[] | null;
@@ -224,7 +224,7 @@ export function mapOnboardingGoalToPersonaGoal(
 ): PersonaGoal | null {
   if (!goal) return null;
   if (goal === 'weight_loss') return 'loss';
-  if (goal === 'muscle_gain' || goal === 'strength_gain') return 'gain';
+  if (goal === 'muscle_gain' || goal === 'lean_bulk' || goal === 'strength_gain') return 'gain';
   if (goal === 'maintenance' || goal === 'health') return 'maintain';
   return null;
 }
@@ -292,7 +292,7 @@ export function deriveTargets(
       resolvedGoal === 'loss'
         ? Math.max(Math.round(tdee - 500), 1200)
         : resolvedGoal === 'gain'
-          ? Math.round(tdee + 300)
+          ? onboarding?.goal === 'lean_bulk' ? Math.round(tdee + 200) : Math.round(tdee + 300)
           : Math.round(tdee);
   }
 
@@ -384,7 +384,7 @@ export function scoreDietFromOnboarding(onboarding?: PersonaOnboardingInput | nu
   const restrictionCount = onboarding.dietaryRestrictions?.length ?? 0;
   const goal = onboarding.goal ?? 'health';
   let score =
-    goal === 'muscle_gain' || goal === 'strength_gain'
+    goal === 'muscle_gain' || goal === 'lean_bulk' || goal === 'strength_gain'
       ? 0.9
       : goal === 'weight_loss'
         ? 0.8

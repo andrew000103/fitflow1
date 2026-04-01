@@ -59,6 +59,7 @@ interface WorkoutStore {
   setTitle: (t: string) => void;
   setNotes: (n: string) => void;
   setExerciseNote: (exerciseIndex: number, note: string) => void;
+  updateExerciseName: (exerciseIndex: number, newName: string) => void;
 }
 
 function makeDefaultTitle(): string {
@@ -557,6 +558,29 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
       const ex = exercises[exerciseIndex];
       if (!ex) return state;
       exercises[exerciseIndex] = { ...ex, note };
+      return { sessionExercises: exercises };
+    });
+  },
+
+  updateExerciseName: (exerciseIndex, newName) => {
+    set((state) => {
+      const exercises = [...state.sessionExercises];
+      const ex = exercises[exerciseIndex];
+      if (!ex) return state;
+
+      const newId = ex.exercise.id.startsWith('local::ai-')
+        ? `local::ai-${newName}`
+        : ex.exercise.id;
+
+      const updatedExercise: SessionExercise = {
+        ...ex,
+        exercise: {
+          ...ex.exercise,
+          id: newId,
+          name_ko: newName,
+        },
+      };
+      exercises[exerciseIndex] = updatedExercise;
       return { sessionExercises: exercises };
     });
   },

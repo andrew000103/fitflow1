@@ -17,6 +17,7 @@ import { useWorkoutStore } from '../../stores/workout-store';
 import { useAppTheme } from '../../theme';
 import { WorkoutStackParamList } from '../../types/navigation';
 import { LocalSet, SessionExercise } from '../../types/workout';
+import { SwapExerciseSheet } from '../../components/ai/SwapExerciseSheet';
 
 type Props = {
   navigation: NativeStackNavigationProp<WorkoutStackParamList, 'WorkoutSession'>;
@@ -373,6 +374,7 @@ interface ExerciseBlockProps {
   onDeleteSet: (si: number) => void;
   onSetExerciseNote: (note: string) => void;
   showSheet: (config: SheetConfig) => void;
+  onSwap: () => void;
 }
 
 function ExerciseBlock({
@@ -386,6 +388,7 @@ function ExerciseBlock({
   onDeleteSet,
   onSetExerciseNote,
   showSheet,
+  onSwap,
 }: ExerciseBlockProps) {
   const { colors, typography } = useAppTheme();
   const [editingNote, setEditingNote] = useState(false);
@@ -458,6 +461,9 @@ function ExerciseBlock({
         >
           {item.exercise.name_ko}
         </Text>
+        <TouchableOpacity onPress={onSwap} style={{ padding: 6 }}>
+          <Text style={{ fontSize: 12, color: colors.accent }}>교체</Text>
+        </TouchableOpacity>
         <Text
           style={{
             fontFamily: typography.fontFamily,
@@ -805,6 +811,7 @@ export default function WorkoutSessionScreen({ navigation }: Props) {
     removeExercise,
     removeSet,
     setExerciseNote,
+    updateExerciseName,
   } = useWorkoutStore();
 
   const scrollRef = useRef<ScrollView>(null);
@@ -812,6 +819,17 @@ export default function WorkoutSessionScreen({ navigation }: Props) {
   const [initError, setInitError] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [activeSheet, setActiveSheet] = useState<SheetConfig | null>(null);
+  const [swapSheet, setSwapSheet] = useState<{
+    visible: boolean;
+    exIdx: number;
+    exerciseName: string;
+  } | null>(null);
+
+  const handleSessionSwap = (newName: string) => {
+    if (!swapSheet) return;
+    updateExerciseName(swapSheet.exIdx, newName);
+    setSwapSheet(null);
+  };
 
   useEffect(() => {
     if (startedAt) return;
@@ -1005,6 +1023,7 @@ export default function WorkoutSessionScreen({ navigation }: Props) {
               onDeleteSet={(si) => removeSet(ei, si)}
               onSetExerciseNote={(note) => setExerciseNote(ei, note)}
               showSheet={showSheet}
+              onSwap={() => setSwapSheet({ visible: true, exIdx: ei, exerciseName: ex.exercise.name_ko })}
             />
           ))
         )}
@@ -1024,6 +1043,16 @@ export default function WorkoutSessionScreen({ navigation }: Props) {
 
       {/* ── Custom Bottom Sheet (replaces Alert) ── */}
       <BottomSheet config={activeSheet} onDismiss={dismissSheet} />
+
+      {swapSheet && (
+        <SwapExerciseSheet
+          exerciseName={swapSheet.exerciseName}
+          visible={swapSheet.visible}
+          onSelect={handleSessionSwap}
+          onClose={() => setSwapSheet(null)}
+          colors={colors}
+        />
+      )}
     </SafeAreaView>
   );
 }

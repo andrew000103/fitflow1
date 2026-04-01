@@ -11,27 +11,59 @@ import WorkoutSessionScreen from '../screens/workout/workout-session-screen';
 import WorkoutSummaryScreen from '../screens/workout/workout-summary-screen';
 import TrainingMaxScreen from '../screens/workout/training-max-screen';
 import { WorkoutStackParamList } from '../types/navigation';
+import { useAppTheme } from '../theme';
+import { TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 const Stack = createNativeStackNavigator<WorkoutStackParamList>();
 
 export default function WorkoutNavigator() {
+  const { colors, typography } = useAppTheme();
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="WorkoutList" component={WorkoutScreen} />
-      <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: colors.background,
+        },
+        headerTitleStyle: {
+          fontFamily: typography.fontFamily,
+          fontSize: typography.size.lg,
+          fontWeight: typography.weight.semibold,
+          color: colors.text,
+        },
+        headerShadowVisible: false,
+        headerTintColor: colors.accent,
+        headerBackTitleVisible: false,
+        headerLeft: ({ canGoBack, onPress }) => {
+          if (!canGoBack) {
+            return null;
+          }
+          return (
+            <TouchableOpacity
+              onPress={onPress}
+              style={{ marginLeft: 10, paddingVertical: 5, paddingRight: 10 }}
+            >
+              <Ionicons name="chevron-back" size={24} color={colors.accent} />
+            </TouchableOpacity>
+          );
+        },
+      }}
+    >
+      <Stack.Screen name="WorkoutList" component={WorkoutScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} options={{ title: '운동 기록' }} />
       <Stack.Screen name="WorkoutSession" component={WorkoutSessionScreen} />
       <Stack.Screen
         name="ExerciseSearch"
         component={ExerciseSearchScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', title: '운동 검색' }}
       />
       <Stack.Screen name="WorkoutSummary" component={WorkoutSummaryScreen} />
-      <Stack.Screen name="ProgramList" component={ProgramListScreen} />
+      <Stack.Screen name="ProgramList" component={ProgramListScreen} options={{ title: '프로그램 목록' }} />
       <Stack.Screen name="ProgramDetail" component={ProgramDetailScreen} />
       <Stack.Screen
         name="ProgramCreate"
         component={ProgramCreateScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', title: '프로그램 생성' }}
       />
       <Stack.Screen
         name="ProgramReview"
@@ -41,7 +73,7 @@ export default function WorkoutNavigator() {
       <Stack.Screen
         name="TrainingMaxSetup"
         component={TrainingMaxScreen}
-        options={{ presentation: 'modal' }}
+        options={{ presentation: 'modal', title: 'T-Max 설정' }}
       />
     </Stack.Navigator>
   );

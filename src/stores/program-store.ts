@@ -9,15 +9,27 @@ import {
   ProgramExerciseRow,
 } from '../types/program';
 
+function resolveSelectedProgramId(
+  programs: ActiveUserProgram[],
+  preferredId?: string | null,
+): string | null {
+  if (preferredId && programs.some((program) => program.id === preferredId)) {
+    return preferredId;
+  }
+  return programs[0]?.id ?? null;
+}
+
 interface ProgramStore {
   myPrograms: Program[];
   publicPrograms: Program[];
-  activeUserProgram: ActiveUserProgram | null;
+  activeUserPrograms: ActiveUserProgram[];
+  selectedActiveProgramId: string | null;
   loading: boolean;
 
   fetchMyPrograms: () => Promise<void>;
   fetchPublicPrograms: () => Promise<void>;
   fetchActiveProgram: () => Promise<void>;
+  setSelectedActiveProgramId: (userProgramId: string | null) => void;
   fetchProgramDays: (programId: string) => Promise<ProgramDayWithExercises[]>;
   fetchProgramDayExercises: (programId: string, dayNumber: number) => Promise<ProgramExerciseRow[]>;
   createProgram: (draft: {
@@ -39,7 +51,8 @@ interface ProgramStore {
 export const useProgramStore = create<ProgramStore>((set, get) => ({
   myPrograms: [],
   publicPrograms: [],
-  activeUserProgram: null,
+  activeUserPrograms: [],
+  selectedActiveProgramId: null,
   loading: false,
 
   fetchMyPrograms: async () => {
@@ -67,22 +80,40 @@ export const useProgramStore = create<ProgramStore>((set, get) => ({
 
   fetchActiveProgram: async () => {
     const userId = useAuthStore.getState().user?.id;
-    if (!userId) return;
+    if (!userId) {
+      set({
+        activeUserPrograms: [],
+        selectedActiveProgramId: null,
+      });
+      return;
+    }
 
     const { data } = await supabase
       .from('user_programs')
       .select('*, program:programs(*)')
       .eq('user_id', userId)
       .eq('is_active', true)
-      .order('started_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('started_at', { ascending: false });
 
-    if (data && data.program) {
-      set({ activeUserProgram: data as unknown as ActiveUserProgram });
-    } else {
-      set({ activeUserProgram: null });
-    }
+    const programs = ((data ?? []).filter((item: any) => item.program) as unknown[]) as ActiveUserProgram[];
+    const selectedActiveProgramId = resolveSelectedProgramId(
+      programs,
+      get().selectedActiveProgramId,
+    );
+
+    set({
+      activeUserPrograms: programs,
+      selectedActiveProgramId,
+    });
+  },
+
+  setSelectedActiveProgramId: (userProgramId) => {
+    set((state) => ({
+      selectedActiveProgramId: resolveSelectedProgramId(
+        state.activeUserPrograms,
+        userProgramId,
+      ),
+    }));
   },
 
   fetchProgramDays: async (programId) => {
@@ -206,15 +237,6 @@ export const useProgramStore = create<ProgramStore>((set, get) => ({
     const userId = useAuthStore.getState().user?.id;
     if (!userId) return;
 
-    // Deactivate current active program
-    const current = get().activeUserProgram;
-    if (current) {
-      await supabase
-        .from('user_programs')
-        .update({ is_active: false })
-        .eq('id', current.id);
-    }
-
     await supabase.from('user_programs').upsert(
       {
         user_id: userId,
@@ -228,6 +250,10 @@ export const useProgramStore = create<ProgramStore>((set, get) => ({
     );
 
     await get().fetchActiveProgram();
+    const enrolledProgram = get().activeUserPrograms.find((item) => item.program_id === programId);
+    if (enrolledProgram) {
+      set({ selectedActiveProgramId: enrolledProgram.id });
+    }
   },
 
   unenrollProgram: async (userProgramId) => {
@@ -235,12 +261,21 @@ export const useProgramStore = create<ProgramStore>((set, get) => ({
       .from('user_programs')
       .update({ is_active: false })
       .eq('id', userProgramId);
-    set({ activeUserProgram: null });
+    set((state) => {
+      const activeUserPrograms = state.activeUserPrograms.filter((program) => program.id !== userProgramId);
+      return {
+        activeUserPrograms,
+        selectedActiveProgramId: resolveSelectedProgramId(
+          activeUserPrograms,
+          state.selectedActiveProgramId === userProgramId ? null : state.selectedActiveProgramId,
+        ),
+      };
+    });
   },
 
   advanceDay: async (userProgramId, daysPerWeek) => {
-    const current = get().activeUserProgram;
-    if (!current || current.id !== userProgramId) return;
+    const current = get().activeUserPrograms.find((program) => program.id === userProgramId);
+    if (!current) return;
 
     const nextDay = current.current_day >= daysPerWeek ? 1 : current.current_day + 1;
     const completedSessions = current.completed_sessions + 1;
@@ -250,24 +285,33 @@ export const useProgramStore = create<ProgramStore>((set, get) => ({
       .update({ current_day: nextDay, completed_sessions: completedSessions })
       .eq('id', userProgramId);
 
-    set({
-      activeUserProgram: {
-        ...current,
-        current_day: nextDay,
-        completed_sessions: completedSessions,
-      },
-    });
+    set((state) => ({
+      activeUserPrograms: state.activeUserPrograms.map((program) =>
+        program.id === userProgramId
+          ? {
+              ...program,
+              current_day: nextDay,
+              completed_sessions: completedSessions,
+            }
+          : program
+      ),
+    }));
   },
 
   deleteProgram: async (programId) => {
     await supabase.from('programs').delete().eq('id', programId);
-    set((state) => ({
-      myPrograms: state.myPrograms.filter((p) => p.id !== programId),
-      publicPrograms: state.publicPrograms.filter((p) => p.id !== programId),
-    }));
-    if (get().activeUserProgram?.program_id === programId) {
-      set({ activeUserProgram: null });
-    }
+    set((state) => {
+      const activeUserPrograms = state.activeUserPrograms.filter((program) => program.program_id !== programId);
+      return {
+        myPrograms: state.myPrograms.filter((p) => p.id !== programId),
+        publicPrograms: state.publicPrograms.filter((p) => p.id !== programId),
+        activeUserPrograms,
+        selectedActiveProgramId: resolveSelectedProgramId(
+          activeUserPrograms,
+          state.selectedActiveProgramId,
+        ),
+      };
+    });
   },
 
   fetchUserTMs: async (userProgramId) => {

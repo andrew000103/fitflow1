@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useCallback, useRef, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { LayoutChangeEvent, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,7 +14,7 @@ import { AppCard } from '../../components/common/AppCard';
 import { AppHeader } from '../../components/common/AppHeader';
 import { AppButton } from '../../components/common/AppButton';
 
-import { getLatestUserGoal } from '../../lib/profile';
+import { getLatestUserGoal, getUserProfile } from '../../lib/profile';
 import { getPlanCycleInfo } from '../../lib/ai-plan-schedule';
 import { supabase } from '../../lib/supabase';
 import { useAIPlanStore } from '../../stores/ai-plan-store';
@@ -82,79 +82,96 @@ function WeeklyCalorieChart({
   goal: number;
 }) {
   const { colors, spacing } = useAppTheme();
-  const screenW = Dimensions.get('window').width;
-  const chartW = screenW - (spacing.lg * 4); // AppCard padding 16 * 2 + Outer margin 16 * 2
+  const [chartW, setChartW] = useState(0);
   const chartH = 96;
   const labelH = 20;
   const totalH = chartH + labelH;
   const n = data.length;
+  const handleLayout = (event: LayoutChangeEvent) => {
+    const nextWidth = Math.max(event.nativeEvent.layout.width, 0);
+    if (nextWidth !== chartW) setChartW(nextWidth);
+  };
+
+  if (chartW <= 0) {
+    return <View onLayout={handleLayout} style={{ width: '100%', height: totalH }} />;
+  }
+
   const slotW = chartW / n;
   const barW = Math.max(slotW - 10, 6);
   const maxCal = Math.max(...data.map((d) => d.calories), goal, 1);
   const today = dateStr(new Date());
 
   return (
-    <Svg width={chartW} height={totalH}>
-      <Line
-        x1={0} y1={chartH - (goal / maxCal) * chartH}
-        x2={chartW} y2={chartH - (goal / maxCal) * chartH}
-        stroke={colors.accent}
-        strokeWidth={1}
-        strokeDasharray="4,4"
-        opacity={0.3}
-      />
+    <View onLayout={handleLayout} style={{ width: '100%' }}>
+      <Svg width={chartW} height={totalH}>
+        <Line
+          x1={0} y1={chartH - (goal / maxCal) * chartH}
+          x2={chartW} y2={chartH - (goal / maxCal) * chartH}
+          stroke={colors.accent}
+          strokeWidth={1}
+          strokeDasharray="4,4"
+          opacity={0.3}
+        />
 
-      {data.map((item, i) => {
-        const slotX = i * slotW;
-        const barX = slotX + (slotW - barW) / 2;
-        const barH = item.calories > 0
-          ? Math.max((item.calories / maxCal) * chartH, 4)
-          : 0;
-        const barY = chartH - barH;
-        const isToday = item.date === today;
+        {data.map((item, i) => {
+          const slotX = i * slotW;
+          const barX = slotX + (slotW - barW) / 2;
+          const barH = item.calories > 0
+            ? Math.max((item.calories / maxCal) * chartH, 4)
+            : 0;
+          const barY = chartH - barH;
+          const isToday = item.date === today;
 
-        return (
-          <React.Fragment key={item.date}>
-            <Rect
-              x={barX} y={barY}
-              width={barW} height={barH}
-              rx={6}
-              fill={isToday ? colors.accent : colors.trackBg}
-            />
-            <SvgText
-              x={slotX + slotW / 2}
-              y={chartH + 15}
-              textAnchor="middle"
-              fontSize={10}
-              fill={isToday ? colors.accent : colors.textTertiary}
-              fontWeight={isToday ? '700' : '500'}
-            >
-              {item.label}
-            </SvgText>
-          </React.Fragment>
-        );
-      })}
-    </Svg>
+          return (
+            <React.Fragment key={item.date}>
+              <Rect
+                x={barX} y={barY}
+                width={barW} height={barH}
+                rx={6}
+                fill={isToday ? colors.accent : colors.trackBg}
+              />
+              <SvgText
+                x={slotX + slotW / 2}
+                y={chartH + 15}
+                textAnchor="middle"
+                fontSize={10}
+                fill={isToday ? colors.accent : colors.textTertiary}
+                fontWeight={isToday ? '700' : '500'}
+              >
+                {item.label}
+              </SvgText>
+            </React.Fragment>
+          );
+        })}
+      </Svg>
+    </View>
   );
 }
 
 // ─── WeightLineChart ──────────────────────────────────────────────────────────
 function WeightLineChart({ data }: { data: { date: string; weight_kg: number }[] }) {
-  const { colors, typography, spacing, isDark } = useAppTheme();
-  const screenW = Dimensions.get('window').width;
-  const chartW = screenW - (spacing.lg * 4);
+  const { colors, typography, isDark } = useAppTheme();
+  const [chartW, setChartW] = useState(0);
   const chartH = 80;
   const padH = 8;
   const padV = 10;
+  const handleLayout = (event: LayoutChangeEvent) => {
+    const nextWidth = Math.max(event.nativeEvent.layout.width, 0);
+    if (nextWidth !== chartW) setChartW(nextWidth);
+  };
 
   if (data.length < 2) {
     return (
-      <View style={{ height: chartH, justifyContent: 'center', alignItems: 'center' }}>
+      <View onLayout={handleLayout} style={{ width: '100%', height: chartH, justifyContent: 'center', alignItems: 'center' }}>
         <Text style={{ color: colors.textTertiary, fontFamily: typography.fontFamily, fontSize: 13 }}>
           데이터를 쌓고 체중 변화를 확인하세요
         </Text>
       </View>
     );
+  }
+
+  if (chartW <= 0) {
+    return <View onLayout={handleLayout} style={{ width: '100%', height: chartH }} />;
   }
 
   const weights = data.map((d) => d.weight_kg);
@@ -173,19 +190,21 @@ function WeightLineChart({ data }: { data: { date: string; weight_kg: number }[]
   const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
 
   return (
-    <Svg width={chartW} height={chartH}>
-      <Path
-        d={pathD}
-        stroke={colors.accent}
-        strokeWidth={3}
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {pts.map((p, i) => (
-        <Circle key={i} cx={p.x} cy={p.y} r={4} fill={isDark ? colors.background : '#FFF'} stroke={colors.accent} strokeWidth={2} />
-      ))}
-    </Svg>
+    <View onLayout={handleLayout} style={{ width: '100%' }}>
+      <Svg width={chartW} height={chartH}>
+        <Path
+          d={pathD}
+          stroke={colors.accent}
+          strokeWidth={3}
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {pts.map((p, i) => (
+          <Circle key={i} cx={p.x} cy={p.y} r={4} fill={isDark ? colors.background : '#FFF'} stroke={colors.accent} strokeWidth={2} />
+        ))}
+      </Svg>
+    </View>
   );
 }
 
@@ -386,6 +405,7 @@ export default function HomeScreen() {
   const [weeklyCount, setWeeklyCount] = useState(0);
   const [weightHistory, setWeightHistory] = useState<{ date: string; weight_kg: number }[]>([]);
   const [goals, setGoals] = useState(DEFAULT_GOALS);
+  const [homeNickname, setHomeNickname] = useState<string | null>(null);
   const remoteRequestIdRef = useRef(0);
 
   const todayTotals = getDayTotals(today);
@@ -478,6 +498,12 @@ export default function HomeScreen() {
     } catch {}
 
     try {
+      const profile = await getUserProfile(user.id);
+      if (requestId !== remoteRequestIdRef.current) return;
+      setHomeNickname(profile?.nickname?.trim() || null);
+    } catch {}
+
+    try {
       const goal = await getLatestUserGoal(user.id);
       if (requestId !== remoteRequestIdRef.current) return;
 
@@ -517,13 +543,14 @@ export default function HomeScreen() {
   }, [fetchRemote, refreshPersona, syncRecurringPlanForToday, user?.id]));
 
   const latestWeight = weightHistory.length > 0 ? weightHistory[weightHistory.length - 1].weight_kg : null;
+  const displayName = homeNickname || (user?.email ? user.email.split('@')[0] : '사용자');
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
         <AppHeader
-          title={`${user?.email ? user.email.split('@')[0] : '사용자'} 님`}
+          title={`${displayName} 님`}
           subtitle={todayLabel()}
           rightAction={{
             icon: <MaterialCommunityIcons name={isDark ? 'weather-sunny' : 'weather-night'} size={24} color={colors.textSecondary} />,

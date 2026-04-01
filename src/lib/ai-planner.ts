@@ -388,6 +388,14 @@ function buildPrompt(
       '- 주요 복합 운동과 보조 운동을 균형 있게 포함하세요.',
       '- 식단은 근성장에 필요한 소폭 칼로리 흑자와 충분한 단백질을 우선하세요.',
     ].join('\n'),
+    lean_bulk: [
+      '- 운동은 근비대와 체력 향상을 동시에 달성하도록 복합 운동 위주로 설계하세요.',
+      '- 주요 리프트는 8~12회 반복 범위를 중심으로, 충분한 볼륨을 확보하세요.',
+      '- 유산소 또는 컨디셔닝 요소를 주 1~2회 포함해 체지방 증가를 억제하세요.',
+      '- 식단은 유지칼로리 대비 150~300kcal 소폭 흑자만 유지하여 체지방 최소화와 근성장을 동시에 추구하세요.',
+      '- 단백질은 체중 1kg당 2g 이상 충분히 확보하세요.',
+      '- 무분별한 벌크업보다 린한 체성분 변화를 우선하세요.',
+    ].join('\n'),
     strength_gain: [
       '- 운동은 스쿼트, 벤치프레스, 데드리프트, 오버헤드프레스 같은 메인 리프트 중심으로 설계하세요.',
       '- 주요 리프트는 3~6회 반복의 저반복·고중량 성향 세트를 적극 활용하세요.',
@@ -416,6 +424,8 @@ ${data.strengthProfile.map(e => `- ${e.exercise}: ${e.weightKg}kg`).join('\n')}
   } else if (Array.isArray(data.strengthProfile) && data.strengthProfile.length === 0) {
     strengthSection = data.goal === 'strength_gain'
       ? `\n→ 사용자가 현재 중량을 입력하지 않았습니다. 운동 경험(${experienceLabel[data.experience]})과 강화 우선 리프트를 고려해 메인 리프트의 weight_kg를 매우 보수적으로 설정하고, 무리한 추정 중량은 피해주세요.\n`
+      : data.goal === 'lean_bulk'
+      ? `\n→ 사용자가 현재 중량을 입력하지 않았습니다. 운동 경험(${experienceLabel[data.experience]})을 고려하여 주요 복합 운동의 weight_kg를 보수적으로 설정하고, 8~12회 반복이 가능한 수준으로 설정해주세요.\n`
       : `\n→ 사용자가 운동 중량을 입력하지 않았습니다. 운동 경험(${experienceLabel[data.experience]})을 고려하여 weight_kg를 맨몸 또는 매우 가벼운 중량(0~10kg)으로 보수적으로 설정해주세요.\n`;
   }
 

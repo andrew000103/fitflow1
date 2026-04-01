@@ -4,7 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
-export type AIGoal = 'weight_loss' | 'muscle_gain' | 'strength_gain' | 'maintenance' | 'health';
+export type AIGoal = 'weight_loss' | 'muscle_gain' | 'lean_bulk' | 'strength_gain' | 'maintenance' | 'health';
 export type AIGender = 'male' | 'female' | 'undisclosed';
 export type AIExperience = 'beginner' | 'intermediate' | 'advanced';
 export type GymType = 'full_gym' | 'garage_gym' | 'dumbbell_only' | 'bodyweight';
@@ -12,6 +12,7 @@ export type GymType = 'full_gym' | 'garage_gym' | 'dumbbell_only' | 'bodyweight'
 export const AI_GOAL_LABEL: Record<AIGoal, string> = {
   weight_loss: '체중 감량',
   muscle_gain: '근육 증가 (벌크업)',
+  lean_bulk: '린매스업',
   strength_gain: '근력 강화',
   maintenance: '체형 유지',
   health: '건강 개선',
@@ -169,6 +170,7 @@ interface AIPlanState {
   restorePreviousPlan: () => void;
   clearPlan: () => void;
   reset: () => void;
+  swapExercise: (dayLabel: WorkoutDay['dayLabel'], exerciseIndex: number, newExerciseName: string) => void;
   applyRuleBasedAdjustment: (userId: string) => Promise<void>;
   syncRecurringPlanForToday: (userId: string, today?: Date) => Promise<void>;
 }
@@ -230,6 +232,27 @@ export const useAIPlanStore = create<AIPlanState>()(
         })),
 
       clearPlan: () => set({ currentPlan: null }),
+
+      swapExercise: (dayLabel, exerciseIndex, newExerciseName) =>
+        set((state) => ({
+          currentPlan: state.currentPlan
+            ? {
+                ...state.currentPlan,
+                weeklyWorkout: state.currentPlan.weeklyWorkout.map((day) =>
+                  day.dayLabel !== dayLabel
+                    ? day
+                    : {
+                        ...day,
+                        exercises: day.exercises.map((exercise, index) =>
+                          index === exerciseIndex
+                            ? { ...exercise, name: newExerciseName.trim() || exercise.name }
+                            : exercise
+                        ),
+                      }
+                ),
+              }
+            : null,
+        })),
 
       reset: () =>
         set({

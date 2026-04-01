@@ -7,3 +7,4 @@
 | [p2-stabilization](./p2-stabilization/) | 2026-03-26 | 88% | completed |
 | [ai-onboarding-improvements](./ai-onboarding-improvements/) | 2026-03-27 | 98% | completed |
 | [ai-plan-start-date](./ai-plan-start-date/) | 2026-03-27 | 93% | completed |
+| [ai-plan-trust-upgrade](./ai-plan-trust-upgrade/) | 2026-03-31 | 92% | completed |

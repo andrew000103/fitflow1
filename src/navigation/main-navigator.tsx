@@ -6,6 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import AIConsentScreen from '../screens/ai/ai-consent-screen';
+import AIExerciseSearchScreen from '../screens/ai/ai-exercise-search-screen';
 import AIOnboardingScreen from '../screens/ai/ai-onboarding-screen';
 import HomeScreen from '../screens/home/home-screen';
 import ProfileScreen from '../screens/profile/profile-screen';
@@ -118,6 +119,11 @@ export default function MainNavigator() {
         name="AIPlanWeekly"
         component={AIPlanWeeklyScreen}
         options={{ presentation: 'modal' }}
+      />
+      <RootStack.Screen
+        name="AIExerciseSearch"
+        component={AIExerciseSearchScreen}
+        options={{ presentation: 'card' }}
       />
     </RootStack.Navigator>
   );
