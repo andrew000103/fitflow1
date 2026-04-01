@@ -45,18 +45,18 @@ const STATE_META: Record<PersonaDailyState, { icon: string; label: string }> = {
 };
 
 const LEVEL_IMAGE_MAP: Record<HamsterLevelId, any> = {
-  beginner: require('../../../assets/hamster_1200x1200/초심자.png'),
-  novice: require('../../../assets/hamster_1200x1200/초급자.png'),
-  intermediate: require('../../../assets/hamster_1200x1200/중급자.png'),
-  upper_intermediate: require('../../../assets/hamster_1200x1200/중상급자.png'),
-  advanced: require('../../../assets/hamster_1200x1200/상급자.png'),
-  veteran: require('../../../assets/hamster_1200x1200/고인물.png'),
-  artisan: require('../../../assets/hamster_1200x1200/달인.png'),
-  master: require('../../../assets/hamster_1200x1200/마스터.png'),
-  grandmaster: require('../../../assets/hamster_1200x1200/그랜드마스터.png'),
-  challenger: require('../../../assets/hamster_1200x1200/챌린저.png'),
-  ranker: require('../../../assets/hamster_1200x1200/랭커.png'),
-  god: require('../../../assets/hamster_1200x1200/신.png'),
+  beginner: require('../../../assets/hamster_1200x1200/beginner.png'),
+  novice: require('../../../assets/hamster_1200x1200/novice.png'),
+  intermediate: require('../../../assets/hamster_1200x1200/intermediate.png'),
+  upper_intermediate: require('../../../assets/hamster_1200x1200/upper-intermediate.png'),
+  advanced: require('../../../assets/hamster_1200x1200/advanced.png'),
+  veteran: require('../../../assets/hamster_1200x1200/veteran.png'),
+  artisan: require('../../../assets/hamster_1200x1200/artisan.png'),
+  master: require('../../../assets/hamster_1200x1200/master.png'),
+  grandmaster: require('../../../assets/hamster_1200x1200/grandmaster.png'),
+  challenger: require('../../../assets/hamster_1200x1200/challenger.png'),
+  ranker: require('../../../assets/hamster_1200x1200/ranker.png'),
+  god: require('../../../assets/hamster_1200x1200/god.png'),
 };
 
 type HamsterLevelMetaItem = (typeof HAMSTER_LEVEL_META)[number];
