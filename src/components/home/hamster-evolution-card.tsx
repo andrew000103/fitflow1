@@ -194,6 +194,8 @@ export default function HamsterEvolutionCard({
   const { colors, spacing, radius, typography } = useAppTheme();
   const [viewerOpen, setViewerOpen] = useState(false);
   const hasAssignedCharacter = Boolean(levelId && levelName);
+  const isEmptyState = !hasAssignedCharacter && Boolean(ctaLabel && onPressCta);
+  const isLoadingAssignedState = hasAssignedCharacter && loading;
   const imageSource = levelId ? LEVEL_IMAGE_MAP[levelId] : null;
   const stateMeta = dailyState ? STATE_META[dailyState] : null;
   const progressWidth = `${Math.round(Math.min(Math.max(progressToNext ?? 0, 0), 1) * 100)}%` as `${number}%`;
@@ -202,13 +204,42 @@ export default function HamsterEvolutionCard({
     [levelId],
   );
 
+  if (isEmptyState) {
+    return (
+      <>
+        <View style={[styles.container, { borderBottomColor: colors.border, padding: spacing.lg }]}>
+          <View style={styles.emptyStateWrap}>
+            <Text style={[styles.emptyStateTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
+              내 헬스 레벨을 확인해보세요
+            </Text>
+            <Text style={[styles.emptyStateDescription, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
+              준비되면 지금 루틴 기준으로 바로 판정할 수 있어요.
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={onPressCta ?? undefined}
+              style={[styles.emptyStateButton, { backgroundColor: colors.accent, borderRadius: radius.full }]}
+            >
+              <Text style={[styles.emptyStateButtonLabel, { color: '#FFFFFF', fontFamily: typography.fontFamily }]}>
+                {ctaLabel}
+              </Text>
+              <MaterialCommunityIcons name="chevron-right" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <HamsterLevelViewer currentLevelId={levelId} visible={viewerOpen} onClose={() => setViewerOpen(false)} />
+      </>
+    );
+  }
+
   return (
     <>
       <View style={[styles.container, { borderBottomColor: colors.border, padding: spacing.lg }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerCopy}>
             <Text style={[styles.levelTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
-              {loading ? '진화 상태 계산 중' : hasAssignedCharacter ? `${levelName} 햄식이` : '햄식이를 설정해보세요'}
+              {isLoadingAssignedState ? '진화 상태 계산 중' : hasAssignedCharacter ? `${levelName} 햄식이` : '햄식이를 설정해보세요'}
             </Text>
             <Text style={[styles.headline, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
               {headline ?? viewerMeta?.description ?? '운동과 식단 기록에 따라 햄식이가 성장해요.'}
@@ -396,6 +427,33 @@ const styles = StyleSheet.create({
   },
   progressPanel: {
     flex: 1,
+  },
+  emptyStateWrap: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  emptyStateTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  emptyStateDescription: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  emptyStateButton: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  emptyStateButtonLabel: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   nextLabel: {
     fontSize: 12,

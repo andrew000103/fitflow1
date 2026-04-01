@@ -1,19 +1,19 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { LayoutChangeEvent, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import CalorieRing from '../../components/home/calorie-ring';
+import BodyFatigueCard from '../../components/home/body-fatigue-card';
 import HamsterEvolutionCard from '../../components/home/hamster-evolution-card';
-import MacroBars from '../../components/home/macro-bars';
+import ProteinRemainingCard from '../../components/home/protein-remaining-card';
 import { AppCard } from '../../components/common/AppCard';
 import { AppHeader } from '../../components/common/AppHeader';
-import { AppButton } from '../../components/common/AppButton';
 
+import { calculateBodyFatigue, FatigueResult } from '../../lib/home-fatigue';
 import { getLatestUserGoal, getUserProfile } from '../../lib/profile';
 import { getPlanCycleInfo } from '../../lib/ai-plan-schedule';
 import { supabase } from '../../lib/supabase';
@@ -23,8 +23,7 @@ import { useDietStore } from '../../stores/diet-store';
 import { usePersonaStore } from '../../stores/persona-store';
 import { useThemeStore } from '../../stores/theme-store';
 import { useAppTheme } from '../../theme';
-import { NutritionSummary } from '../../types/nutrition';
-import { RootStackParamList } from '../../types/navigation';
+import { MainTabParamList, RootStackParamList } from '../../types/navigation';
 
 // ─── Goals defaults (used when user_goals not set) ───────────────────────────
 const DEFAULT_GOALS = { calories: 2200, protein: 150, carbs: 250, fat: 60 };
@@ -35,17 +34,6 @@ function dateStr(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
-}
-
-function getLast7Days(): { date: string; label: string }[] {
-  const labels = ['일', '월', '화', '수', '목', '금', '토'];
-  const result = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    result.push({ date: dateStr(d), label: labels[d.getDay()] });
-  }
-  return result;
 }
 
 function todayLabel() {
@@ -84,153 +72,18 @@ function getQuickCharacterStyleCopy(
   };
 }
 
-// ─── WeeklyCalorieChart ───────────────────────────────────────────────────────
-function WeeklyCalorieChart({
-  data,
-  goal,
-}: {
-  data: { date: string; label: string; calories: number }[];
-  goal: number;
-}) {
-  const { colors, spacing } = useAppTheme();
-  const [chartW, setChartW] = useState(0);
-  const chartH = 96;
-  const labelH = 20;
-  const totalH = chartH + labelH;
-  const n = data.length;
-  const handleLayout = (event: LayoutChangeEvent) => {
-    const nextWidth = Math.max(event.nativeEvent.layout.width, 0);
-    if (nextWidth !== chartW) setChartW(nextWidth);
-  };
-
-  if (chartW <= 0) {
-    return <View onLayout={handleLayout} style={{ width: '100%', height: totalH }} />;
-  }
-
-  const slotW = chartW / n;
-  const barW = Math.max(slotW - 10, 6);
-  const maxCal = Math.max(...data.map((d) => d.calories), goal, 1);
-  const today = dateStr(new Date());
-
-  return (
-    <View onLayout={handleLayout} style={{ width: '100%' }}>
-      <Svg width={chartW} height={totalH}>
-        <Line
-          x1={0} y1={chartH - (goal / maxCal) * chartH}
-          x2={chartW} y2={chartH - (goal / maxCal) * chartH}
-          stroke={colors.accent}
-          strokeWidth={1}
-          strokeDasharray="4,4"
-          opacity={0.3}
-        />
-
-        {data.map((item, i) => {
-          const slotX = i * slotW;
-          const barX = slotX + (slotW - barW) / 2;
-          const barH = item.calories > 0
-            ? Math.max((item.calories / maxCal) * chartH, 4)
-            : 0;
-          const barY = chartH - barH;
-          const isToday = item.date === today;
-
-          return (
-            <React.Fragment key={item.date}>
-              <Rect
-                x={barX} y={barY}
-                width={barW} height={barH}
-                rx={6}
-                fill={isToday ? colors.accent : colors.trackBg}
-              />
-              <SvgText
-                x={slotX + slotW / 2}
-                y={chartH + 15}
-                textAnchor="middle"
-                fontSize={10}
-                fill={isToday ? colors.accent : colors.textTertiary}
-                fontWeight={isToday ? '700' : '500'}
-              >
-                {item.label}
-              </SvgText>
-            </React.Fragment>
-          );
-        })}
-      </Svg>
-    </View>
-  );
-}
-
-// ─── WeightLineChart ──────────────────────────────────────────────────────────
-function WeightLineChart({ data }: { data: { date: string; weight_kg: number }[] }) {
-  const { colors, typography, isDark } = useAppTheme();
-  const [chartW, setChartW] = useState(0);
-  const chartH = 80;
-  const padH = 8;
-  const padV = 10;
-  const handleLayout = (event: LayoutChangeEvent) => {
-    const nextWidth = Math.max(event.nativeEvent.layout.width, 0);
-    if (nextWidth !== chartW) setChartW(nextWidth);
-  };
-
-  if (data.length < 2) {
-    return (
-      <View onLayout={handleLayout} style={{ width: '100%', height: chartH, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: colors.textTertiary, fontFamily: typography.fontFamily, fontSize: 13 }}>
-          데이터를 쌓고 체중 변화를 확인하세요
-        </Text>
-      </View>
-    );
-  }
-
-  if (chartW <= 0) {
-    return <View onLayout={handleLayout} style={{ width: '100%', height: chartH }} />;
-  }
-
-  const weights = data.map((d) => d.weight_kg);
-  const minW = Math.min(...weights);
-  const maxW = Math.max(...weights);
-  const range = Math.max(maxW - minW, 1);
-  const innerW = chartW - padH * 2;
-  const innerH = chartH - padV * 2;
-  const xStep = innerW / (data.length - 1);
-
-  const pts = data.map((d, i) => ({
-    x: padH + i * xStep,
-    y: padV + (1 - (d.weight_kg - minW) / range) * innerH,
-  }));
-
-  const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-
-  return (
-    <View onLayout={handleLayout} style={{ width: '100%' }}>
-      <Svg width={chartW} height={chartH}>
-        <Path
-          d={pathD}
-          stroke={colors.accent}
-          strokeWidth={3}
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {pts.map((p, i) => (
-          <Circle key={i} cx={p.x} cy={p.y} r={4} fill={isDark ? colors.background : '#FFF'} stroke={colors.accent} strokeWidth={2} />
-        ))}
-      </Svg>
-    </View>
-  );
-}
-
 // ─── AIPlanCard ───────────────────────────────────────────────────────────────
 function AIPlanCard() {
   const { colors, typography, spacing, radius } = useAppTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { currentPlan, hasCompletedOnboarding, setNeedsOnboarding } = useAIPlanStore();
+  const { currentPlan, hasCompletedOnboarding, surveyLevelResult, setNeedsOnboarding } = useAIPlanStore();
   const isAppliedPlan = Boolean(currentPlan?.isApplied);
 
   const handlePress = () => {
     if (currentPlan) {
       navigation.navigate('AIPlanResult', {});
     } else if (hasCompletedOnboarding) {
-      navigation.navigate('AIOnboarding');
+      navigation.navigate(surveyLevelResult ? 'AILevelResult' : 'AIOnboarding');
     } else {
       setNeedsOnboarding(true);
       navigation.navigate('AIConsent');
@@ -280,8 +133,10 @@ function AIPlanCard() {
     if (hasCompletedOnboarding) {
       return {
         icon: 'robot-outline',
-        title: 'AI 플랜 준비 중',
-        subtitle: '정보를 입력하면 맞춤 계획을 생성합니다',
+        title: surveyLevelResult ? `${surveyLevelResult.levelName} 맞춤 AI 플랜` : 'AI 플랜 준비 중',
+        subtitle: surveyLevelResult
+          ? '현재 레벨 결과를 바탕으로 운동·식단 계획을 이어서 만들 수 있어요'
+          : '정보를 입력하면 맞춤 계획을 생성합니다',
         extra: null,
         badge: null,
         cta: '생성하기'
@@ -351,12 +206,19 @@ interface TodayWorkout {
   exerciseNames: string[];
 }
 
-function TodayWorkoutCard({ workout }: { workout: TodayWorkout | null }) {
+function TodayWorkoutCard({
+  workout,
+  onPress,
+}: {
+  workout: TodayWorkout | null;
+  onPress: () => void;
+}) {
   const { colors, typography, spacing, radius } = useAppTheme();
   const done = workout !== null;
 
   return (
-    <AppCard style={twStyles.card}>
+    <TouchableOpacity activeOpacity={0.88} onPress={onPress}>
+      <AppCard style={twStyles.card}>
       <View style={[twStyles.icon, { backgroundColor: done ? colors.successMuted : colors.accentMuted }]}>
         <MaterialCommunityIcons
           name={done ? 'check-circle' : 'dumbbell'}
@@ -374,10 +236,9 @@ function TodayWorkoutCard({ workout }: { workout: TodayWorkout | null }) {
             : '운동 탭에서 세션을 시작하세요'}
         </Text>
       </View>
-      {!done && (
-        <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
-      )}
-    </AppCard>
+      <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
+      </AppCard>
+    </TouchableOpacity>
   );
 }
 
@@ -388,13 +249,19 @@ const twStyles = StyleSheet.create({
 
 // ─── HomeScreen ───────────────────────────────────────────────────────────────
 export default function HomeScreen() {
-  const { colors, typography, isDark, spacing, radius } = useAppTheme();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { colors, typography, isDark, spacing } = useAppTheme();
+  const navigation = useNavigation<
+    CompositeNavigationProp<
+      BottomTabNavigationProp<MainTabParamList, 'Home'>,
+      NativeStackNavigationProp<RootStackParamList>
+    >
+  >();
   const { user } = useAuthStore();
   const toggle = useThemeStore((s) => s.toggle);
   const getDayTotals = useDietStore((s) => s.getDayTotals);
   const currentPlan = useAIPlanStore((s) => s.currentPlan);
   const onboardingData = useAIPlanStore((s) => s.onboardingData);
+  const surveyLevelResult = useAIPlanStore((s) => s.surveyLevelResult);
   const hasCompletedOnboarding = useAIPlanStore((s) => s.hasCompletedOnboarding);
   const setNeedsOnboarding = useAIPlanStore((s) => s.setNeedsOnboarding);
   const syncRecurringPlanForToday = useAIPlanStore((s) => s.syncRecurringPlanForToday);
@@ -415,28 +282,15 @@ export default function HomeScreen() {
   const isPersonaLoading = usePersonaStore((s) => s.isCalculating);
 
   const today = dateStr(new Date());
-  const last7 = getLast7Days();
-
   const [todayWorkout, setTodayWorkout] = useState<TodayWorkout | null>(null);
   const [weeklyCount, setWeeklyCount] = useState(0);
-  const [weightHistory, setWeightHistory] = useState<{ date: string; weight_kg: number }[]>([]);
+  const [latestWeight, setLatestWeight] = useState<number | null>(null);
+  const [fatigueData, setFatigueData] = useState<FatigueResult>({ items: [], unclassifiedCount: 0 });
   const [goals, setGoals] = useState(DEFAULT_GOALS);
   const [homeNickname, setHomeNickname] = useState<string | null>(null);
   const remoteRequestIdRef = useRef(0);
 
   const todayTotals = getDayTotals(today);
-  const nutrition: NutritionSummary = {
-    calories: { current: todayTotals.calories, goal: goals.calories },
-    protein: { current_g: todayTotals.protein_g, goal_g: goals.protein },
-    carbs: { current_g: todayTotals.carbs_g, goal_g: goals.carbs },
-    fat: { current_g: todayTotals.fat_g, goal_g: goals.fat },
-  };
-
-  const weeklyCalories = last7.map(({ date, label }) => ({
-    date,
-    label,
-    calories: getDayTotals(date).calories,
-  }));
 
   const fetchRemote = useCallback(async () => {
     if (!user?.id) return;
@@ -481,18 +335,47 @@ export default function HomeScreen() {
     } catch {}
 
     try {
-      const { data: weights, error } = await supabase
+      const { data: latestWeightRow, error } = await supabase
         .from('body_weights')
-        .select('measured_at, weight_kg')
+        .select('weight_kg')
         .eq('user_id', user.id)
-        .gte('measured_at', `${weekAgo}T00:00:00.000Z`)
-        .order('measured_at', { ascending: true });
+        .order('measured_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (weights && !error) {
+      if (!error) {
         if (requestId !== remoteRequestIdRef.current) return;
-        setWeightHistory(weights.map((w: any) => ({ date: w.measured_at.split('T')[0], weight_kg: w.weight_kg })));
+        setLatestWeight(latestWeightRow?.weight_kg ?? null);
       }
     } catch {}
+
+    try {
+      const fatigueSince = new Date();
+      fatigueSince.setDate(fatigueSince.getDate() - 4);
+      const { data: fatigueSets } = await supabase
+        .from('workout_sets')
+        .select('weight_kg, reps, exercises(name_ko, category), workout_sessions!inner(started_at, user_id, ended_at)')
+        .eq('workout_sessions.user_id', user.id)
+        .not('workout_sessions.ended_at', 'is', null)
+        .gte('workout_sessions.started_at', fatigueSince.toISOString());
+
+      if (requestId !== remoteRequestIdRef.current) return;
+      const fatigueScores = calculateBodyFatigue(
+        (fatigueSets ?? []).map((set: any) => ({
+          category: Array.isArray(set.exercises) ? set.exercises[0]?.category ?? null : set.exercises?.category ?? null,
+          exerciseName: Array.isArray(set.exercises) ? set.exercises[0]?.name_ko ?? null : set.exercises?.name_ko ?? null,
+          weightKg: set.weight_kg ?? 0,
+          reps: set.reps ?? 0,
+          startedAt: Array.isArray(set.workout_sessions)
+            ? set.workout_sessions[0]?.started_at
+            : set.workout_sessions?.started_at,
+        })),
+      );
+      setFatigueData(fatigueScores);
+    } catch {
+      if (requestId !== remoteRequestIdRef.current) return;
+      setFatigueData({ items: [], unclassifiedCount: 0 });
+    }
 
     try {
       const profile = await getUserProfile(user.id);
@@ -550,44 +433,52 @@ export default function HomeScreen() {
     user?.id,
   ]);
 
-  const latestWeight = weightHistory.length > 0 ? weightHistory[weightHistory.length - 1].weight_kg : null;
   const displayName = homeNickname || (user?.email ? user.email.split('@')[0] : '사용자');
-  const hasAIPlan = Boolean(currentPlan);
-  const hasDetailedCharacterProfile = Boolean(currentPlan || onboardingData || hasCompletedOnboarding);
+  const hasDetailedCharacterProfile = Boolean(currentPlan || onboardingData || hasCompletedOnboarding || surveyLevelResult);
   const activeQuickCharacterProfile = quickCharacterProfile?.userId === user?.id ? quickCharacterProfile : null;
   const hasQuickCharacterProfile = Boolean(activeQuickCharacterProfile);
-  const hasAnyCharacterProfile = hasDetailedCharacterProfile || hasQuickCharacterProfile;
+  const hasAnyCharacterProfile = Boolean(surveyLevelResult || hasDetailedCharacterProfile || hasQuickCharacterProfile);
+  const displayLevelId = surveyLevelResult?.levelId ?? hamsterLevelId;
+  const displayLevelName = surveyLevelResult?.levelName ?? hamsterLevelName;
   const quickCharacterCopy = getQuickCharacterStyleCopy(
     activeQuickCharacterProfile?.trainingStyle,
     activeQuickCharacterProfile?.dietConsistency ?? null,
   );
   const hamsterCtaLabel = hasDetailedCharacterProfile
     ? null
-    : hasQuickCharacterProfile
-      ? 'AI 플랜으로 재판정'
-      : '내 헬스 레벨 판정받기';
+    : '내 헬스 레벨 판정받기';
   const hamsterCtaSupportingMessage = hasDetailedCharacterProfile
     ? personaSupportingMessage
+      ? `최근 기록 기준: ${personaSupportingMessage}`
+      : surveyLevelResult?.detail ?? null
     : hasQuickCharacterProfile
-      ? quickCharacterCopy.supporting
-      : 'AI 플랜 없이도 괜찮아요. 짧게 답하면 지금 내 루틴 기준으로 햄식이 등급을 바로 판정해드려요.';
+      ? '예전 빠른 설정 대신, 이제는 설문 한 번으로 헬스 레벨과 햄식이를 더 정확하게 판정해드려요.'
+      : 'AI 플랜 없이도 괜찮아요. 설문 한 번으로 지금 내 루틴 기준 헬스 레벨과 햄식이를 먼저 확인할 수 있어요.';
   const hamsterCtaHeadline = hasDetailedCharacterProfile
-    ? personaHeadline
+    ? surveyLevelResult?.shortDescription ?? (personaHeadline ? `최근 기록 기준: ${personaHeadline}` : null)
     : hasQuickCharacterProfile
-      ? quickCharacterCopy.headline
-      : '몇 가지만 답하면 지금 내 헬스 레벨을 바로 판정할 수 있어요.';
+      ? `${quickCharacterCopy.headline} 지금은 설문 기반 판정으로 더 정확하게 다시 볼 수 있어요.`
+      : null;
   const handleHamsterCtaPress = useCallback(() => {
+    if (hasCompletedOnboarding && surveyLevelResult) {
+      navigation.navigate('AILevelResult');
+      return;
+    }
+    if (hasCompletedOnboarding) {
+      navigation.navigate('AIOnboarding');
+      return;
+    }
     if (hasQuickCharacterProfile) {
-      if (hasCompletedOnboarding) {
-        navigation.navigate('AIOnboarding');
-        return;
-      }
       setNeedsOnboarding(true);
       navigation.navigate('AIConsent');
       return;
     }
-    navigation.navigate('CharacterSetup');
-  }, [hasCompletedOnboarding, hasQuickCharacterProfile, navigation, setNeedsOnboarding]);
+    setNeedsOnboarding(true);
+    navigation.navigate('AIConsent');
+  }, [hasCompletedOnboarding, hasQuickCharacterProfile, navigation, setNeedsOnboarding, surveyLevelResult]);
+  const handleWorkoutCardPress = useCallback(() => {
+    navigation.navigate('Workout');
+  }, [navigation]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
@@ -609,8 +500,8 @@ export default function HomeScreen() {
               checklist={hamsterChecklist}
               dailyState={personaDailyState}
               headline={hamsterCtaHeadline}
-              levelId={hasAnyCharacterProfile ? hamsterLevelId : null}
-              levelName={hasAnyCharacterProfile ? hamsterLevelName : null}
+              levelId={hasAnyCharacterProfile ? displayLevelId : null}
+              levelName={hasAnyCharacterProfile ? displayLevelName : null}
               loading={isPersonaLoading}
               nextLevelName={hasAnyCharacterProfile ? hamsterNextLevelName : null}
               onPressCta={hamsterCtaLabel ? handleHamsterCtaPress : null}
@@ -618,49 +509,32 @@ export default function HomeScreen() {
                 !hasAnyCharacterProfile
                   ? null
                   : personaReliabilityState === 'error'
-                  ? '햄식이 진화 정보를 잠시 불러오지 못했어요.'
+                  ? '최근 기록 기준 진화 정보를 잠시 불러오지 못했어요.'
                   : personaProgressMessage
+                  ? `최근 기록 기준: ${personaProgressMessage}`
+                  : null
               }
               progressToNext={hasAnyCharacterProfile ? hamsterProgressToNext : null}
               supportingMessage={hamsterCtaSupportingMessage}
             />
-            <View style={styles.ringArea}>
-              <CalorieRing current={nutrition.calories.current} goal={goals.calories} />
-            </View>
-            <View style={[styles.statRow, { borderTopColor: colors.border }]}>
-              <View style={styles.statItem}>
-                <Text style={[styles.statVal, { color: colors.text }]}>{nutrition.calories.current.toLocaleString()}</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>섭취</Text>
-              </View>
-              <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-              <View style={styles.statItem}>
-                <Text style={[styles.statVal, { color: colors.text }]}>{goals.calories.toLocaleString()}</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>목표</Text>
-              </View>
-            </View>
           </AppCard>
 
           <AIPlanCard />
 
-          <MacroBars nutrition={nutrition} />
+          <ProteinRemainingCard
+            currentProtein={todayTotals.protein_g}
+            goalProtein={goals.protein}
+          />
 
-          <TodayWorkoutCard workout={todayWorkout} />
+          <TodayWorkoutCard workout={todayWorkout} onPress={handleWorkoutCardPress} />
+
+          <BodyFatigueCard data={fatigueData} />
         </View>
 
         <View style={styles.trendSection}>
           <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: typography.fontFamily, marginLeft: spacing.lg }]}>
             주간 트렌드
           </Text>
-
-          <AppCard style={styles.trendCard}>
-            <View style={styles.trendHeader}>
-              <Text style={[styles.trendTitle, { color: colors.text }]}>이번 주 칼로리</Text>
-              <View style={[styles.trendBadge, { backgroundColor: colors.accentMuted }]}>
-                <Text style={[styles.trendBadgeText, { color: colors.accent }]}>목표 {goals.calories.toLocaleString()}</Text>
-              </View>
-            </View>
-            <WeeklyCalorieChart data={weeklyCalories} goal={goals.calories} />
-          </AppCard>
 
           <View style={styles.dualTrendRow}>
             <AppCard style={[styles.miniTrendCard, { flex: 1 }]}>
@@ -675,15 +549,10 @@ export default function HomeScreen() {
               <View style={[styles.miniIcon, { backgroundColor: colors.accentMuted }]}>
                 <MaterialCommunityIcons name="scale-bathroom" size={18} color={colors.accent} />
               </View>
-              <Text style={[styles.miniValue, { color: colors.text }]}>{latestWeight ? `${latestWeight}kg` : '-'}</Text>
+              <Text style={[styles.miniValue, { color: colors.text }]}>{latestWeight != null ? `${latestWeight}kg` : '-'}</Text>
               <Text style={[styles.miniLabel, { color: colors.textSecondary }]}>현재 체중</Text>
             </AppCard>
           </View>
-
-          <AppCard style={styles.trendCard}>
-            <Text style={[styles.trendTitle, { color: colors.text, marginBottom: 16 }]}>체중 변화</Text>
-            <WeightLineChart data={weightHistory} />
-          </AppCard>
         </View>
 
         <View style={{ height: 40 }} />
@@ -697,22 +566,8 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: 20 },
   summaryContainer: { gap: 12, marginTop: 12 },
   calorieCard: { marginHorizontal: 16, overflow: 'hidden' },
-  ringArea: { alignItems: 'center', justifyContent: 'center', paddingVertical: 24 },
-  ringOverlay: { position: 'absolute', alignItems: 'center' },
-  remainingVal: { fontSize: 32, fontWeight: '800' },
-  remainingLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 1, marginTop: 4 },
-  statRow: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth },
-  statItem: { flex: 1, alignItems: 'center', paddingVertical: 14 },
-  statVal: { fontSize: 16, fontWeight: '700' },
-  statLabel: { fontSize: 11, fontWeight: '600', marginTop: 2 },
-  statDivider: { width: StyleSheet.hairlineWidth, marginVertical: 12 },
   trendSection: { marginTop: 28, gap: 12 },
   sectionTitle: { fontSize: 18, fontWeight: '700' },
-  trendCard: { marginHorizontal: 16, padding: 16 },
-  trendHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  trendTitle: { fontSize: 16, fontWeight: '700' },
-  trendBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  trendBadgeText: { fontSize: 11, fontWeight: '700' },
   dualTrendRow: { flexDirection: 'row', marginHorizontal: 16, gap: 12 },
   miniTrendCard: { padding: 16, alignItems: 'flex-start' },
   miniIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },

@@ -1,7 +1,6 @@
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useRef, useState } from 'react';
-import { AILoadingScreen } from '../../components/ai/AILoadingScreen';
 import { AIFlowScreen } from '../../components/ai/AIFlowScreen';
 import {
   Alert,
@@ -17,13 +16,10 @@ import {
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import {
-  buildWorkoutHistorySection,
-  fetchUserHistorySummary,
-  generateAIPlan,
-  saveAIPlanToSupabase,
   saveOnboardingDataToSupabase,
   validateSafety,
 } from '../../lib/ai-planner';
+import { classifySurveyLevel } from '../../lib/ai-level-classifier';
 import {
   AI_EXPERIENCE_LABEL,
   AIGoal,
@@ -414,8 +410,9 @@ export default function AIOnboardingScreen() {
   const { colors } = useAppTheme();
   const { width, height } = useWindowDimensions();
   const navigation = useNavigation<NavProp>();
+  const route = useRoute();
   const user = useAuthStore((s) => s.user);
-  const { setOnboardingData, setCurrentPlan, setGenerating, setError } =
+  const { setOnboardingData, setSurveyLevelResult } =
     useAIPlanStore();
   const isCompact = width < 380 || height < 760;
   const horizontalPadding = isCompact ? 16 : 24;
@@ -429,12 +426,34 @@ export default function AIOnboardingScreen() {
   const [strengthSkipped, setStrengthSkipped] = useState(false);
   const [strengthInputs, setStrengthInputs] = useState<Record<string, string>>({});
   const [rmCalcTarget, setRmCalcTarget] = useState<string | null>(null);
-  const [generating, setLocalGenerating] = useState(false);
-  const [planReady, setPlanReady] = useState(false);
   const [answers, setAnswers] = useState<Partial<Record<keyof OnboardingData, string | string[]>>>({});
   const [showEquipmentSheet, setShowEquipmentSheet] = useState(false);
   const [equipmentStep, setEquipmentStep] = useState<'confirm' | 'select'>('confirm');
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
+
+  const resetSurveyState = React.useCallback(() => {
+    setStep(0);
+    setSkippedPhase2(false);
+    setPassedSeparator(false);
+    setPassedStrengthStep(false);
+    setStrengthSkipped(false);
+    setStrengthInputs({});
+    setRmCalcTarget(null);
+    setAnswers({});
+    setShowEquipmentSheet(false);
+    setEquipmentStep('confirm');
+    setSelectedEquipment([]);
+    strengthCardOffsets.current = {};
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    });
+  }, []);
+
+  useEffect(() => {
+    const params = route.params as RootStackParamList['AIOnboarding'] | undefined;
+    if (!params?.resetAt) return;
+    resetSurveyState();
+  }, [resetSurveyState, route.params]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -456,10 +475,6 @@ export default function AIOnboardingScreen() {
       } catch {}
     })();
   }, [user?.id]);
-
-  const handleNavigate = () => {
-    navigation.replace('AIPlanResult', {});
-  };
 
   const visibleQuestions = skippedPhase2
     ? getVisibleQuestions(answers).filter((q) => q.phase === 1)
@@ -529,9 +544,7 @@ export default function AIOnboardingScreen() {
     handleFinish(true);
   };
 
-  // ─── 완료 및 플랜 생성 ───────────────────────────────────────────────────────
-  const handleFinish = async (skipPhase2 = false) => {
-    // 답변 조립
+  const buildOnboardingPayload = (skipPhase2 = false): OnboardingData => {
     const raw = answers;
     const restrictions =
       (raw.dietaryRestrictions as string[] | undefined)?.filter((v) => v !== 'none') ?? [];
@@ -543,7 +556,7 @@ export default function AIOnboardingScreen() {
           .filter(ex => strengthInputs[ex.id] && Number(strengthInputs[ex.id]) > 0)
           .map(ex => ({ exercise: ex.label, weightKg: Number(strengthInputs[ex.id]) }));
 
-    const data: OnboardingData = {
+    return {
       goal: (raw.goal as OnboardingData['goal']) ?? 'health',
       ...(raw.goal === 'strength_gain' && raw.primaryStrengthFocus
         ? { primaryStrengthFocus: raw.primaryStrengthFocus as OnboardingData['primaryStrengthFocus'] }
@@ -568,6 +581,11 @@ export default function AIOnboardingScreen() {
             plateauHistory: raw.plateauHistory as string | undefined,
           }),
     };
+  };
+
+  // ─── 완료 및 레벨 판정 ───────────────────────────────────────────────────────
+  const handleFinish = async (skipPhase2 = false) => {
+    const data = buildOnboardingPayload(skipPhase2);
 
     // 안전 검증
     const safety = validateSafety(data);
@@ -581,50 +599,15 @@ export default function AIOnboardingScreen() {
     }
 
     setOnboardingData(data);
-    setLocalGenerating(true);
-    setGenerating(true);
 
     // 온보딩 데이터 Supabase 저장 (비동기, 결과 무시)
     if (user?.id) {
       saveOnboardingDataToSupabase(user.id, data).catch(() => {});
     }
 
-    try {
-      const history = user?.id ? await fetchUserHistorySummary(user.id) : null;
-
-      // 신규: AI 재생성 시 최근 운동 히스토리 주입 (FR-5)
-      let workoutHistorySection = '';
-      if (user?.id) {
-        const existingPlan = useAIPlanStore.getState().currentPlan;
-        if (existingPlan) {
-          workoutHistorySection = await buildWorkoutHistorySection(user.id, existingPlan);
-        }
-      }
-
-      const plan = await generateAIPlan(data, history, workoutHistorySection);
-      setCurrentPlan(plan);
-
-      // Supabase 저장 (비동기, 결과 무시)
-      if (user?.id) {
-        saveAIPlanToSupabase(user.id, plan, data).catch(() => {});
-      }
-
-      setPlanReady(true); // AILoadingScreen이 onComplete()를 호출해 결과 화면으로 이동
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'AI 플랜 생성에 실패했습니다.';
-      setError(msg);
-      setLocalGenerating(false);
-      setGenerating(false);
-      // skippedPhase2=true 상태에서 실패하면 step=9가 blank screen이 되므로 separator로 복원
-      if (skipPhase2) {
-        setSkippedPhase2(false);
-        setStep(phase1Count);
-      }
-      Alert.alert('오류', msg, [
-        { text: '다시 시도', onPress: () => handleFinish(skipPhase2) },
-        { text: '취소', onPress: () => navigation.goBack() },
-      ]);
-    }
+    const levelResult = classifySurveyLevel(data);
+    setSurveyLevelResult(levelResult);
+    navigation.replace('AILevelResult');
   };
 
   const s = styles(colors, {
@@ -637,15 +620,6 @@ export default function AIOnboardingScreen() {
       scrollRef.current?.scrollTo({ y: Math.max(y, 0), animated: true });
     });
   };
-
-  // ─── 로딩 화면 ──────────────────────────────────────────────────────────────
-  if (generating) {
-    return (
-      <AIFlowScreen scroll={false}>
-        <AILoadingScreen isComplete={planReady} onComplete={handleNavigate} />
-      </AIFlowScreen>
-    );
-  }
 
   // ─── Phase 2 구분선 ──────────────────────────────────────────────────────────
   if (isPhase2Separator) {
@@ -669,7 +643,7 @@ export default function AIOnboardingScreen() {
               <Text style={s.primaryBtnText}>계속 입력하기</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.skipBtn} onPress={handleSkipPhase2}>
-              <Text style={s.skipText}>건너뛰고 플랜 받기</Text>
+              <Text style={s.skipText}>여기까지 답하고 레벨 결과 보기</Text>
             </TouchableOpacity>
           </>
         }
@@ -677,7 +651,7 @@ export default function AIOnboardingScreen() {
           <Text style={s.separatorIcon}>💡</Text>
           <Text style={s.separatorTitle}>선택 사항</Text>
           <Text style={s.separatorDesc}>
-            다음 질문을 추가로 답해주시면{'\n'}AI 플랜의 정확도가 더 높아집니다.
+            다음 질문을 추가로 답해주시면{'\n'}헬스 레벨 판정과 추천이 더 정교해집니다.
           </Text>
       </AIFlowScreen>
     );
@@ -708,10 +682,10 @@ export default function AIOnboardingScreen() {
               onPress={() => { setStrengthSkipped(true); setPassedStrengthStep(true); }}
               activeOpacity={0.85}
             >
-              <Text style={[s.skipText, s.centeredSkipText]}>모르면 건너뛰기 (맨몸 기준으로 설정)</Text>
+              <Text style={[s.skipText, s.centeredSkipText]}>모르면 건너뛰기 (보수적으로 판정)</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.skipBtn, s.centeredSkipBtn, { marginTop: 2 }]} onPress={handleSkipPhase2}>
-              <Text style={[s.skipText, s.centeredSkipText, { fontSize: 13 }]}>건너뛰고 플랜 받기</Text>
+              <Text style={[s.skipText, s.centeredSkipText, { fontSize: 13 }]}>여기까지 답하고 레벨 결과 보기</Text>
             </TouchableOpacity>
           </>
         }
@@ -821,7 +795,7 @@ export default function AIOnboardingScreen() {
           activeOpacity={0.85}
         >
           <Text style={s.primaryBtnText}>
-            {step === totalSteps - 1 ? 'AI 플랜 생성하기' : '다음'}
+            {step === totalSteps - 1 ? '레벨 결과 보기' : '다음'}
           </Text>
         </TouchableOpacity>
       }
@@ -996,6 +970,7 @@ export default function AIOnboardingScreen() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
     </AIFlowScreen>
   );
 }

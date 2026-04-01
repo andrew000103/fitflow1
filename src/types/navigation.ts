@@ -70,7 +70,8 @@ export type ProfileStackParamList = {
 
 export type AIModalParamList = {
   AIConsent: undefined;
-  AIOnboarding: undefined;
+  AIOnboarding: { resetAt?: number } | undefined;
+  AILevelResult: undefined;
   AIPlanResult: { planId?: string };
   AIPlanWeekly: { weekStart: string };
 };
@@ -79,7 +80,8 @@ export type RootStackParamList = {
   Main: undefined;
   CharacterSetup: undefined;
   AIConsent: undefined;
-  AIOnboarding: undefined;
+  AIOnboarding: { resetAt?: number } | undefined;
+  AILevelResult: undefined;
   AIPlanResult: { planId?: string };
   AIPlanWeekly: { weekStart: string };
   AIExerciseSearch: {

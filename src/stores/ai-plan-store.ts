@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import type { SurveyLevelResult } from '../lib/ai-level-classifier';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -210,6 +211,7 @@ function normalizeAIPlan(plan: AIPlan | LegacyAIPlan | null): AIPlan | null {
 
 interface AIPlanState {
   onboardingData: OnboardingData | null;
+  surveyLevelResult: SurveyLevelResult | null;
   currentPlan: AIPlan | null;
   previousPlan: AIPlan | null;
   isGenerating: boolean;
@@ -219,6 +221,7 @@ interface AIPlanState {
   needsOnboarding: boolean;
 
   setOnboardingData: (data: OnboardingData) => void;
+  setSurveyLevelResult: (result: SurveyLevelResult | null) => void;
   setCurrentPlan: (plan: AIPlan) => void;
   updateWeekStart: (weekStart: string) => void;
   markCurrentPlanApplied: (appliedSections?: string[]) => void;
@@ -238,6 +241,7 @@ export const useAIPlanStore = create<AIPlanState>()(
   persist(
     (set, get) => ({
       onboardingData: null,
+      surveyLevelResult: null,
       currentPlan: null,
       previousPlan: null,
       isGenerating: false,
@@ -255,6 +259,8 @@ export const useAIPlanStore = create<AIPlanState>()(
           onboardingData: normalizeOnboardingData(data),
           hasCompletedOnboarding: true,
         }),
+
+      setSurveyLevelResult: (result) => set({ surveyLevelResult: result }),
 
       setCurrentPlan: (plan) =>
         set((state) => ({
@@ -319,6 +325,7 @@ export const useAIPlanStore = create<AIPlanState>()(
       reset: () =>
         set({
           onboardingData: null,
+          surveyLevelResult: null,
           currentPlan: null,
           previousPlan: null,
           isGenerating: false,
@@ -478,6 +485,7 @@ export const useAIPlanStore = create<AIPlanState>()(
         return {
           ...state,
           onboardingData: normalizeOnboardingData(state.onboardingData),
+          surveyLevelResult: state.surveyLevelResult ?? null,
           currentPlan: normalizeAIPlan(state.currentPlan as AIPlan | LegacyAIPlan | null),
           previousPlan: normalizeAIPlan(state.previousPlan as AIPlan | LegacyAIPlan | null),
         } as AIPlanState;

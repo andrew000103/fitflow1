@@ -76,7 +76,7 @@ export default function AIConsentScreen() {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={s.primaryBtnText}>AI 플랜 시작하기</Text>
+              <Text style={s.primaryBtnText}>설문 시작하기</Text>
             )}
           </TouchableOpacity>
 
@@ -90,14 +90,14 @@ export default function AIConsentScreen() {
           <MaterialCommunityIcons name="creation" size={40} color={colors.accent} />
         </View>
 
-        <Text style={s.title}>AI가 나만의 플랜을{'\n'}만들어드릴게요</Text>
+        <Text style={s.title}>설문을 바탕으로{'\n'}현재 헬스 레벨을 먼저 판정해드릴게요</Text>
         <Text style={s.subtitle}>
-          체중, 운동 기록을 분석해서 정체기를 돌파하는{'\n'}
-          맞춤 식단·운동 계획을 매주 제공합니다
+          먼저 지금 단계에 맞는 햄식이를 배정해드리고,{'\n'}
+          원하시면 그다음 맞춤 AI 플랜까지 이어서 만들 수 있어요
         </Text>
 
         <View style={s.card}>
-          <Text style={s.cardTitle}>AI가 활용하는 데이터</Text>
+          <Text style={s.cardTitle}>판정과 추천에 활용하는 정보</Text>
           {DATA_ITEMS.map((item, i) => (
             <View key={i} style={s.dataRow}>
               <Text style={[s.bullet, i === 3 && s.noticeText]}>

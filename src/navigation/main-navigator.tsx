@@ -7,6 +7,7 @@ import React, { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import AIConsentScreen from '../screens/ai/ai-consent-screen';
 import AIExerciseSearchScreen from '../screens/ai/ai-exercise-search-screen';
+import AILevelResultScreen from '../screens/ai/ai-level-result-screen';
 import AIOnboardingScreen from '../screens/ai/ai-onboarding-screen';
 import HomeScreen from '../screens/home/home-screen';
 import CharacterSetupScreen from '../screens/persona/character-setup-screen';
@@ -114,6 +115,11 @@ export default function MainNavigator() {
       <RootStack.Screen
         name="AIOnboarding"
         component={AIOnboardingScreen}
+        options={{ presentation: 'card', gestureEnabled: false }}
+      />
+      <RootStack.Screen
+        name="AILevelResult"
+        component={AILevelResultScreen}
         options={{ presentation: 'card', gestureEnabled: false }}
       />
       <RootStack.Screen
