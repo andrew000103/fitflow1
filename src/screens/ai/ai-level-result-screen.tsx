@@ -14,6 +14,7 @@ import {
   saveAIPlanToSupabase,
 } from '../../lib/ai-planner';
 import type { SurveyLevelId } from '../../lib/ai-level-classifier';
+import { DEFAULT_PIXEL_VARIANT, PIXEL_IMAGE_MAP } from '../../lib/pixel-character-config';
 import { useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { useAppTheme } from '../../theme';
@@ -21,14 +22,6 @@ import { RootStackParamList } from '../../types/navigation';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
-const LEVEL_IMAGE_MAP: Record<SurveyLevelId, any> = {
-  beginner: require('../../../assets/hamster_1200x1200/beginner.png'),
-  novice: require('../../../assets/hamster_1200x1200/novice.png'),
-  intermediate: require('../../../assets/hamster_1200x1200/intermediate.png'),
-  upper_intermediate: require('../../../assets/hamster_1200x1200/upper-intermediate.png'),
-  advanced: require('../../../assets/hamster_1200x1200/advanced.png'),
-  veteran: require('../../../assets/hamster_1200x1200/veteran.png'),
-};
 
 export default function AILevelResultScreen() {
   const navigation = useNavigation<NavProp>();
@@ -52,7 +45,8 @@ export default function AILevelResultScreen() {
 
   const imageSource = useMemo(() => {
     if (!surveyLevelResult) return null;
-    return LEVEL_IMAGE_MAP[surveyLevelResult.levelId];
+    const variant = surveyLevelResult.variantId ?? DEFAULT_PIXEL_VARIANT;
+    return PIXEL_IMAGE_MAP[variant][surveyLevelResult.levelId];
   }, [surveyLevelResult]);
 
   const handleNavigate = () => {
@@ -143,9 +137,9 @@ export default function AILevelResultScreen() {
         </View>
       ) : null}
 
-      <Text style={styles(colors).title}>{surveyLevelResult.title}</Text>
-      <Text style={styles(colors).subtitle}>{surveyLevelResult.shortDescription}</Text>
-      <Text style={styles(colors).body}>{surveyLevelResult.detail}</Text>
+      <Text style={styles(colors).title}>{surveyLevelResult.nickname}</Text>
+      <Text style={styles(colors).subtitle}>{surveyLevelResult.vibe}</Text>
+      <Text style={styles(colors).body}>{surveyLevelResult.description}</Text>
 
       <View style={styles(colors).tagWrap}>
         {surveyLevelResult.rationaleTags.map((tag) => (

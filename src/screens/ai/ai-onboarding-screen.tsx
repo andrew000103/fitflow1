@@ -217,38 +217,34 @@ function OneRMCalcModal({
 // ─── 질문 정의 ─────────────────────────────────────────────────────────────────
 
 type QuestionOption = { label: string; value: string };
+type AnswerKey = keyof OnboardingData | 'optionalStrengthConsent';
 type Question = {
   key: keyof OnboardingData;
   question: string;
   options?: QuestionOption[];
   type: 'single' | 'multi' | 'number';
-  phase: 1 | 2;
   unit?: string;
   placeholder?: string;
-  showWhen?: (answers: Partial<Record<keyof OnboardingData, string | string[]>>) => boolean;
+  showWhen?: (answers: Partial<Record<AnswerKey, string | string[]>>) => boolean;
 };
 
 const QUESTIONS: Question[] = [
-  // Phase 1
   {
     key: 'goal',
     question: '주요 목표가 무엇인가요?',
     type: 'single',
-    phase: 1,
     options: [
-      { label: '체중 감량', value: 'weight_loss' },
-      { label: '근육 증가 (벌크업)', value: 'muscle_gain' },
-      { label: '린매스업 (체지방 최소화 + 근육 증가)', value: 'lean_bulk' },
-      { label: '근력 강화 (파워리프팅/힘 증가)', value: 'strength_gain' },
-      { label: '체형 유지', value: 'maintenance' },
-      { label: '건강 개선', value: 'health' },
+      { label: '다이어트', value: 'weight_loss' },
+      { label: '벌크업', value: 'muscle_gain' },
+      { label: '린매스업', value: 'lean_bulk' },
+      { label: '스트렝스 강화', value: 'strength_gain' },
+      { label: '체중 유지', value: 'maintenance' },
     ],
   },
   {
     key: 'primaryStrengthFocus',
     question: '어떤 리프트의 근력 향상이 가장 중요하신가요?',
     type: 'single',
-    phase: 1,
     showWhen: (answers) => answers.goal === 'strength_gain',
     options: [
       { label: '바벨 스쿼트', value: 'squat' },
@@ -258,45 +254,9 @@ const QUESTIONS: Question[] = [
     ],
   },
   {
-    key: 'gender',
-    question: '성별을 선택해주세요',
-    type: 'single',
-    phase: 1,
-    options: [
-      { label: '남성', value: 'male' },
-      { label: '여성', value: 'female' },
-      { label: '밝히지 않음', value: 'undisclosed' },
-    ],
-  },
-  {
-    key: 'age',
-    question: '나이를 입력해주세요',
-    type: 'number',
-    phase: 1,
-    unit: '세',
-    placeholder: '예: 28',
-  },
-  {
-    key: 'height',
-    question: '키를 입력해주세요',
-    type: 'number',
-    phase: 1,
-    unit: 'cm',
-    placeholder: '예: 170',
-  },
-  {
-    key: 'weight',
-    question: '현재 체중을 입력해주세요',
-    type: 'number',
-    phase: 1,
-    unit: 'kg',
-    placeholder: '예: 65',
-  },
-  {
     key: 'experience',
     question: '운동 경험이 어느 정도인가요?',
     type: 'single',
-    phase: 1,
     options: [
       { label: AI_EXPERIENCE_LABEL.beginner, value: 'beginner' },
       { label: AI_EXPERIENCE_LABEL.novice, value: 'novice' },
@@ -309,7 +269,6 @@ const QUESTIONS: Question[] = [
     key: 'workoutDaysPerWeek',
     question: '주당 운동할 수 있는 날은 며칠인가요?',
     type: 'single',
-    phase: 1,
     options: [
       { label: '주 2일', value: '2' },
       { label: '주 3일', value: '3' },
@@ -322,7 +281,6 @@ const QUESTIONS: Question[] = [
     key: 'gymType',
     question: '주로 어떤 환경에서 운동하시나요?',
     type: 'single',
-    phase: 1,
     options: [
       { label: '헬스장 (Full Gym)', value: 'full_gym' },
       { label: '홈짐 / 파워랙', value: 'garage_gym' },
@@ -334,7 +292,6 @@ const QUESTIONS: Question[] = [
     key: 'dietaryRestrictions',
     question: '식이 제한이 있나요? (여러 개 선택 가능)',
     type: 'multi',
-    phase: 1,
     options: [
       { label: '없음', value: 'none' },
       { label: '채식 (고기 제외)', value: '채식' },
@@ -342,12 +299,10 @@ const QUESTIONS: Question[] = [
       { label: '글루텐 제외', value: '글루텐 제외' },
     ],
   },
-  // Phase 2
   {
     key: 'recoveryLevel',
     question: '운동 다음 날 몸 상태는 어떤가요?',
     type: 'single',
-    phase: 2,
     options: [
       { label: '거뜬해요', value: 'easy' },
       { label: '약간 뻐근해요', value: 'moderate' },
@@ -358,7 +313,6 @@ const QUESTIONS: Question[] = [
     key: 'overeatingHabit',
     question: '배가 고프지 않아도 습관적으로 먹는 편인가요?',
     type: 'single',
-    phase: 2,
     options: [
       { label: '거의 없어요', value: 'rarely' },
       { label: '가끔 있어요', value: 'sometimes' },
@@ -369,7 +323,6 @@ const QUESTIONS: Question[] = [
     key: 'sleepQuality',
     question: '일어났을 때 피로가 회복된 느낌인가요?',
     type: 'single',
-    phase: 2,
     options: [
       { label: '대부분 회복돼요', value: 'good' },
       { label: '가끔 피곤해요', value: 'average' },
@@ -380,7 +333,6 @@ const QUESTIONS: Question[] = [
     key: 'plateauHistory',
     question: '운동이나 식단을 꾸준히 하다가\n막힌 적이 있나요?',
     type: 'single',
-    phase: 2,
     options: [
       { label: '없어요', value: '없음' },
       { label: '식단 관리가 힘들었어요', value: '식단 유지 실패' },
@@ -391,7 +343,7 @@ const QUESTIONS: Question[] = [
 ];
 
 function getVisibleQuestions(
-  answers: Partial<Record<keyof OnboardingData, string | string[]>>
+  answers: Partial<Record<AnswerKey, string | string[]>>
 ): Question[] {
   return QUESTIONS.filter((question) => (question.showWhen ? question.showWhen(answers) : true));
 }
@@ -420,29 +372,23 @@ export default function AIOnboardingScreen() {
   const strengthCardOffsets = useRef<Record<string, number>>({});
 
   const [step, setStep] = useState(0);
-  const [skippedPhase2, setSkippedPhase2] = useState(false);
-  const [passedSeparator, setPassedSeparator] = useState(false);
-  const [passedStrengthStep, setPassedStrengthStep] = useState(false);
-  const [strengthSkipped, setStrengthSkipped] = useState(false);
   const [strengthInputs, setStrengthInputs] = useState<Record<string, string>>({});
   const [rmCalcTarget, setRmCalcTarget] = useState<string | null>(null);
-  const [answers, setAnswers] = useState<Partial<Record<keyof OnboardingData, string | string[]>>>({});
+  const [answers, setAnswers] = useState<Partial<Record<AnswerKey, string | string[]>>>({});
   const [showEquipmentSheet, setShowEquipmentSheet] = useState(false);
   const [equipmentStep, setEquipmentStep] = useState<'confirm' | 'select'>('confirm');
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
+  const [showGoalInfo, setShowGoalInfo] = useState(false);
 
   const resetSurveyState = React.useCallback(() => {
     setStep(0);
-    setSkippedPhase2(false);
-    setPassedSeparator(false);
-    setPassedStrengthStep(false);
-    setStrengthSkipped(false);
     setStrengthInputs({});
     setRmCalcTarget(null);
     setAnswers({});
     setShowEquipmentSheet(false);
     setEquipmentStep('confirm');
     setSelectedEquipment([]);
+    setShowGoalInfo(false);
     strengthCardOffsets.current = {};
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ y: 0, animated: false });
@@ -476,18 +422,32 @@ export default function AIOnboardingScreen() {
     })();
   }, [user?.id]);
 
-  const visibleQuestions = skippedPhase2
-    ? getVisibleQuestions(answers).filter((q) => q.phase === 1)
-    : getVisibleQuestions(answers);
-  const phase1Count = visibleQuestions.filter((q) => q.phase === 1).length;
-  const isPhase2Separator = step === phase1Count && !skippedPhase2 && !passedSeparator;
-  const isStrengthStep = passedSeparator && !passedStrengthStep && !skippedPhase2;
-  const currentQuestion = (isPhase2Separator || isStrengthStep) ? null : visibleQuestions[step];
-  const totalSteps = visibleQuestions.length;
+  const visibleQuestions = getVisibleQuestions(answers);
+  const isBodyProfileStep = step === 0;
+  const questionStepCount = visibleQuestions.length;
+  const isQuestionStep = step > 0 && step <= questionStepCount;
+  const strengthConsentStepIndex = questionStepCount + 1;
+  const wantsStrengthInput = answers.optionalStrengthConsent === 'yes';
+  const isStrengthConsentStep = step === strengthConsentStepIndex;
+  const isStrengthStep = step === strengthConsentStepIndex + 1 && wantsStrengthInput;
+  const currentQuestion = isQuestionStep ? visibleQuestions[step - 1] : null;
+  const totalSteps = 1 + questionStepCount + 1 + (wantsStrengthInput ? 1 : 0);
   const selectedGoal = answers.goal as AIGoal | undefined;
+  const bodyProfileComplete =
+    (answers.gender === 'male' || answers.gender === 'female') &&
+    !!answers.age &&
+    Number(answers.age) > 0 &&
+    !!answers.height &&
+    Number(answers.height) > 0 &&
+    !!answers.weight &&
+    Number(answers.weight) > 0;
 
   // ─── 단일 선택 ──────────────────────────────────────────────────────────────
   const handleSingleSelect = (value: string) => {
+    if (isStrengthConsentStep) {
+      setAnswers((prev) => ({ ...prev, optionalStrengthConsent: value }));
+      return;
+    }
     if (!currentQuestion) return;
     setAnswers((prev) => ({ ...prev, [currentQuestion.key]: value }));
   };
@@ -511,8 +471,19 @@ export default function AIOnboardingScreen() {
 
   // ─── 다음 스텝 ──────────────────────────────────────────────────────────────
   const handleNext = () => {
-    // 마지막 질문이면 항상 플랜 생성 (gymType 인터셉트보다 우선)
-    if (step === totalSteps - 1) {
+    if (isBodyProfileStep) {
+      setStep(1);
+      return;
+    }
+    if (isStrengthConsentStep) {
+      if (answers.optionalStrengthConsent === 'yes') {
+        setStep((s) => s + 1);
+      } else {
+        handleFinish();
+      }
+      return;
+    }
+    if (isStrengthStep || step === totalSteps - 1) {
       handleFinish();
       return;
     }
@@ -528,40 +499,47 @@ export default function AIOnboardingScreen() {
   const handleEquipmentClose = (list: string[]) => {
     if (list.length > 0) {
       setSelectedEquipment(list);
-      setAnswers((prev) => ({ ...prev, equipmentList: list }));
     }
     setShowEquipmentSheet(false);
     setStep((s) => s + 1);
   };
 
   const handleBack = () => {
-    if (step > 0) setStep((s) => s - 1);
-    else navigation.goBack();
+    if (isStrengthStep) {
+      setStep(strengthConsentStepIndex);
+      return;
+    }
+    if (step > 0) {
+      setStep((s) => s - 1);
+      return;
+    }
+    navigation.goBack();
   };
 
-  const handleSkipPhase2 = () => {
-    setSkippedPhase2(true);
-    handleFinish(true);
-  };
-
-  const buildOnboardingPayload = (skipPhase2 = false): OnboardingData => {
+  const buildOnboardingPayload = (): OnboardingData => {
     const raw = answers;
+    const goal = raw.goal as OnboardingData['goal'] | undefined;
+    const gender = raw.gender as OnboardingData['gender'] | undefined;
+
+    if (!goal || !gender) {
+      throw new Error('Required onboarding answers are missing');
+    }
+
     const restrictions =
       (raw.dietaryRestrictions as string[] | undefined)?.filter((v) => v !== 'none') ?? [];
-
-    // strengthSkipped=true면 명시적 빈 배열(보수적 프롬프트 트리거)
-    const strengthProfile: StrengthEntry[] = strengthSkipped
+    const shouldIncludeStrengthProfile = raw.optionalStrengthConsent === 'yes';
+    const strengthProfile: StrengthEntry[] = !shouldIncludeStrengthProfile
       ? []
       : MAIN_EXERCISES
           .filter(ex => strengthInputs[ex.id] && Number(strengthInputs[ex.id]) > 0)
           .map(ex => ({ exercise: ex.label, weightKg: Number(strengthInputs[ex.id]) }));
 
     return {
-      goal: (raw.goal as OnboardingData['goal']) ?? 'health',
-      ...(raw.goal === 'strength_gain' && raw.primaryStrengthFocus
+      goal,
+      ...(goal === 'strength_gain' && raw.primaryStrengthFocus
         ? { primaryStrengthFocus: raw.primaryStrengthFocus as OnboardingData['primaryStrengthFocus'] }
         : {}),
-      gender: (raw.gender as OnboardingData['gender']) ?? 'undisclosed',
+      gender,
       age: parseInt(String(raw.age ?? '0'), 10),
       height: parseFloat(String(raw.height ?? '0')),
       weight: parseFloat(String(raw.weight ?? '0')),
@@ -570,22 +548,23 @@ export default function AIOnboardingScreen() {
       gymType: (raw.gymType as GymType) ?? 'full_gym',
       ...(selectedEquipment.length > 0 ? { equipmentList: selectedEquipment } : {}),
       dietaryRestrictions: restrictions,
-      // Phase 2를 통과한 경우 항상 strengthProfile 포함 ([] = 보수적 지시)
-      ...(skipPhase2 ? {} : { strengthProfile }),
-      ...(skipPhase2
-        ? {}
-        : {
-            recoveryLevel: raw.recoveryLevel as OnboardingData['recoveryLevel'],
-            overeatingHabit: raw.overeatingHabit as OnboardingData['overeatingHabit'],
-            sleepQuality: raw.sleepQuality as OnboardingData['sleepQuality'],
-            plateauHistory: raw.plateauHistory as string | undefined,
-          }),
+      ...(shouldIncludeStrengthProfile ? { strengthProfile } : {}),
+      recoveryLevel: raw.recoveryLevel as OnboardingData['recoveryLevel'],
+      overeatingHabit: raw.overeatingHabit as OnboardingData['overeatingHabit'],
+      sleepQuality: raw.sleepQuality as OnboardingData['sleepQuality'],
+      plateauHistory: raw.plateauHistory as string | undefined,
     };
   };
 
   // ─── 완료 및 레벨 판정 ───────────────────────────────────────────────────────
-  const handleFinish = async (skipPhase2 = false) => {
-    const data = buildOnboardingPayload(skipPhase2);
+  const handleFinish = async () => {
+    let data: OnboardingData;
+    try {
+      data = buildOnboardingPayload();
+    } catch {
+      Alert.alert('입력 정보를 다시 확인해주세요', '필수 질문에 답변한 뒤 다시 진행해주세요.');
+      return;
+    }
 
     // 안전 검증
     const safety = validateSafety(data);
@@ -621,38 +600,155 @@ export default function AIOnboardingScreen() {
     });
   };
 
-  // ─── Phase 2 구분선 ──────────────────────────────────────────────────────────
-  if (isPhase2Separator) {
+  // ─── 신체 정보 입력 화면 ─────────────────────────────────────────────────────
+  if (isBodyProfileStep) {
     return (
       <AIFlowScreen
-        scroll={false}
         header={
           <View style={s.header}>
             <TouchableOpacity onPress={handleBack} style={s.backBtn}>
               <Text style={s.backText}>←</Text>
             </TouchableOpacity>
+            <View style={s.progressBar}>
+              {Array.from({ length: totalSteps }).map((_, i) => (
+                <View key={i} style={[s.progressDot, i <= step && s.progressDotActive]} />
+              ))}
+            </View>
+            <Text style={s.stepLabel}>
+              {step + 1}/{totalSteps}
+            </Text>
           </View>
         }
-        bodyStyle={s.separatorContent}
+        scrollRef={scrollRef}
+        keyboardVerticalOffset={16}
+        contentContainerStyle={s.content}
         footer={
-          <>
-            <TouchableOpacity
-              style={s.primaryBtn}
-              onPress={() => setPassedSeparator(true)}
-            >
-              <Text style={s.primaryBtnText}>계속 입력하기</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.skipBtn} onPress={handleSkipPhase2}>
-              <Text style={s.skipText}>여기까지 답하고 레벨 결과 보기</Text>
-            </TouchableOpacity>
-          </>
+          <TouchableOpacity
+            style={[s.primaryBtn, !bodyProfileComplete && s.btnDisabled]}
+            onPress={handleNext}
+            disabled={!bodyProfileComplete}
+            activeOpacity={0.85}
+          >
+            <Text style={s.primaryBtnText}>다음</Text>
+          </TouchableOpacity>
         }
       >
-          <Text style={s.separatorIcon}>💡</Text>
-          <Text style={s.separatorTitle}>선택 사항</Text>
-          <Text style={s.separatorDesc}>
-            다음 질문을 추가로 답해주시면{'\n'}헬스 레벨 판정과 추천이 더 정교해집니다.
-          </Text>
+        <Text style={s.questionText}>기본 정보를 알려주세요</Text>
+        <Text style={s.helperText}>
+          레벨 판정과 추천 정확도를 높이기 위해 먼저 필요한 정보예요.
+        </Text>
+        <View style={s.genderRow}>
+          {[
+            { label: '남성', value: 'male' },
+            { label: '여성', value: 'female' },
+          ].map((option) => {
+            const selected = answers.gender === option.value;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                style={[s.genderBtn, selected && s.optionBtnSelected]}
+                onPress={() => setAnswers((prev) => ({ ...prev, gender: option.value }))}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.optionText, selected && s.optionTextSelected]}>{option.label}</Text>
+                {selected && <Text style={s.checkmark}>✓</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <View style={s.profileGrid}>
+          {[
+            { key: 'age', label: '나이', unit: '세', placeholder: '28' },
+            { key: 'height', label: '키', unit: 'cm', placeholder: '170' },
+            { key: 'weight', label: '몸무게', unit: 'kg', placeholder: '65' },
+          ].map((field) => (
+            <View key={field.key} style={s.profileField}>
+              <Text style={s.profileLabel}>{field.label}</Text>
+              <View style={s.profileInputRow}>
+                <TextInput
+                  style={[s.profileInput, { color: colors.text, borderColor: colors.border }]}
+                  keyboardType="numeric"
+                  placeholder={field.placeholder}
+                  placeholderTextColor={colors.textSecondary}
+                  value={String(answers[field.key as keyof typeof answers] ?? '')}
+                  onChangeText={(text) => {
+                    const numeric = text.replace(/[^0-9]/g, '');
+                    setAnswers((prev) => ({ ...prev, [field.key]: numeric }));
+                  }}
+                  onFocus={() => scrollToFocusedInput(160)}
+                  maxLength={3}
+                />
+                <Text style={s.profileUnit}>{field.unit}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </AIFlowScreen>
+    );
+  }
+
+  // ─── 강도 프로필 입력 여부 선택 ──────────────────────────────────────────────
+  if (isStrengthConsentStep) {
+    const currentAnswer = answers.optionalStrengthConsent;
+    const canProceed = currentAnswer === 'yes' || currentAnswer === 'no';
+
+    return (
+      <AIFlowScreen
+        header={
+          <View style={s.header}>
+            <TouchableOpacity onPress={handleBack} style={s.backBtn}>
+              <Text style={s.backText}>←</Text>
+            </TouchableOpacity>
+            <View style={s.progressBar}>
+              {Array.from({ length: totalSteps }).map((_, i) => (
+                <View key={i} style={[s.progressDot, i <= step && s.progressDotActive]} />
+              ))}
+            </View>
+            <Text style={s.stepLabel}>
+              {step + 1}/{totalSteps}
+            </Text>
+          </View>
+        }
+        contentContainerStyle={s.content}
+        footer={
+          <TouchableOpacity
+            style={[s.primaryBtn, !canProceed && s.btnDisabled]}
+            onPress={handleNext}
+            disabled={!canProceed}
+            activeOpacity={0.85}
+          >
+            <Text style={s.primaryBtnText}>
+              {currentAnswer === 'yes' ? '중량 입력으로 이동' : '레벨 결과 보기'}
+            </Text>
+          </TouchableOpacity>
+        }
+      >
+        <View style={s.phaseBadge}>
+          <Text style={s.phaseBadgeText}>선택 입력</Text>
+        </View>
+        <Text style={s.questionText}>선택 입력이에요.{'\n'}현재 사용 중량도 알려주실래요?</Text>
+        <Text style={s.strengthIntroText}>
+          모르거나 아직 입력하고 싶지 않다면 건너뛰셔도 괜찮아요.
+        </Text>
+        <View style={s.optionsWrap}>
+          {[
+            { label: '네, 입력할게요', value: 'yes' },
+            { label: '아니요, 건너뛸게요', value: 'no' },
+          ].map((option) => {
+            const selected = currentAnswer === option.value;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                style={[s.optionBtn, selected && s.optionBtnSelected]}
+                onPress={() => handleSingleSelect(option.value)}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.optionText, selected && s.optionTextSelected]}>{option.label}</Text>
+                {selected && <Text style={s.checkmark}>✓</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </AIFlowScreen>
     );
   }
@@ -663,9 +759,17 @@ export default function AIOnboardingScreen() {
       <AIFlowScreen
         header={
           <View style={s.header}>
-            <TouchableOpacity onPress={() => setPassedSeparator(false)} style={s.backBtn}>
+            <TouchableOpacity onPress={handleBack} style={s.backBtn}>
               <Text style={s.backText}>←</Text>
             </TouchableOpacity>
+            <View style={s.progressBar}>
+              {Array.from({ length: totalSteps }).map((_, i) => (
+                <View key={i} style={[s.progressDot, i <= step && s.progressDotActive]} />
+              ))}
+            </View>
+            <Text style={s.stepLabel}>
+              {step + 1}/{totalSteps}
+            </Text>
           </View>
         }
         scrollRef={scrollRef}
@@ -673,79 +777,67 @@ export default function AIOnboardingScreen() {
         contentContainerStyle={[s.content, s.strengthContent]}
         footerStyle={s.strengthFooter}
         footer={
-          <>
-            <TouchableOpacity style={s.primaryBtn} onPress={() => setPassedStrengthStep(true)} activeOpacity={0.85}>
-              <Text style={s.primaryBtnText}>다음</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.skipBtn, s.centeredSkipBtn]}
-              onPress={() => { setStrengthSkipped(true); setPassedStrengthStep(true); }}
-              activeOpacity={0.85}
-            >
-              <Text style={[s.skipText, s.centeredSkipText]}>모르면 건너뛰기 (보수적으로 판정)</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[s.skipBtn, s.centeredSkipBtn, { marginTop: 2 }]} onPress={handleSkipPhase2}>
-              <Text style={[s.skipText, s.centeredSkipText, { fontSize: 13 }]}>여기까지 답하고 레벨 결과 보기</Text>
-            </TouchableOpacity>
-          </>
+          <TouchableOpacity style={s.primaryBtn} onPress={handleFinish} activeOpacity={0.85}>
+            <Text style={s.primaryBtnText}>레벨 결과 보기</Text>
+          </TouchableOpacity>
         }
       >
-          <View style={s.phaseBadge}>
-            <Text style={s.phaseBadgeText}>선택 질문</Text>
-          </View>
-          <Text style={s.questionText}>주요 운동의 현재{'\n'}사용 중량을 입력해주세요</Text>
-          <Text style={s.strengthIntroText}>
-            현재 사용 중량을 바로 입력하면 됩니다.{'\n'}
-            1RM을 모르면 오른쪽 계산기로 간단히 입력할 수 있어요.
-          </Text>
-          <OneRMCalcModal
-            targetId={rmCalcTarget}
-            exerciseLabel={MAIN_EXERCISES.find(ex => ex.id === rmCalcTarget)?.label ?? ''}
-            visible={rmCalcTarget !== null}
-            onClose={() => setRmCalcTarget(null)}
-            onApply={(targetId, value) => {
-              setStrengthInputs(prev => ({ ...prev, [targetId]: String(value) }));
-              setRmCalcTarget(null);
-            }}
-            colors={colors}
-          />
-          <View style={s.strengthList}>
-            {MAIN_EXERCISES.map(ex => (
-              <View
-                key={ex.id}
-                style={s.strengthRow}
-                onLayout={(event) => {
-                  strengthCardOffsets.current[ex.id] = event.nativeEvent.layout.y;
-                }}
-              >
-                <Text style={s.strengthName}>{ex.label}</Text>
-                <View style={s.strengthValueGroup}>
-                  <TextInput
-                    style={[s.strengthInputCompact, { color: colors.text, borderColor: colors.border }]}
-                    keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
-                    inputMode="decimal"
-                    placeholder="0"
-                    placeholderTextColor={colors.textSecondary}
-                    value={strengthInputs[ex.id] ?? ''}
-                    onChangeText={text => {
-                      setStrengthInputs(prev => ({ ...prev, [ex.id]: sanitizeDecimalInput(text) }));
-                    }}
-                    onFocus={() => scrollToFocusedInput((strengthCardOffsets.current[ex.id] ?? 0) - 24)}
-                    maxLength={6}
-                  />
-                  <Text style={s.strengthUnitCompact}>kg</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setRmCalcTarget(ex.id)}
-                  style={s.strengthCalcButtonCompact}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Text style={s.strengthCalcButtonTextCompact}>1RM 계산</Text>
-                </TouchableOpacity>
+        <View style={s.phaseBadge}>
+          <Text style={s.phaseBadgeText}>선택 입력</Text>
+        </View>
+        <Text style={s.questionText}>선택 입력이에요.{'\n'}아는 만큼만 현재 사용 중량을 적어주세요</Text>
+        <Text style={s.strengthIntroText}>
+          정확하지 않아도 괜찮아요. 모르겠다면 비워두고 넘어가도 돼요.{'\n'}
+          1RM을 모르면 오른쪽 계산기로 간단히 입력할 수 있어요.
+        </Text>
+        <OneRMCalcModal
+          targetId={rmCalcTarget}
+          exerciseLabel={MAIN_EXERCISES.find(ex => ex.id === rmCalcTarget)?.label ?? ''}
+          visible={rmCalcTarget !== null}
+          onClose={() => setRmCalcTarget(null)}
+          onApply={(targetId, value) => {
+            setStrengthInputs(prev => ({ ...prev, [targetId]: String(value) }));
+            setRmCalcTarget(null);
+          }}
+          colors={colors}
+        />
+        <View style={s.strengthList}>
+          {MAIN_EXERCISES.map(ex => (
+            <View
+              key={ex.id}
+              style={s.strengthRow}
+              onLayout={(event) => {
+                strengthCardOffsets.current[ex.id] = event.nativeEvent.layout.y;
+              }}
+            >
+              <Text style={s.strengthName}>{ex.label}</Text>
+              <View style={s.strengthValueGroup}>
+                <TextInput
+                  style={[s.strengthInputCompact, { color: colors.text, borderColor: colors.border }]}
+                  keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                  inputMode="decimal"
+                  placeholder="0"
+                  placeholderTextColor={colors.textSecondary}
+                  value={strengthInputs[ex.id] ?? ''}
+                  onChangeText={text => {
+                    setStrengthInputs(prev => ({ ...prev, [ex.id]: sanitizeDecimalInput(text) }));
+                  }}
+                  onFocus={() => scrollToFocusedInput((strengthCardOffsets.current[ex.id] ?? 0) - 24)}
+                  maxLength={6}
+                />
+                <Text style={s.strengthUnitCompact}>kg</Text>
               </View>
-            ))}
-          </View>
+              <TouchableOpacity
+                onPress={() => setRmCalcTarget(ex.id)}
+                style={s.strengthCalcButtonCompact}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={s.strengthCalcButtonTextCompact}>1RM 계산</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
       </AIFlowScreen>
     );
   }
@@ -760,12 +852,11 @@ export default function AIOnboardingScreen() {
       : currentQuestion.type === 'multi'
       ? Array.isArray(currentAnswer) && currentAnswer.length > 0
       : !!currentAnswer && !isNaN(Number(currentAnswer)) && Number(currentAnswer) > 0;
-  // 마지막 스텝(Phase 2 선택 질문)은 답변 없어도 진행 가능
-  const canProceed = isLastStep || hasAnswer;
+  const canProceed = hasAnswer;
 
   // ─── 질문 화면 ──────────────────────────────────────────────────────────────
   return (
-      <AIFlowScreen
+    <AIFlowScreen
       header={
         <View style={s.header}>
           <TouchableOpacity onPress={handleBack} style={s.backBtn}>
@@ -795,75 +886,110 @@ export default function AIOnboardingScreen() {
           activeOpacity={0.85}
         >
           <Text style={s.primaryBtnText}>
-            {step === totalSteps - 1 ? '레벨 결과 보기' : '다음'}
+            {isLastStep ? '다음' : '다음'}
           </Text>
         </TouchableOpacity>
       }
     >
-        {currentQuestion.phase === 2 && (
-          <View style={s.phaseBadge}>
-            <Text style={s.phaseBadgeText}>선택 질문</Text>
-          </View>
+
+      <View style={currentQuestion.key === 'goal' ? s.questionHeader : undefined}>
+        <Text style={[s.questionText, currentQuestion.key === 'goal' && s.questionTextCompact]}>
+          {currentQuestion.question}
+        </Text>
+        {currentQuestion.key === 'goal' && (
+          <TouchableOpacity
+            style={s.infoButton}
+            onPress={() => setShowGoalInfo(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={s.infoButtonText}>i</Text>
+          </TouchableOpacity>
         )}
+      </View>
 
-        <Text style={s.questionText}>{currentQuestion.question}</Text>
+      {currentQuestion.key === 'primaryStrengthFocus' && selectedGoal === 'strength_gain' && (
+        <Text style={[s.helperText, { color: colors.textSecondary }]}>
+          우선순위 리프트를 알면 근력 강화 루틴을 더 정확하게 맞출 수 있어요.
+        </Text>
+      )}
 
-        {currentQuestion.key === 'primaryStrengthFocus' && selectedGoal === 'strength_gain' && (
-          <Text style={[s.helperText, { color: colors.textSecondary }]}>
-            우선순위 리프트를 알면 근력 강화 루틴을 더 정확하게 맞출 수 있어요.
-          </Text>
-        )}
+      {currentQuestion.type === 'number' ? (
+        <View style={s.numberInputWrap}>
+          <TextInput
+            style={[s.numberInput, { color: colors.text, borderColor: colors.border }]}
+            keyboardType="numeric"
+            placeholder={currentQuestion.placeholder}
+            placeholderTextColor={colors.textSecondary}
+            value={String(currentAnswer ?? '')}
+            onChangeText={(text) => {
+              const numeric = text.replace(/[^0-9]/g, '');
+              setAnswers((prev) => ({ ...prev, [currentQuestion.key]: numeric }));
+            }}
+            onFocus={() => scrollToFocusedInput(180)}
+            maxLength={3}
+            autoFocus
+          />
+          {currentQuestion.unit && (
+            <Text style={[s.numberUnit, { color: colors.textSecondary }]}>
+              {currentQuestion.unit}
+            </Text>
+          )}
+        </View>
+      ) : (
+        <View style={s.optionsWrap}>
+          {currentQuestion.options?.map((opt) => {
+            const selected =
+              currentQuestion.type === 'single'
+                ? currentAnswer === opt.value
+                : Array.isArray(currentAnswer) && currentAnswer.includes(opt.value);
 
-        {currentQuestion.type === 'number' ? (
-          <View style={s.numberInputWrap}>
-            <TextInput
-              style={[s.numberInput, { color: colors.text, borderColor: colors.border }]}
-              keyboardType="numeric"
-              placeholder={currentQuestion.placeholder}
-              placeholderTextColor={colors.textSecondary}
-              value={String(currentAnswer ?? '')}
-              onChangeText={(text) => {
-                const numeric = text.replace(/[^0-9]/g, '');
-                setAnswers((prev) => ({ ...prev, [currentQuestion.key]: numeric }));
-              }}
-              onFocus={() => scrollToFocusedInput(180)}
-              maxLength={3}
-              autoFocus
-            />
-            {currentQuestion.unit && (
-              <Text style={[s.numberUnit, { color: colors.textSecondary }]}>
-                {currentQuestion.unit}
-              </Text>
-            )}
-          </View>
-        ) : (
-          <View style={s.optionsWrap}>
-            {currentQuestion.options?.map((opt) => {
-              const selected =
-                currentQuestion.type === 'single'
-                  ? currentAnswer === opt.value
-                  : Array.isArray(currentAnswer) && currentAnswer.includes(opt.value);
+            return (
+              <TouchableOpacity
+                key={opt.value}
+                style={[s.optionBtn, selected && s.optionBtnSelected]}
+                onPress={() =>
+                  currentQuestion.type === 'single'
+                    ? handleSingleSelect(opt.value)
+                    : handleMultiSelect(opt.value)
+                }
+                activeOpacity={0.8}
+              >
+                <Text style={[s.optionText, selected && s.optionTextSelected]}>
+                  {opt.label}
+                </Text>
+                {selected && <Text style={s.checkmark}>✓</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
-              return (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[s.optionBtn, selected && s.optionBtnSelected]}
-                  onPress={() =>
-                    currentQuestion.type === 'single'
-                      ? handleSingleSelect(opt.value)
-                      : handleMultiSelect(opt.value)
-                  }
-                  activeOpacity={0.8}
-                >
-                  <Text style={[s.optionText, selected && s.optionTextSelected]}>
-                    {opt.label}
-                  </Text>
-                  {selected && <Text style={s.checkmark}>✓</Text>}
+      <Modal
+        visible={showGoalInfo}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowGoalInfo(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowGoalInfo(false)}>
+          <View style={s.infoModalBackdrop}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={s.infoModalCard}>
+                <Text style={s.infoModalTitle}>목표 설명</Text>
+                <View style={s.infoList}>
+                  <Text style={s.infoListItem}>다이어트: 체지방 감량을 우선하는 목표예요.</Text>
+                  <Text style={s.infoListItem}>벌크업: 근육 증가를 위해 체중 증가를 어느 정도 허용해요.</Text>
+                  <Text style={s.infoListItem}>린매스업: 체지방 증가를 최소화하며 근육을 늘려요.</Text>
+                  <Text style={s.infoListItem}>스트렝스 강화: 중량과 수행 능력 향상에 집중해요.</Text>
+                  <Text style={s.infoListItem}>체중 유지: 현재 체형과 컨디션을 안정적으로 유지해요.</Text>
+                </View>
+                <TouchableOpacity style={s.sheetPrimaryButton} onPress={() => setShowGoalInfo(false)}>
+                  <Text style={s.sheetPrimaryButtonText}>확인</Text>
                 </TouchableOpacity>
-              );
-            })}
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        )}
+        </TouchableWithoutFeedback>
+      </Modal>
 
       {/* ─── EquipmentDetailSheet ────────────────────────────────────────── */}
       <Modal
@@ -1043,6 +1169,31 @@ const styles = (
       lineHeight: layout.isCompact ? 28 : 30,
       marginBottom: layout.isCompact ? 24 : 28,
     },
+    questionHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    questionTextCompact: {
+      flex: 1,
+      marginBottom: layout.isCompact ? 20 : 24,
+    },
+    infoButton: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 2,
+    },
+    infoButtonText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
     helperText: {
       fontSize: 14,
       lineHeight: 20,
@@ -1057,6 +1208,52 @@ const styles = (
     },
     optionsWrap: {
       gap: 12,
+    },
+    genderRow: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 18,
+    },
+    genderBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      paddingHorizontal: layout.isCompact ? 16 : 20,
+      paddingVertical: layout.isCompact ? 16 : 18,
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+    },
+    profileGrid: {
+      gap: 14,
+    },
+    profileField: {
+      gap: 8,
+    },
+    profileLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    profileInputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    profileInput: {
+      flex: 1,
+      fontSize: 24,
+      fontWeight: '700',
+      borderBottomWidth: 2,
+      paddingVertical: 8,
+    },
+    profileUnit: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      minWidth: 36,
     },
     numberInputWrap: {
       flexDirection: layout.isCompact ? 'column' : 'row',
@@ -1307,6 +1504,32 @@ const styles = (
     },
     sheetSecondaryActionText: {
       fontSize: 15,
+      color: colors.textSecondary,
+    },
+    infoModalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      justifyContent: 'center',
+      paddingHorizontal: layout.horizontalPadding,
+    },
+    infoModalCard: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      paddingHorizontal: layout.horizontalPadding,
+      paddingVertical: 24,
+      gap: 18,
+    },
+    infoModalTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    infoList: {
+      gap: 10,
+    },
+    infoListItem: {
+      fontSize: 14,
+      lineHeight: 21,
       color: colors.textSecondary,
     },
   });

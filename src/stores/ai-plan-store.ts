@@ -5,8 +5,8 @@ import type { SurveyLevelResult } from '../lib/ai-level-classifier';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
-export type AIGoal = 'weight_loss' | 'muscle_gain' | 'lean_bulk' | 'strength_gain' | 'maintenance' | 'health';
-export type AIGender = 'male' | 'female' | 'undisclosed';
+export type AIGoal = 'weight_loss' | 'muscle_gain' | 'lean_bulk' | 'strength_gain' | 'maintenance';
+export type AIGender = 'male' | 'female';
 export type AIExperience = 'beginner' | 'novice' | 'intermediate' | 'upper_intermediate' | 'advanced';
 export type GymType = 'full_gym' | 'garage_gym' | 'dumbbell_only' | 'bodyweight';
 
@@ -19,12 +19,11 @@ export const AI_EXPERIENCE_LABEL: Record<AIExperience, string> = {
 };
 
 export const AI_GOAL_LABEL: Record<AIGoal, string> = {
-  weight_loss: '체중 감량',
-  muscle_gain: '근육 증가 (벌크업)',
+  weight_loss: '다이어트',
+  muscle_gain: '벌크업',
   lean_bulk: '린매스업',
-  strength_gain: '근력 강화',
-  maintenance: '체형 유지',
-  health: '건강 개선',
+  strength_gain: '스트렝스 강화',
+  maintenance: '체중 유지',
 };
 
 export interface StrengthEntry {
@@ -52,6 +51,9 @@ export interface OnboardingData {
   // 운동 강도 프로필 (optional)
   strengthProfile?: StrengthEntry[];
 }
+
+type LegacyAIGoal = AIGoal | 'health';
+type LegacyAIGender = AIGender | 'undisclosed';
 
 export interface WorkoutExercise {
   name: string;
@@ -140,12 +142,31 @@ export function normalizeExperience(value: unknown): AIExperience {
 }
 
 function normalizeOnboardingData(
-  data?: Partial<OnboardingData> | (Omit<OnboardingData, 'experience'> & { experience?: AIExperience | LegacyAIExperience }) | null,
+  data?: (
+    Partial<Omit<OnboardingData, 'goal' | 'gender' | 'experience'>> & {
+      goal?: LegacyAIGoal;
+      gender?: LegacyAIGender;
+      experience?: AIExperience | LegacyAIExperience;
+    }
+  ) | null,
 ): OnboardingData | null {
   if (!data) return null;
 
+  const normalizedGoal: AIGoal =
+    data.goal === 'weight_loss' ||
+    data.goal === 'muscle_gain' ||
+    data.goal === 'lean_bulk' ||
+    data.goal === 'strength_gain' ||
+    data.goal === 'maintenance'
+      ? data.goal
+      : 'maintenance';
+
+  const normalizedGender: AIGender = data.gender === 'female' ? 'female' : 'male';
+
   return {
     ...data,
+    goal: normalizedGoal,
+    gender: normalizedGender,
     experience: normalizeExperience(data.experience),
     strengthProfile: normalizeStrengthEntries(data.strengthProfile),
   } as OnboardingData;

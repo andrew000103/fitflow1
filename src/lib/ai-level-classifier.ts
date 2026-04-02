@@ -1,4 +1,9 @@
-import type { HamsterLevelId } from './persona-engine';
+import {
+  CHARACTER_LEVELS,
+  type CharacterArchetypeId,
+  type CharacterLevelId,
+  type PixelVariantId,
+} from './pixel-character-config';
 import type {
   AIExperience,
   AIGender,
@@ -8,18 +13,12 @@ import type {
 } from '../stores/ai-plan-store';
 
 export type SurveyLevelId = Extract<
-  HamsterLevelId,
+  CharacterLevelId,
   'beginner' | 'novice' | 'intermediate' | 'upper_intermediate' | 'advanced' | 'veteran'
 >;
 
 type BigThreeKey = 'squat' | 'bench' | 'deadlift';
-
-interface SurveyLevelMeta {
-  id: SurveyLevelId;
-  name: string;
-  shortDescription: string;
-  detail: string;
-}
+type BinaryGender = Extract<AIGender, 'male' | 'female'>;
 
 export interface SurveyLevelScoreBreakdown {
   experience: number;
@@ -37,9 +36,12 @@ export interface SurveyLevelScoreBreakdown {
 export interface SurveyLevelResult {
   levelId: SurveyLevelId;
   levelName: string;
-  title: string;
-  shortDescription: string;
-  detail: string;
+  /** 레벨 별명 (예: 헬린이, 루키, 강철인) */
+  nickname: string;
+  /** 레벨 분위기 한 줄 설명 */
+  vibe: string;
+  /** 레벨 상세 설명 */
+  description: string;
   rationaleTags: string[];
   reasons: string[];
   scoreBreakdown: SurveyLevelScoreBreakdown;
@@ -48,7 +50,54 @@ export interface SurveyLevelResult {
   veteranQualified: boolean;
   bigThreeTotalKg: number | null;
   bigThreeEnteredCount: number;
+  /** 성별+목표 기반으로 배정된 픽셀 캐릭터 변형 */
+  variantId: PixelVariantId;
+  /** 운동 목표 분류 유형 */
+  archetypeId: CharacterArchetypeId;
 }
+
+// ─── 픽셀 캐릭터 변형·아키타입 배정 ──────────────────────────────────────────
+
+const POWER_GOALS = new Set<OnboardingData['goal']>(['strength_gain', 'muscle_gain', 'lean_bulk']);
+const POWER_GYM_TYPES = new Set<GymType>(['full_gym', 'garage_gym']);
+
+/**
+ * 성별 + 목표 + 운동 환경 기반으로 픽셀 캐릭터 변형을 배정합니다.
+ */
+export function assignPixelVariant(
+  gender: AIGender,
+  goal: OnboardingData['goal'],
+  gymType: GymType,
+): PixelVariantId {
+  const isPower = POWER_GOALS.has(goal) && POWER_GYM_TYPES.has(gymType);
+  const binaryGender = toBinaryGender(gender);
+  if (binaryGender === 'male') return isPower ? 'male-black' : 'male-lightblue';
+  return isPower ? 'female-white' : 'female-pink';
+}
+
+/**
+ * 목표 + 운동 환경 + 경험 기반으로 운동 아키타입(분류 유형)을 분류합니다.
+ */
+export function classifyArchetype(
+  goal: OnboardingData['goal'],
+  gymType: GymType,
+  experience: OnboardingData['experience'],
+): CharacterArchetypeId {
+  if (goal === 'strength_gain' && POWER_GYM_TYPES.has(gymType)) return 'powerlifter';
+  if ((goal === 'muscle_gain' || goal === 'lean_bulk') && gymType === 'full_gym') return 'mass_builder';
+  if (goal === 'lean_bulk') return 'lean_body';
+  if (goal === 'weight_loss') return 'dieter';
+  if (goal === 'maintenance') return 'wellness';
+  return 'all_rounder';
+}
+
+// ─── 레벨 메타 조회 ──────────────────────────────────────────────────────────
+
+function getLevelMeta(levelId: SurveyLevelId) {
+  return CHARACTER_LEVELS.find((level) => level.id === levelId);
+}
+
+// ─── 레벨 순서 ────────────────────────────────────────────────────────────────
 
 const LEVEL_ORDER: SurveyLevelId[] = [
   'beginner',
@@ -58,45 +107,6 @@ const LEVEL_ORDER: SurveyLevelId[] = [
   'advanced',
   'veteran',
 ];
-
-const LEVEL_META: Record<SurveyLevelId, SurveyLevelMeta> = {
-  beginner: {
-    id: 'beginner',
-    name: '초심자',
-    shortDescription: '첫 루틴을 안정적으로 시작하는 단계',
-    detail: '지금은 완벽함보다 시작과 적응이 더 중요해요. 무리하지 않고 운동 습관을 만드는 것만으로도 충분히 좋은 출발입니다.',
-  },
-  novice: {
-    id: 'novice',
-    name: '초급자',
-    shortDescription: '기초 루틴이 자리를 잡기 시작한 단계',
-    detail: '헬스장과 기본 동작이 조금씩 익숙해지는 구간이에요. 일관성을 유지하면 몸 변화가 눈에 띄기 시작합니다.',
-  },
-  intermediate: {
-    id: 'intermediate',
-    name: '중급자',
-    shortDescription: '운동이 생활 안으로 들어온 단계',
-    detail: '운동 빈도와 루틴 이해도가 어느 정도 확보된 상태예요. 이제는 단순 반복보다 방향성 있는 설계가 점점 중요해집니다.',
-  },
-  upper_intermediate: {
-    id: 'upper_intermediate',
-    name: '중상급자',
-    shortDescription: '루틴과 자기 조절이 꽤 안정된 단계',
-    detail: '운동 경험과 루틴 수행력이 분명히 쌓였어요. 작은 차이가 성과를 가르는 구간이라 회복과 강도 관리가 중요합니다.',
-  },
-  advanced: {
-    id: 'advanced',
-    name: '상급자',
-    shortDescription: '루틴을 스스로 조정할 수 있는 단계',
-    detail: '운동 경험과 강도 이해도가 높아서, 이제는 더 정교한 프로그램 설계가 성과에 직접 영향을 줍니다.',
-  },
-  veteran: {
-    id: 'veteran',
-    name: '고인물',
-    shortDescription: '상급 루틴과 중량 기준까지 통과한 단계',
-    detail: '오랜 훈련 경험뿐 아니라 실제 수행 강도까지 확인된 상태예요. 단순 운동 경력보다 검증된 훈련 수준이 느껴지는 구간입니다.',
-  },
-};
 
 const EXPERIENCE_POINTS: Record<AIExperience, number> = {
   beginner: 0,
@@ -153,12 +163,16 @@ const BIG_THREE_ALIASES: Record<string, BigThreeKey> = {
 };
 
 const BIG_THREE_TOTAL_THRESHOLDS: Record<
-  Exclude<AIGender, 'undisclosed'>,
+  BinaryGender,
   { tier1: number; tier2: number; veteran: number }
 > = {
   male: { tier1: 350, tier2: 430, veteran: 500 },
   female: { tier1: 200, tier2: 260, veteran: 300 },
 };
+
+function toBinaryGender(gender: AIGender): BinaryGender {
+  return gender === 'female' ? 'female' : 'male';
+}
 
 function getLevelIndex(levelId: SurveyLevelId) {
   return LEVEL_ORDER.indexOf(levelId);
@@ -213,9 +227,9 @@ function getStrengthEntryPoints(count: number) {
 }
 
 function getStrengthTotalPoints(gender: AIGender, bigThreeTotalKg: number | null) {
-  if (gender === 'undisclosed' || bigThreeTotalKg === null) return 0;
+  if (bigThreeTotalKg === null) return 0;
 
-  const thresholds = BIG_THREE_TOTAL_THRESHOLDS[gender];
+  const thresholds = BIG_THREE_TOTAL_THRESHOLDS[toBinaryGender(gender)];
   if (bigThreeTotalKg >= thresholds.veteran) return 3;
   if (bigThreeTotalKg >= thresholds.tier2) return 2;
   if (bigThreeTotalKg >= thresholds.tier1) return 1;
@@ -247,14 +261,15 @@ function qualifiesForVeteran(data: OnboardingData, bigThreeCount: number, bigThr
   if (data.experience !== 'advanced') return false;
   if (data.workoutDaysPerWeek < 4) return false;
   if (data.gymType !== 'full_gym' && data.gymType !== 'garage_gym') return false;
-  if (data.gender === 'undisclosed') return false;
   if (bigThreeCount < 3 || bigThreeTotalKg === null) return false;
-  return bigThreeTotalKg >= BIG_THREE_TOTAL_THRESHOLDS[data.gender].veteran;
+  return bigThreeTotalKg >= BIG_THREE_TOTAL_THRESHOLDS[toBinaryGender(data.gender)].veteran;
 }
 
 function buildRationaleTags(data: OnboardingData, bigThreeCount: number, bigThreeTotalKg: number | null) {
+  const maxLevelId = EXPERIENCE_MAX_LEVEL[data.experience];
+  const maxLevelMeta = getLevelMeta(maxLevelId);
   const tags = [
-    `운동 경험: ${LEVEL_META[EXPERIENCE_MAX_LEVEL[data.experience]].name} 후보군`,
+    `운동 경험: ${maxLevelMeta?.name ?? '알 수 없음'} 후보군`,
     `주 ${data.workoutDaysPerWeek}일 운동`,
     `운동 환경: ${GYM_TYPE_LABEL[data.gymType]}`,
   ];
@@ -281,8 +296,9 @@ function buildReasons(
   bigThreeCount: number,
   bigThreeTotalKg: number | null,
 ) {
+  const levelMeta = getLevelMeta(levelId);
   const reasons = [
-    `${LEVEL_META[levelId].name} 판정은 운동 경험, 주당 빈도, 운동 환경, 회복 상태를 함께 반영했어요.`,
+    `${levelMeta?.name ?? '알 수 없음'} 판정은 운동 경험, 주당 빈도, 운동 환경, 회복 상태를 함께 반영했어요.`,
   ];
 
   if (bigThreeCount > 0) {
@@ -297,10 +313,6 @@ function buildReasons(
 
   if (!veteranQualified && levelId !== 'veteran' && data.experience === 'advanced') {
     reasons.push('고인물 판정은 상급 경험 외에도 3대 기록과 훈련 환경 기준을 함께 통과해야 열려요.');
-  }
-
-  if (data.gender === 'undisclosed') {
-    reasons.push('성별 미선택 상태에서는 고인물 컷 판정을 보수적으로 잠가두었어요.');
   }
 
   return reasons;
@@ -353,13 +365,20 @@ export function classifySurveyLevel(data: OnboardingData): SurveyLevelResult {
     finalLevel = 'veteran';
   }
 
-  const meta = LEVEL_META[finalLevel];
+  const meta = getLevelMeta(finalLevel);
+  if (!meta) {
+    throw new Error(`Could not find level meta for ${finalLevel}`);
+  }
+
+  const variantId = assignPixelVariant(data.gender, data.goal, data.gymType);
+  const archetypeId = classifyArchetype(data.goal, data.gymType, data.experience);
+
   return {
-    levelId: meta.id,
+    levelId: meta.id as SurveyLevelId,
     levelName: meta.name,
-    title: `${meta.name} 햄식이`,
-    shortDescription: meta.shortDescription,
-    detail: meta.detail,
+    nickname: meta.nickname,
+    vibe: meta.vibe,
+    description: meta.description,
     rationaleTags: buildRationaleTags(data, bigThreeEnteredCount, bigThreeTotalKg),
     reasons: buildReasons(data, finalLevel, veteranQualified, bigThreeEnteredCount, bigThreeTotalKg),
     scoreBreakdown,
@@ -368,9 +387,10 @@ export function classifySurveyLevel(data: OnboardingData): SurveyLevelResult {
     veteranQualified,
     bigThreeTotalKg,
     bigThreeEnteredCount,
+    variantId,
+    archetypeId,
   };
 }
 
-export const SURVEY_LEVEL_META = LEVEL_ORDER.map((levelId) => LEVEL_META[levelId]);
 export const SURVEY_BIG_THREE_THRESHOLDS = BIG_THREE_TOTAL_THRESHOLDS;
 export const SURVEY_BIG_THREE_LABELS = BIG_THREE_NAME_MAP;

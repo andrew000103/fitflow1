@@ -26,6 +26,12 @@ type Option<T extends string> = {
   description?: string;
 };
 
+const GENDER_OPTIONS: Option<'male' | 'female' | 'undisclosed'>[] = [
+  { label: '남성', value: 'male' },
+  { label: '여성', value: 'female' },
+  { label: '선택 안 함', value: 'undisclosed' },
+];
+
 const EXPERIENCE_OPTIONS = [
   { label: '입문 (0~3개월)', value: 'beginner', description: '운동 루틴을 막 만들기 시작했어요.' },
   { label: '초급 (3개월~1년)', value: 'novice', description: '기초 동작과 헬스장 환경이 조금 익숙해졌어요.' },
@@ -129,6 +135,9 @@ export default function CharacterSetupScreen() {
   const [dietConsistency, setDietConsistency] = useState<QuickCharacterDietConsistency | null>(
     quickProfile?.dietConsistency ?? null,
   );
+  const [gender, setGender] = useState<'male' | 'female' | 'undisclosed'>(
+    quickProfile?.gender ?? 'undisclosed',
+  );
   const [saving, setSaving] = useState(false);
 
   const canSubmit = useMemo(
@@ -147,6 +156,7 @@ export default function CharacterSetupScreen() {
         workoutFrequency,
         trainingStyle,
         dietConsistency,
+        gender,
       });
 
       if (user?.id) {
@@ -184,13 +194,14 @@ export default function CharacterSetupScreen() {
     >
       <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border, padding: spacing.lg }]}>
         <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800' }}>
-          몇 가지만 답하면{'\n'}햄식이 시작 단계를 정해드릴게요
+          몇 가지만 답하면{'\n'}픽셀 캐릭터 시작 단계를 정해드릴게요
         </Text>
         <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 10 }}>
           AI 플랜을 꼭 만들지 않아도 괜찮아요. 지금 운동 경력과 루틴만 빠르게 반영해서 홈 캐릭터를 먼저 배정해드려요.
         </Text>
       </View>
 
+      <OptionGroup title="성별 (선택)" options={GENDER_OPTIONS} selected={gender} onSelect={setGender} />
       <OptionGroup title="운동 경력" options={EXPERIENCE_OPTIONS} selected={experience} onSelect={setExperience} />
       <OptionGroup title="주당 운동 빈도" options={WORKOUT_FREQUENCY_OPTIONS} selected={workoutFrequency} onSelect={setWorkoutFrequency} />
       <OptionGroup title="운동 성향" options={TRAINING_STYLE_OPTIONS} selected={trainingStyle} onSelect={setTrainingStyle} />

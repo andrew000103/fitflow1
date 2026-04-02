@@ -6,13 +6,18 @@ import { getLatestUserGoal } from '../lib/profile';
 import {
   calculatePersonaProfile,
   type EvolutionChecklistItem,
-  type HamsterLevelId,
   type PersonaCalculationResult,
   type PersonaDailyState,
   type PersonaGoalSnapshot,
   type PersonaMealDaySummary,
   type PersonaOnboardingInput,
 } from '../lib/persona-engine';
+import { assignPixelVariant, classifyArchetype } from '../lib/ai-level-classifier';
+import {
+  type CharacterArchetypeId,
+  type CharacterLevelId,
+  type PixelVariantId,
+} from '../lib/pixel-character-config';
 import { supabase } from '../lib/supabase';
 import { type AIPlan } from './ai-plan-store';
 import { useAIPlanStore } from './ai-plan-store';
@@ -30,6 +35,8 @@ export interface QuickCharacterProfile {
   workoutFrequency: QuickCharacterWorkoutFrequency;
   trainingStyle: QuickCharacterTrainingStyle;
   dietConsistency?: QuickCharacterDietConsistency | null;
+  /** 픽셀 캐릭터 변형 배정에 사용. character-setup-screen에서 선택 */
+  gender?: 'male' | 'female' | 'undisclosed' | null;
   completedAt: string;
   source: 'quick_character_setup';
 }
@@ -42,9 +49,9 @@ interface WorkoutSessionRow {
 
 interface PersonaStoreState {
   quickCharacterProfile: QuickCharacterProfile | null;
-  levelId: HamsterLevelId | null;
+  levelId: CharacterLevelId | null;
   levelName: string | null;
-  nextLevelId: HamsterLevelId | null;
+  nextLevelId: CharacterLevelId | null;
   nextLevelName: string | null;
   progressToNext: number;
   checklist: EvolutionChecklistItem[];
@@ -56,6 +63,10 @@ interface PersonaStoreState {
   lastUpdated: string | null;
   isCalculating: boolean;
   error: string | null;
+  /** 픽셀 캐릭터 변형 (M3+) */
+  variantId: PixelVariantId | null;
+  /** 분류 유형 (M3+) */
+  archetypeId: CharacterArchetypeId | null;
   setQuickCharacterProfile: (profile: Omit<QuickCharacterProfile, 'completedAt' | 'source'>) => void;
   clearQuickCharacterProfile: () => void;
   calculatePersona: (userId: string) => Promise<PersonaCalculationResult | null>;
@@ -267,6 +278,8 @@ export const usePersonaStore = create<PersonaStoreState>()(
   lastUpdated: null,
   isCalculating: false,
   error: null,
+  variantId: null,
+  archetypeId: null,
 
   setQuickCharacterProfile: (profile) =>
     set({
@@ -322,6 +335,16 @@ export const usePersonaStore = create<PersonaStoreState>()(
           ? '식단 기록까지 쌓이면 진화 진행도가 더 빨리 올라가요.'
           : null;
 
+      // Derive pixel variant + archetype from onboarding or quick profile
+      const onboardingRaw = useAIPlanStore.getState().onboardingData;
+      const quickProfileForVariant = usePersonaStore.getState().quickCharacterProfile;
+      const variantGender: import('../stores/ai-plan-store').AIGender =
+        onboardingRaw?.gender ?? (quickProfileForVariant?.gender === 'female' ? 'female' : 'male');
+      const variantGoal: import('../stores/ai-plan-store').AIGoal = onboardingRaw?.goal ?? 'maintenance';
+      const variantGymType: import('../stores/ai-plan-store').GymType = onboardingRaw?.gymType ?? 'bodyweight';
+      const computedVariantId = assignPixelVariant(variantGender, variantGoal, variantGymType);
+      const computedArchetypeId = classifyArchetype(variantGoal, variantGymType, onboardingRaw?.experience ?? 'beginner');
+
       set({
         levelId: result.levelId,
         levelName: result.levelName,
@@ -337,6 +360,8 @@ export const usePersonaStore = create<PersonaStoreState>()(
         lastUpdated: now.toISOString(),
         isCalculating: false,
         error: null,
+        variantId: computedVariantId,
+        archetypeId: computedArchetypeId,
       });
 
       return result;
@@ -345,7 +370,7 @@ export const usePersonaStore = create<PersonaStoreState>()(
         return null;
       }
 
-      const message = error instanceof Error ? error.message : 'Failed to calculate hamster evolution';
+      const message = error instanceof Error ? error.message : 'Failed to calculate character evolution';
       set({
         levelId: null,
         levelName: null,
@@ -356,7 +381,7 @@ export const usePersonaStore = create<PersonaStoreState>()(
         dailyState: null,
         headlineMessage: null,
         progressMessage: null,
-        supportingMessage: '햄식이 진화 상태를 다시 계산하지 못했어요. 잠시 후 다시 불러올게요.',
+        supportingMessage: '캐릭터 진화 상태를 다시 계산하지 못했어요. 잠시 후 다시 불러올게요.',
         reliabilityState: 'error',
         lastUpdated: null,
         isCalculating: false,
@@ -383,13 +408,32 @@ export const usePersonaStore = create<PersonaStoreState>()(
       lastUpdated: null,
       isCalculating: false,
       error: null,
+      variantId: null,
+      archetypeId: null,
     }),
 }),
     {
       name: 'persona-store',
+      version: 2,
       storage: createJSONStorage(() => AsyncStorage),
+      migrate: (persistedState: any, fromVersion: number) => {
+        const state = persistedState as Partial<PersonaStoreState>;
+        if (fromVersion < 2) {
+          // challenger/ranker 레벨 ID를 10단계 체계로 마이그레이션
+          const legacyMap: Record<string, string> = { challenger: 'grandmaster', ranker: 'god' };
+          if (state.levelId && legacyMap[state.levelId]) {
+            state.levelId = legacyMap[state.levelId] as CharacterLevelId;
+          }
+          if (state.nextLevelId && legacyMap[state.nextLevelId]) {
+            state.nextLevelId = legacyMap[state.nextLevelId] as CharacterLevelId;
+          }
+        }
+        return state;
+      },
       partialize: (state) => ({
         quickCharacterProfile: state.quickCharacterProfile,
+        variantId: state.variantId,
+        archetypeId: state.archetypeId,
       }),
     })
 );

@@ -336,10 +336,9 @@ function buildPrompt(
   history: UserHistorySummary | null,
   workoutHistorySection: string = ''
 ): string {
-  const genderLabel: Record<string, string> = {
+  const genderLabel: Record<OnboardingData['gender'], string> = {
     male: '남성',
     female: '여성',
-    undisclosed: '미공개',
   };
 
   const recoveryLabel: Record<string, string> = {
@@ -401,10 +400,6 @@ function buildPrompt(
     maintenance: [
       '- 운동은 현재 체력과 체형을 유지할 수 있도록 균형 있게 설계하세요.',
       '- 식단은 유지 가능한 수준과 일관성을 우선하세요.',
-    ].join('\n'),
-    health: [
-      '- 운동은 전신 움직임, 기초 체력, 부상 위험 관리에 초점을 두세요.',
-      '- 식단은 건강 습관 형성과 영양 균형을 우선하세요.',
     ].join('\n'),
   };
 

@@ -8,7 +8,7 @@ import { Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import BodyFatigueCard from '../../components/home/body-fatigue-card';
-import HamsterEvolutionCard from '../../components/home/hamster-evolution-card';
+import PixelEvolutionCard from '../../components/home/pixel-evolution-card';
 import ProteinRemainingCard from '../../components/home/protein-remaining-card';
 import { AppCard } from '../../components/common/AppCard';
 import { AppHeader } from '../../components/common/AppHeader';
@@ -269,17 +269,19 @@ export default function HomeScreen() {
   const appliedSections = currentPlan?.isApplied ? currentPlan.appliedSections ?? ['workout', 'diet', 'goals'] : [];
   const calculatePersona = usePersonaStore((s) => s.calculatePersona);
   const quickCharacterProfile = usePersonaStore((s) => s.quickCharacterProfile);
-  const hamsterLevelId = usePersonaStore((s) => s.levelId);
-  const hamsterLevelName = usePersonaStore((s) => s.levelName);
-  const hamsterNextLevelName = usePersonaStore((s) => s.nextLevelName);
-  const hamsterProgressToNext = usePersonaStore((s) => s.progressToNext);
-  const hamsterChecklist = usePersonaStore((s) => s.checklist);
+  const personaLevelId = usePersonaStore((s) => s.levelId);
+  const personaLevelName = usePersonaStore((s) => s.levelName);
+  const personaNextLevelName = usePersonaStore((s) => s.nextLevelName);
+  const personaProgressToNext = usePersonaStore((s) => s.progressToNext);
+  const personaChecklist = usePersonaStore((s) => s.checklist);
   const personaDailyState = usePersonaStore((s) => s.dailyState);
   const personaHeadline = usePersonaStore((s) => s.headlineMessage);
   const personaProgressMessage = usePersonaStore((s) => s.progressMessage);
   const personaSupportingMessage = usePersonaStore((s) => s.supportingMessage);
   const personaReliabilityState = usePersonaStore((s) => s.reliabilityState);
   const isPersonaLoading = usePersonaStore((s) => s.isCalculating);
+  const personaVariantId = usePersonaStore((s) => s.variantId);
+  const personaArchetypeId = usePersonaStore((s) => s.archetypeId);
 
   const today = dateStr(new Date());
   const [todayWorkout, setTodayWorkout] = useState<TodayWorkout | null>(null);
@@ -438,8 +440,8 @@ export default function HomeScreen() {
   const activeQuickCharacterProfile = quickCharacterProfile?.userId === user?.id ? quickCharacterProfile : null;
   const hasQuickCharacterProfile = Boolean(activeQuickCharacterProfile);
   const hasAnyCharacterProfile = Boolean(surveyLevelResult || hasDetailedCharacterProfile || hasQuickCharacterProfile);
-  const displayLevelId = surveyLevelResult?.levelId ?? hamsterLevelId;
-  const displayLevelName = surveyLevelResult?.levelName ?? hamsterLevelName;
+  const displayLevelId = surveyLevelResult?.levelId ?? personaLevelId;
+  const displayLevelName = surveyLevelResult?.levelName ?? personaLevelName;
   const quickCharacterCopy = getQuickCharacterStyleCopy(
     activeQuickCharacterProfile?.trainingStyle,
     activeQuickCharacterProfile?.dietConsistency ?? null,
@@ -450,12 +452,12 @@ export default function HomeScreen() {
   const hamsterCtaSupportingMessage = hasDetailedCharacterProfile
     ? personaSupportingMessage
       ? `최근 기록 기준: ${personaSupportingMessage}`
-      : surveyLevelResult?.detail ?? null
+      : surveyLevelResult?.description ?? null
     : hasQuickCharacterProfile
-      ? '예전 빠른 설정 대신, 이제는 설문 한 번으로 헬스 레벨과 햄식이를 더 정확하게 판정해드려요.'
-      : 'AI 플랜 없이도 괜찮아요. 설문 한 번으로 지금 내 루틴 기준 헬스 레벨과 햄식이를 먼저 확인할 수 있어요.';
+      ? '예전 빠른 설정 대신, 이제는 설문 한 번으로 헬스 레벨과 픽셀 캐릭터를 더 정확하게 판정해드려요.'
+      : 'AI 플랜 없이도 괜찮아요. 설문 한 번으로 지금 내 루틴 기준 헬스 레벨과 픽셀 캐릭터를 먼저 확인할 수 있어요.';
   const hamsterCtaHeadline = hasDetailedCharacterProfile
-    ? surveyLevelResult?.shortDescription ?? (personaHeadline ? `최근 기록 기준: ${personaHeadline}` : null)
+    ? surveyLevelResult?.vibe ?? (personaHeadline ? `최근 기록 기준: ${personaHeadline}` : null)
     : hasQuickCharacterProfile
       ? `${quickCharacterCopy.headline} 지금은 설문 기반 판정으로 더 정확하게 다시 볼 수 있어요.`
       : null;
@@ -495,15 +497,15 @@ export default function HomeScreen() {
 
         <View style={styles.summaryContainer}>
           <AppCard variant="elevated" style={styles.calorieCard}>
-            <HamsterEvolutionCard
+            <PixelEvolutionCard
               ctaLabel={hamsterCtaLabel}
-              checklist={hamsterChecklist}
+              checklist={personaChecklist}
               dailyState={personaDailyState}
               headline={hamsterCtaHeadline}
               levelId={hasAnyCharacterProfile ? displayLevelId : null}
               levelName={hasAnyCharacterProfile ? displayLevelName : null}
               loading={isPersonaLoading}
-              nextLevelName={hasAnyCharacterProfile ? hamsterNextLevelName : null}
+              nextLevelName={hasAnyCharacterProfile ? personaNextLevelName : null}
               onPressCta={hamsterCtaLabel ? handleHamsterCtaPress : null}
               progressMessage={
                 !hasAnyCharacterProfile
@@ -514,8 +516,10 @@ export default function HomeScreen() {
                   ? `최근 기록 기준: ${personaProgressMessage}`
                   : null
               }
-              progressToNext={hasAnyCharacterProfile ? hamsterProgressToNext : null}
+              progressToNext={hasAnyCharacterProfile ? personaProgressToNext : null}
               supportingMessage={hamsterCtaSupportingMessage}
+              variantId={personaVariantId}
+              archetypeId={personaArchetypeId}
             />
           </AppCard>
 
