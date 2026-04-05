@@ -167,10 +167,8 @@ export default function ExerciseSearchScreen({ navigation, route }: Props) {
     const restSeconds = item.default_rest_seconds ?? fallback?.default_rest_seconds ?? null;
 
     return (
-      <TouchableOpacity
+      <View
         style={[styles.item, { borderBottomColor: colors.border }]}
-        onPress={() => handleSelect(item)}
-        activeOpacity={0.7}
       >
         <View style={styles.itemContent}>
           <View style={styles.itemNameRow}>
@@ -208,8 +206,15 @@ export default function ExerciseSearchScreen({ navigation, route }: Props) {
             </Text>
           )}
         </View>
-        <MaterialCommunityIcons name="plus-circle-outline" size={22} color={colors.accent} />
-      </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => handleSelect(item)}
+          activeOpacity={0.7}
+          style={styles.addButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <MaterialCommunityIcons name="plus-circle-outline" size={22} color={colors.accent} />
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -414,6 +419,12 @@ const styles = StyleSheet.create({
   },
   itemContent: { flex: 1, minWidth: 0, paddingRight: 8 },
   itemNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0, alignSelf: 'flex-start' },
+  addButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 8,
+    paddingVertical: 4,
+  },
   searchThumbnail: {
     width: 40,
     height: 40,

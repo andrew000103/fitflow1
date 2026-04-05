@@ -403,18 +403,18 @@ function buildDailyState(input: PersonaCalculationInput): PersonaDailyState {
 
 function buildHeadlineMessage(level: LevelMeta, nextLevel: LevelMeta | null, progressToNext: number) {
   if (!nextLevel) {
-    return `${level.name} 픽셀에 도달했어요. 지금은 완성형 루틴을 유지하는 구간이에요.`;
+    return `${level.name} 단계에 도달했어요. 지금은 완성도 높은 루틴을 안정적으로 유지하는 구간이에요.`;
   }
 
   if (progressToNext >= 1) {
-    return `${nextLevel.name} 진화 조건을 채웠어요. 이번 갱신에서 바로 진화합니다.`;
+    return `${nextLevel.name} 단계 조건을 채웠어요. 다음 갱신에서 최신 상태로 반영돼요.`;
   }
 
   if (progressToNext >= 0.8) {
-    return `${level.name} 픽셀가 ${nextLevel.name} 진화를 코앞에 두고 있어요.`;
+    return `${nextLevel.name} 단계가 가까워졌어요. 지금 흐름을 조금만 더 이어가면 돼요.`;
   }
 
-  return `${level.name} 픽셀가 차근차근 ${nextLevel.name}을 향해 성장 중이에요.`;
+  return `${level.name} 단계에서 차근차근 ${nextLevel.name} 단계로 올라가는 흐름이에요.`;
 }
 
 function buildProgressMessage(
@@ -432,13 +432,13 @@ function buildProgressMessage(
     .sort((a, b) => (a.target - a.current) - (b.target - b.current))[0];
 
   if (!incomplete) {
-    return `${nextLevel.name} 진화 준비가 끝났어요. 홈에 들어올 때마다 최신 상태로 반영돼요.`;
+    return `${nextLevel.name} 단계 준비가 끝났어요. 홈에 들어올 때마다 최신 상태로 반영돼요.`;
   }
 
   const remaining = Math.max(incomplete.target - incomplete.current, 0);
 
   if (progressToNext >= 0.75) {
-    return `${incomplete.label} ${remaining}${incomplete.label.includes('운동') || incomplete.label.includes('기록') || incomplete.label.includes('달성') ? '회' : ''}만 더 채우면 ${nextLevel.name}로 진화해요.`;
+    return `${incomplete.label} ${remaining}${incomplete.label.includes('운동') || incomplete.label.includes('기록') || incomplete.label.includes('달성') ? '회' : ''}만 더 채우면 ${nextLevel.name} 단계에 도달할 수 있어요.`;
   }
 
   return `${nextLevel.name}까지 ${Math.round(progressToNext * 100)}%. 지금은 ${incomplete.label}을 ${remaining}만큼 더 쌓는 게 가장 빨라요.`;

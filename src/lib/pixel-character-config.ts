@@ -225,13 +225,47 @@ export const PIXEL_IMAGE_MAP: Record<PixelVariantId, Record<CharacterLevelId, an
 /** 성별 미설정 또는 undisclosed 시 사용하는 기본 변형 */
 export const DEFAULT_PIXEL_VARIANT: PixelVariantId = 'male-lightblue';
 
+export interface PixelVariantMeta {
+  id: PixelVariantId;
+  label: string;
+  shortReason: string;
+  detailReason: string;
+}
+
+export const PIXEL_VARIANT_META: Record<PixelVariantId, PixelVariantMeta> = {
+  'male-lightblue': {
+    id: 'male-lightblue',
+    label: '라이트 블루 타입',
+    shortReason: '체형 정리와 밸런스 쪽 흐름이 보여서 가볍고 민첩한 타입으로 배정했어요.',
+    detailReason: '목표뿐 아니라 운동 환경도 함께 봤을 때, 중량 특화보다는 컨디션과 흐름을 깔끔하게 가져가는 방향에 더 가까워요.',
+  },
+  'male-black': {
+    id: 'male-black',
+    label: '블랙 타입',
+    shortReason: '힘과 중량 중심 성향이 보여서 묵직하게 성장하는 타입으로 배정했어요.',
+    detailReason: '근력 향상, 근성장, 린벌크 같은 성장 목표와 장비를 활용하는 환경이 함께 보여서 파워 지향 캐릭터에 가깝게 분류했어요.',
+  },
+  'female-pink': {
+    id: 'female-pink',
+    label: '핑크 타입',
+    shortReason: '근력과 성장 쪽 성향이 보여서 에너지 있게 밀고 가는 타입으로 배정했어요.',
+    detailReason: '핑크는 귀여움보다는 추진력 쪽 의미예요. 근력 향상이나 근성장처럼 몸을 힘 있게 키워가는 방향을 반영한 결과예요.',
+  },
+  'female-white': {
+    id: 'female-white',
+    label: '화이트 타입',
+    shortReason: '감량과 정리 쪽 흐름이 보여서 깔끔하게 다듬는 타입으로 배정했어요.',
+    detailReason: '화이트는 비워내고 정리하는 방향에 가까워요. 감량, 유지, 밸런스 중심 목표를 반영해 가볍고 정돈된 타입으로 분류했어요.',
+  },
+};
+
 // ─── 아키타입 메타 ────────────────────────────────────────────────────────────
 
 export interface ArchetypeMeta {
   id: CharacterArchetypeId;
   name: string;
   description: string;
-  /** 변형 힌트: power → black/white, lean → lightblue/pink */
+  /** 변형 힌트: 남성 power → black / lean → lightblue, 여성 power → pink / lean → white */
   variantHint: 'power' | 'lean';
 }
 

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Text } from 'react-native-paper';
 
+import { getHealthLevelContent } from '../../lib/health-level-content';
 import {
   ARCHETYPE_META,
   CHARACTER_LEVELS,
@@ -35,6 +36,10 @@ interface PixelEvolutionCardProps {
   supportingMessage?: string | null;
   checklist?: EvolutionChecklistItem[];
   dailyState?: PersonaDailyState | null;
+  hasWorkoutToday?: boolean;
+  mealEntryCountToday?: number;
+  proteinToday?: number | null;
+  proteinGoal?: number | null;
   loading?: boolean;
   ctaLabel?: string | null;
   onPressCta?: (() => void) | null;
@@ -42,19 +47,93 @@ interface PixelEvolutionCardProps {
   archetypeId?: CharacterArchetypeId | null;
 }
 
-const STATE_META: Record<PersonaDailyState, { icon: string; label: string }> = {
-  ACTIVE: { icon: 'arm-flex-outline', label: '활성' },
-  RESTING: { icon: 'weather-night', label: '휴식' },
-  HUNGRY: { icon: 'food-apple-outline', label: '배고픔' },
-  FULL: { icon: 'silverware-fork-knife', label: '포만' },
-  TIRED: { icon: 'battery-low', label: '회복 필요' },
-};
-
 type CharacterLevelMetaItem = (typeof CHARACTER_LEVELS)[number];
 
 function formatPercent(progress?: number | null) {
   if (typeof progress !== 'number' || !Number.isFinite(progress)) return '0%';
   return `${Math.round(Math.min(Math.max(progress, 0), 1) * 100)}%`;
+}
+
+function buildNextStepMessage(
+  nextLevelName?: string | null,
+  checklist: EvolutionChecklistItem[] = [],
+  progressToNext?: number | null,
+  progressMessage?: string | null,
+) {
+  const incomplete = checklist.filter((item) => !item.complete);
+
+  if (!nextLevelName) {
+    return '지금 루틴을 안정적으로 유지해보세요. 현재 단계의 완성도를 다지는 것이 가장 중요해요.';
+  }
+
+  if (incomplete.length > 0) {
+    const [first, second] = incomplete;
+    const parts = [first, second].filter(Boolean).map((item) => {
+      const remaining = Math.max(item.target - item.current, 0);
+      return `${item.label} ${remaining}${item.label.includes('운동') || item.label.includes('기록') || item.label.includes('달성') ? '회' : ''}`;
+    });
+    return `${nextLevelName} 단계까지 ${parts.join(', ')} 더 채워보세요.`;
+  }
+
+  if (progressMessage?.trim()) {
+    return progressMessage;
+  }
+
+  return `${nextLevelName} 단계까지 ${formatPercent(progressToNext)} 정도 진행됐어요. 지금 페이스를 유지해보세요.`;
+}
+
+function buildWorkoutTip(
+  baseTip: string | undefined,
+  checklist: EvolutionChecklistItem[] = [],
+  hasWorkoutToday?: boolean,
+) {
+  const workoutItem = checklist.find((item) => !item.complete && item.label.includes('운동'));
+  if (workoutItem) {
+    const remaining = Math.max(workoutItem.target - workoutItem.current, 0);
+    return `${workoutItem.label} ${remaining}회만 더 채우는 걸 이번 주 우선순위로 잡아보세요. ${baseTip ?? ''}`.trim();
+  }
+
+  if (!hasWorkoutToday) {
+    return `오늘 운동 기록이 아직 없어요. 짧게라도 한 세션을 시작하면 흐름을 이어가기 훨씬 쉬워져요. ${baseTip ?? ''}`.trim();
+  }
+
+  return baseTip ?? '이번 주에는 자주 하는 운동 1~2개만이라도 꾸준히 이어가며 기록을 남겨보세요.';
+}
+
+function buildDietTip(
+  baseTip: string | undefined,
+  mealEntryCountToday?: number,
+  proteinToday?: number | null,
+  proteinGoal?: number | null,
+) {
+  if ((mealEntryCountToday ?? 0) === 0) {
+    return `오늘 식단 기록이 아직 없어요. 첫 끼부터 가볍게 기록하면 레벨 안내도 더 정확해져요. ${baseTip ?? ''}`.trim();
+  }
+
+  if (
+    typeof proteinToday === 'number'
+    && typeof proteinGoal === 'number'
+    && proteinGoal > 0
+    && proteinToday < proteinGoal * 0.6
+  ) {
+    const remaining = Math.max(Math.round(proteinGoal - proteinToday), 0);
+    return `단백질이 아직 ${remaining}g 정도 부족해요. 다음 식사에서 단백질 한 가지를 먼저 채워보세요. ${baseTip ?? ''}`.trim();
+  }
+
+  return baseTip ?? '하루 전체를 완벽하게 맞추기보다 단백질과 식사 기록부터 차근차근 정리해보세요.';
+}
+
+function buildSimpleHeadline(
+  headline?: string | null,
+  shortBlurb?: string | null,
+) {
+  const conciseHeadline = headline?.trim();
+  if (conciseHeadline) return conciseHeadline;
+
+  const conciseBlurb = shortBlurb?.trim();
+  if (conciseBlurb) return conciseBlurb;
+
+  return '지금 페이스를 이어가보세요.';
 }
 
 function PixelLevelViewer({
@@ -100,12 +179,12 @@ function PixelLevelViewer({
         >
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
           <View style={[styles.modalHeader, { paddingHorizontal: spacing.lg }]}>
-            <View>
+            <View style={styles.modalHeaderCopy}>
               <Text style={[styles.modalTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
-                픽셀 캐릭터 도감
+                현재 단계 보기
               </Text>
               <Text style={[styles.modalSubtitle, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-                좌우로 넘기면서 전 단계와 다음 단계를 구경해보세요.
+                지금 단계와 다음 단계를 한눈에 확인해보세요.
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: colors.separator, borderRadius: radius.full }]}>
@@ -126,19 +205,18 @@ function PixelLevelViewer({
             renderItem={({ item }: { item: CharacterLevelMetaItem }) => {
               const isCurrent = item.id === currentLevelId;
               const imageSource = PIXEL_IMAGE_MAP[variantId][item.id];
+              const levelContent = getHealthLevelContent(item.id);
+
               return (
                 <View style={[styles.slide, { width: sliderWidth, paddingHorizontal: spacing.lg }]}>
                   <View style={[styles.slideCard, { backgroundColor: colors.background, borderRadius: radius.xl, padding: spacing.lg }]}>
                     <View style={styles.slideHeader}>
-                      <View>
-                        <Text style={[styles.slideNickname, { color: colors.accent, fontFamily: typography.fontFamily }]}>
-                          {item.nickname}
-                        </Text>
+                      <View style={styles.slideTitleWrap}>
                         <Text style={[styles.slideLevel, { color: colors.text, fontFamily: typography.fontFamily }]}>
                           {item.name}
                         </Text>
-                        <Text style={[styles.slideVibe, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-                          {item.vibe}
+                        <Text style={[styles.slideNickname, { color: colors.accent, fontFamily: typography.fontFamily }]}>
+                          {item.nickname}
                         </Text>
                       </View>
                       {isCurrent && (
@@ -164,8 +242,24 @@ function PixelLevelViewer({
                       showsVerticalScrollIndicator={false}
                     >
                       <Text style={[styles.slideDescription, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-                        {item.description}
+                        {levelContent?.shortBlurb ?? levelContent?.summary ?? item.description}
                       </Text>
+                      {levelContent && (
+                        <>
+                          <Text style={[styles.slideTipTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
+                            운동 팁
+                          </Text>
+                          <Text style={[styles.slideTipBody, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
+                            {levelContent.workoutTip}
+                          </Text>
+                          <Text style={[styles.slideTipTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
+                            식단 팁
+                          </Text>
+                          <Text style={[styles.slideTipBody, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
+                            {levelContent.dietTip}
+                          </Text>
+                        </>
+                      )}
                     </ScrollView>
                   </View>
                 </View>
@@ -178,6 +272,34 @@ function PixelLevelViewer({
   );
 }
 
+function InfoBlock({
+  icon,
+  title,
+  body,
+}: {
+  icon: string;
+  title: string;
+  body: string;
+}) {
+  const { colors, radius, typography } = useAppTheme();
+
+  return (
+    <View style={[styles.infoBlock, { backgroundColor: colors.background, borderRadius: radius.lg, borderColor: colors.border }]}>
+      <View style={[styles.infoIconWrap, { backgroundColor: colors.separator, borderRadius: radius.md }]}>
+        <MaterialCommunityIcons name={icon as any} size={18} color={colors.accent} />
+      </View>
+      <View style={styles.infoCopy}>
+        <Text style={[styles.infoTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
+          {title}
+        </Text>
+        <Text style={[styles.infoBody, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
+          {body}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export default function PixelEvolutionCard({
   levelId,
   levelName,
@@ -187,7 +309,10 @@ export default function PixelEvolutionCard({
   progressMessage,
   supportingMessage,
   checklist = [],
-  dailyState,
+  hasWorkoutToday,
+  mealEntryCountToday,
+  proteinToday,
+  proteinGoal,
   loading = false,
   ctaLabel,
   onPressCta,
@@ -199,15 +324,17 @@ export default function PixelEvolutionCard({
   const activeVariant: PixelVariantId = variantId ?? DEFAULT_PIXEL_VARIANT;
   const hasAssignedCharacter = Boolean(levelId && levelName);
   const isEmptyState = !hasAssignedCharacter && Boolean(ctaLabel && onPressCta);
-  const isLoadingAssignedState = hasAssignedCharacter && loading;
-  const imageSource = levelId ? PIXEL_IMAGE_MAP[activeVariant][levelId] : null;
-  const stateMeta = dailyState ? STATE_META[dailyState] : null;
-  const progressWidth = `${Math.round(Math.min(Math.max(progressToNext ?? 0, 0), 1) * 100)}%` as `${number}%`;
   const levelMeta = useMemo(
     () => CHARACTER_LEVELS.find((item) => item.id === levelId),
     [levelId],
   );
   const archetypeMeta = archetypeId ? ARCHETYPE_META[archetypeId] : null;
+  const levelContent = getHealthLevelContent(levelId);
+  const nextStepMessage = buildNextStepMessage(nextLevelName, checklist, progressToNext, progressMessage);
+  const reliabilityNote = supportingMessage?.trim() || null;
+  const workoutTip = buildWorkoutTip(levelContent?.workoutTip, checklist, hasWorkoutToday);
+  const dietTip = buildDietTip(levelContent?.dietTip, mealEntryCountToday, proteinToday, proteinGoal);
+  const simpleHeadline = buildSimpleHeadline(headline, levelContent?.shortBlurb);
 
   if (isEmptyState) {
     return (
@@ -218,7 +345,7 @@ export default function PixelEvolutionCard({
               내 헬스 레벨을 확인해보세요
             </Text>
             <Text style={[styles.emptyStateDescription, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-              준비되면 지금 루틴 기준으로 바로 판정할 수 있어요.
+              설문을 바탕으로 현재 수준과 다음 단계를 간단히 정리해드려요.
             </Text>
             <TouchableOpacity
               activeOpacity={0.85}
@@ -243,131 +370,89 @@ export default function PixelEvolutionCard({
       <View style={[styles.container, { borderBottomColor: colors.border, padding: spacing.lg }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerCopy}>
+            <Text style={[styles.eyebrow, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
+              현재 헬스 레벨
+            </Text>
             <View style={styles.titleRow}>
               <Text style={[styles.levelTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
-                {isLoadingAssignedState
-                  ? '진화 상태 계산 중'
-                  : hasAssignedCharacter
-                  ? `${levelMeta?.nickname ?? levelName}`
-                  : '캐릭터를 설정해보세요'}
+                {levelName ?? levelMeta?.name ?? '헬스 레벨'}
               </Text>
-              {archetypeMeta && hasAssignedCharacter && (
-                <View style={[styles.archetypeBadge, { backgroundColor: colors.accentMuted, borderRadius: radius.full }]}>
-                  <Text style={[styles.archetypeBadgeText, { color: colors.accent, fontFamily: typography.fontFamily }]}>
+              {levelMeta?.nickname && (
+                <View style={[styles.levelBadge, { backgroundColor: colors.accentMuted, borderRadius: radius.full }]}>
+                  <Text style={[styles.levelBadgeText, { color: colors.accent, fontFamily: typography.fontFamily }]}>
+                    {levelMeta.nickname}
+                  </Text>
+                </View>
+              )}
+              {archetypeMeta && (
+                <View style={[styles.levelBadge, { backgroundColor: colors.separator, borderRadius: radius.full }]}>
+                  <Text style={[styles.secondaryBadgeText, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
                     {archetypeMeta.name}
                   </Text>
                 </View>
               )}
             </View>
             <Text style={[styles.headline, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-              {headline ?? levelMeta?.description ?? '운동과 식단 기록에 따라 캐릭터가 성장해요.'}
+              {simpleHeadline}
             </Text>
           </View>
 
-          {hasAssignedCharacter && stateMeta && (
-            <View style={[styles.stateBadge, { backgroundColor: colors.accentMuted, borderRadius: radius.full }]}>
-              <MaterialCommunityIcons name={stateMeta.icon as any} size={14} color={colors.accent} />
-              <Text style={[styles.stateLabel, { color: colors.accent, fontFamily: typography.fontFamily }]}>
-                {stateMeta.label}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <View style={[styles.heroRow, { marginTop: spacing.md }]}>
           <TouchableOpacity
-            activeOpacity={0.9}
+            activeOpacity={0.85}
             onPress={() => {
               if (levelId) setViewerOpen(true);
             }}
-            style={[styles.imageButton, { borderRadius: radius.lg }]}
+            style={[styles.detailButton, { backgroundColor: colors.separator, borderRadius: radius.full }]}
           >
-            <View style={[styles.imageWrap, { backgroundColor: colors.separator, borderRadius: radius.lg }]}>
-              {imageSource ? (
-                <Image source={imageSource} style={styles.image} resizeMode="contain" />
-              ) : (
-                <MaterialCommunityIcons name="human" size={40} color={colors.textTertiary} />
-              )}
-            </View>
-            {hasAssignedCharacter && (
-              <View style={[styles.peekBadge, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: radius.full }]}>
-                <MaterialCommunityIcons name="gesture-swipe-horizontal" size={14} color={colors.textSecondary} />
-                <Text style={[styles.peekBadgeText, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-                  단계 보기
-                </Text>
-              </View>
-            )}
+            <Text style={[styles.detailButtonText, { color: colors.text, fontFamily: typography.fontFamily }]}>
+              현재 단계 보기
+            </Text>
+            <MaterialCommunityIcons name="chevron-right" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
-
-          <View style={styles.progressPanel}>
-            {hasAssignedCharacter ? (
-              <>
-                <Text style={[styles.nextLabel, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-                  {nextLevelName ? `다음 진화: ${nextLevelName}` : '최종 진화 완료'}
-                </Text>
-                <Text style={[styles.percent, { color: colors.text, fontFamily: typography.fontFamily }]}>
-                  {nextLevelName ? formatPercent(progressToNext) : '100%'}
-                </Text>
-
-                <View style={[styles.progressTrack, { backgroundColor: colors.separator, borderRadius: radius.full }]}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { backgroundColor: colors.accent, borderRadius: radius.full, width: nextLevelName ? progressWidth : '100%' },
-                    ]}
-                  />
-                </View>
-
-                <Text style={[styles.progressMessage, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-                  {progressMessage ?? '다음 진화를 위한 기록을 쌓아보세요.'}
-                </Text>
-              </>
-            ) : null}
-            {supportingMessage && (
-              <Text style={[styles.supportingMessage, { color: colors.textTertiary, fontFamily: typography.fontFamily }]}>
-                {supportingMessage}
-              </Text>
-            )}
-            {ctaLabel && onPressCta && (
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={onPressCta}
-                style={[
-                  styles.ctaButton,
-                  {
-                    backgroundColor: colors.accentMuted,
-                    borderColor: colors.border,
-                    borderRadius: radius.full,
-                  },
-                ]}
-              >
-                <Text style={[styles.ctaLabel, { color: colors.accent, fontFamily: typography.fontFamily }]}>
-                  {ctaLabel}
-                </Text>
-                <MaterialCommunityIcons name="chevron-right" size={16} color={colors.accent} />
-              </TouchableOpacity>
-            )}
-          </View>
         </View>
 
-        {hasAssignedCharacter && checklist.length > 0 && (
-          <View style={[styles.checklistWrap, { marginTop: spacing.md }]}>
-            {checklist.map((item) => (
-              <View key={item.id} style={styles.checklistRow}>
-                <MaterialCommunityIcons
-                  name={item.complete ? 'check-circle' : 'circle-outline'}
-                  size={16}
-                  color={item.complete ? colors.success : colors.textTertiary}
-                />
-                <Text style={[styles.checklistLabel, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-                  {item.label}
-                </Text>
-                <Text style={[styles.checklistValue, { color: colors.text, fontFamily: typography.fontFamily }]}>
-                  {item.current}/{item.target}
-                </Text>
-              </View>
-            ))}
+        <View style={[styles.infoGrid, { marginTop: spacing.md }]}>
+          <InfoBlock icon="stairs-up" title={nextLevelName ? `다음 단계: ${nextLevelName}` : '지금 단계 유지'} body={nextStepMessage} />
+          <InfoBlock
+            icon="dumbbell"
+            title="운동 팁"
+            body={workoutTip}
+          />
+          <InfoBlock
+            icon="silverware-fork-knife"
+            title="식단 팁"
+            body={dietTip}
+          />
+        </View>
+
+        {reliabilityNote && (
+          <View style={[styles.noteWrap, { backgroundColor: colors.background, borderColor: colors.border, borderRadius: radius.lg, marginTop: spacing.md }]}>
+            <MaterialCommunityIcons name="information-outline" size={16} color={colors.textSecondary} />
+            <Text style={[styles.noteText, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
+              {reliabilityNote}
+            </Text>
           </View>
+        )}
+
+        {ctaLabel && onPressCta && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={onPressCta}
+            style={[
+              styles.ctaButton,
+              {
+                backgroundColor: colors.accentMuted,
+                borderColor: colors.border,
+                borderRadius: radius.full,
+                marginTop: spacing.md,
+              },
+            ]}
+          >
+            <Text style={[styles.ctaLabel, { color: colors.accent, fontFamily: typography.fontFamily }]}>
+              {ctaLabel}
+            </Text>
+            <MaterialCommunityIcons name="chevron-right" size={16} color={colors.accent} />
+          </TouchableOpacity>
         )}
       </View>
 
@@ -381,84 +466,95 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerRow: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     gap: 12,
   },
   headerCopy: {
     flex: 1,
+  },
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   titleRow: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginTop: 6,
   },
   levelTitle: {
     fontSize: 24,
     fontWeight: '800',
   },
-  archetypeBadge: {
+  levelBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  archetypeBadgeText: {
+  levelBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  secondaryBadgeText: {
     fontSize: 11,
     fontWeight: '700',
   },
   headline: {
     fontSize: 13,
-    lineHeight: 19,
-    marginTop: 6,
+    lineHeight: 20,
+    marginTop: 8,
   },
-  stateBadge: {
+  detailButton: {
     alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  stateLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  heroRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 14,
-  },
-  imageButton: {
-    position: 'relative',
-  },
-  imageWrap: {
-    alignItems: 'center',
-    aspectRatio: 1,
-    justifyContent: 'center',
-    overflow: 'hidden',
-    width: 132,
-  },
-  image: {
-    height: '100%',
-    width: '100%',
-  },
-  peekBadge: {
-    alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    bottom: -8,
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     gap: 4,
-    left: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    position: 'absolute',
+    marginTop: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  peekBadgeText: {
-    fontSize: 11,
+  detailButtonText: {
+    fontSize: 13,
     fontWeight: '700',
   },
-  progressPanel: {
+  infoGrid: {
+    gap: 10,
+  },
+  infoBlock: {
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 14,
+  },
+  infoIconWrap: {
+    alignItems: 'center',
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  infoCopy: {
     flex: 1,
+  },
+  infoTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  infoBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  noteWrap: {
+    alignItems: 'flex-start',
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 8,
+    padding: 12,
+  },
+  noteText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
   },
   emptyStateWrap: {
     alignItems: 'center',
@@ -487,88 +583,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
-  nextLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  percent: {
-    fontSize: 28,
-    fontWeight: '800',
-    marginTop: 6,
-  },
-  progressTrack: {
-    height: 10,
-    marginTop: 10,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  progressFill: {
-    height: '100%',
-  },
-  progressMessage: {
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 10,
-  },
-  supportingMessage: {
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 8,
-  },
   ctaButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
     borderWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    gap: 4,
-    marginTop: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
   },
   ctaLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
-  checklistWrap: {
-    gap: 10,
-  },
-  checklistRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  checklistLabel: {
-    flex: 1,
-    fontSize: 13,
-  },
-  checklistValue: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
   modalBackdrop: {
-    backgroundColor: 'rgba(0,0,0,0.38)',
+    backgroundColor: 'rgba(0,0,0,0.28)',
     flex: 1,
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    minHeight: 480,
+    minHeight: 320,
   },
   modalHandle: {
     alignSelf: 'center',
     borderRadius: 999,
-    height: 5,
+    height: 4,
     marginTop: 10,
-    width: 40,
+    width: 42,
   },
   modalHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
-    marginTop: 14,
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  modalHeaderCopy: {
+    flex: 1,
+    paddingRight: 12,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
   },
   modalSubtitle: {
@@ -583,29 +638,27 @@ const styles = StyleSheet.create({
     width: 34,
   },
   slide: {
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
   slideCard: {
     flex: 1,
-    minHeight: 480,
   },
   slideHeader: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
   },
-  slideNickname: {
-    fontSize: 13,
-    fontWeight: '700',
+  slideTitleWrap: {
+    flex: 1,
   },
   slideLevel: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '800',
-    marginTop: 2,
   },
-  slideVibe: {
-    fontSize: 13,
+  slideNickname: {
+    fontSize: 14,
+    fontWeight: '700',
     marginTop: 4,
   },
   currentBadge: {
@@ -618,21 +671,19 @@ const styles = StyleSheet.create({
   },
   slideImageWrap: {
     alignItems: 'center',
-    aspectRatio: 1,
+    height: 152,
     justifyContent: 'center',
-    marginTop: 18,
-    maxHeight: 240,
+    marginTop: 14,
     overflow: 'hidden',
-    padding: 8,
     width: '100%',
   },
   slideImage: {
-    height: '100%',
-    width: '100%',
+    height: 144,
+    width: '72%',
   },
   slideDescriptionScroll: {
     flex: 1,
-    marginTop: 16,
+    marginTop: 12,
     minHeight: 120,
   },
   slideDescriptionContent: {
@@ -641,5 +692,15 @@ const styles = StyleSheet.create({
   slideDescription: {
     fontSize: 14,
     lineHeight: 22,
+  },
+  slideTipTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 16,
+  },
+  slideTipBody: {
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 6,
   },
 });

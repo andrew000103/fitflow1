@@ -330,9 +330,9 @@ export const usePersonaStore = create<PersonaStoreState>()(
       const hasMealData = mealContext56d.hasAnyEntries;
       const isMealDataReady = mealContext56d.isReady;
       const supportingMessage = !isMealDataReady
-        ? '식단 기록을 아직 다 불러오지 못해 운동 기록 중심으로 진화도를 보여주고 있어요.'
+        ? '식단 기록을 아직 다 불러오지 못해 지금은 운동 기록 중심으로 레벨 안내를 보여드리고 있어요.'
         : !hasMealData
-          ? '식단 기록까지 쌓이면 진화 진행도가 더 빨리 올라가요.'
+          ? '식단 기록까지 쌓이면 레벨 안내가 더 정확해져요.'
           : null;
 
       // Derive pixel variant + archetype from onboarding or quick profile
@@ -381,7 +381,7 @@ export const usePersonaStore = create<PersonaStoreState>()(
         dailyState: null,
         headlineMessage: null,
         progressMessage: null,
-        supportingMessage: '캐릭터 진화 상태를 다시 계산하지 못했어요. 잠시 후 다시 불러올게요.',
+        supportingMessage: '현재 레벨 상태를 다시 계산하지 못했어요. 잠시 후 다시 불러올게요.',
         reliabilityState: 'error',
         lastUpdated: null,
         isCalculating: false,

@@ -14,7 +14,11 @@ import {
   saveAIPlanToSupabase,
 } from '../../lib/ai-planner';
 import type { SurveyLevelId } from '../../lib/ai-level-classifier';
-import { DEFAULT_PIXEL_VARIANT, PIXEL_IMAGE_MAP } from '../../lib/pixel-character-config';
+import {
+  DEFAULT_PIXEL_VARIANT,
+  PIXEL_IMAGE_MAP,
+  PIXEL_VARIANT_META,
+} from '../../lib/pixel-character-config';
 import { useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { useAppTheme } from '../../theme';
@@ -47,6 +51,12 @@ export default function AILevelResultScreen() {
     if (!surveyLevelResult) return null;
     const variant = surveyLevelResult.variantId ?? DEFAULT_PIXEL_VARIANT;
     return PIXEL_IMAGE_MAP[variant][surveyLevelResult.levelId];
+  }, [surveyLevelResult]);
+
+  const variantMeta = useMemo(() => {
+    if (!surveyLevelResult) return null;
+    const variant = surveyLevelResult.variantId ?? DEFAULT_PIXEL_VARIANT;
+    return PIXEL_VARIANT_META[variant];
   }, [surveyLevelResult]);
 
   const handleNavigate = () => {
@@ -157,6 +167,19 @@ export default function AILevelResultScreen() {
           </Text>
         ))}
       </View>
+
+      {variantMeta ? (
+        <View style={styles(colors).variantCard}>
+          <View style={styles(colors).variantHeader}>
+            <MaterialCommunityIcons name="palette-outline" size={18} color={colors.accent} />
+            <Text style={styles(colors).variantTitle}>배정된 캐릭터 성향: {variantMeta.label}</Text>
+          </View>
+          <Text style={styles(colors).variantBody}>{variantMeta.shortReason}</Text>
+          <Text style={styles(colors).variantHint}>
+            {variantMeta.detailReason}
+          </Text>
+        </View>
+      ) : null}
 
       {inlineError ? (
         <View style={styles(colors).errorCard}>
@@ -274,6 +297,37 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       fontSize: 13,
       lineHeight: 20,
       marginBottom: 6,
+    },
+    variantCard: {
+      backgroundColor: colors.card,
+      borderRadius: 18,
+      padding: 16,
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    variantHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 10,
+    },
+    variantTitle: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '700',
+      flex: 1,
+    },
+    variantBody: {
+      color: colors.text,
+      fontSize: 13,
+      lineHeight: 20,
+      marginBottom: 8,
+    },
+    variantHint: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 18,
     },
     errorCard: {
       backgroundColor: colors.card,

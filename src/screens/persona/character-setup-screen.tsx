@@ -173,8 +173,8 @@ export default function CharacterSetupScreen() {
     <AIFlowScreen
       header={
         <AppHeader
-          title="캐릭터 설정"
-          subtitle="Quick Setup"
+          title="빠른 레벨 설정"
+          subtitle="현재 수준 정리"
           rightAction={{
             icon: <MaterialCommunityIcons name="close" size={22} color={colors.textSecondary} />,
             onPress: () => navigation.goBack(),
@@ -184,7 +184,7 @@ export default function CharacterSetupScreen() {
       contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, gap: spacing.xl }}
       footer={
         <AppButton
-          label={quickProfile ? '캐릭터 다시 배정하기' : '내 캐릭터 정하기'}
+          label={quickProfile ? '레벨 다시 정리하기' : '현재 수준 정리하기'}
           loading={saving}
           onPress={handleSubmit}
           disabled={!canSubmit}
@@ -194,10 +194,10 @@ export default function CharacterSetupScreen() {
     >
       <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border, padding: spacing.lg }]}>
         <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800' }}>
-          몇 가지만 답하면{'\n'}픽셀 캐릭터 시작 단계를 정해드릴게요
+          몇 가지만 답하면{'\n'}현재 운동 수준을 빠르게 정리해드릴게요
         </Text>
         <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 10 }}>
-          AI 플랜을 꼭 만들지 않아도 괜찮아요. 지금 운동 경력과 루틴만 빠르게 반영해서 홈 캐릭터를 먼저 배정해드려요.
+          AI 플랜을 꼭 만들지 않아도 괜찮아요. 지금 운동 경력과 루틴을 바탕으로 홈에서 볼 현재 레벨 안내를 먼저 정리해드려요.
         </Text>
       </View>
 

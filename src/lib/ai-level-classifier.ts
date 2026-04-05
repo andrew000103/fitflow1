@@ -63,6 +63,7 @@ const POWER_GYM_TYPES = new Set<GymType>(['full_gym', 'garage_gym']);
 
 /**
  * 성별 + 목표 + 운동 환경 기반으로 픽셀 캐릭터 변형을 배정합니다.
+ * power 성향은 성장 목표가 있으면서 장비를 활용하는 환경일 때만 열립니다.
  */
 export function assignPixelVariant(
   gender: AIGender,
@@ -72,7 +73,7 @@ export function assignPixelVariant(
   const isPower = POWER_GOALS.has(goal) && POWER_GYM_TYPES.has(gymType);
   const binaryGender = toBinaryGender(gender);
   if (binaryGender === 'male') return isPower ? 'male-black' : 'male-lightblue';
-  return isPower ? 'female-white' : 'female-pink';
+  return isPower ? 'female-pink' : 'female-white';
 }
 
 /**
