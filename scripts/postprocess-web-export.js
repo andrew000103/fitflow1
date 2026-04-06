@@ -20,6 +20,7 @@ const sourceFontDir = path.join(
   'Fonts'
 );
 const targetFontDir = path.join(distDir, 'assets', 'expo-vector-icons', 'Fonts');
+const redirectsFilePath = path.join(distDir, '_redirects');
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
@@ -53,6 +54,13 @@ function rewriteWebBundles() {
   }
 }
 
+function writeSpaRedirects() {
+  if (!fs.existsSync(distDir)) return;
+
+  const redirectsContent = '/* /index.html 200\n';
+  fs.writeFileSync(redirectsFilePath, redirectsContent);
+}
+
 copyFonts();
 rewriteWebBundles();
-
+writeSpaRedirects();
