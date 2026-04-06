@@ -1,4 +1,4 @@
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useRef, useState } from 'react';
 import { AIFlowScreen } from '../../components/ai/AIFlowScreen';
@@ -362,7 +362,7 @@ export default function AIOnboardingScreen() {
   const { colors } = useAppTheme();
   const { width, height } = useWindowDimensions();
   const navigation = useNavigation<NavProp>();
-  const route = useRoute();
+  const route = useRoute<RouteProp<RootStackParamList, 'AIOnboarding'>>();
   const user = useAuthStore((s) => s.user);
   const { setOnboardingData, setSurveyLevelResult } =
     useAIPlanStore();
@@ -371,6 +371,8 @@ export default function AIOnboardingScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const strengthCardOffsets = useRef<Record<string, number>>({});
 
+  const onboardingEntry = route.params?.entry ?? 'direct';
+  const isSharedEntry = onboardingEntry === 'shared';
   const [step, setStep] = useState(0);
   const [strengthInputs, setStrengthInputs] = useState<Record<string, string>>({});
   const [rmCalcTarget, setRmCalcTarget] = useState<string | null>(null);
@@ -396,7 +398,7 @@ export default function AIOnboardingScreen() {
   }, []);
 
   useEffect(() => {
-    const params = route.params as RootStackParamList['AIOnboarding'] | undefined;
+    const params = route.params;
     if (!params?.resetAt) return;
     resetSurveyState();
   }, [resetSurveyState, route.params]);
@@ -513,6 +515,10 @@ export default function AIOnboardingScreen() {
       setStep((s) => s - 1);
       return;
     }
+    if (isSharedEntry) {
+      navigation.popToTop();
+      return;
+    }
     navigation.goBack();
   };
 
@@ -580,13 +586,13 @@ export default function AIOnboardingScreen() {
     setOnboardingData(data);
 
     // 온보딩 데이터 Supabase 저장 (비동기, 결과 무시)
-    if (user?.id) {
+    if (user?.id && !user.isAnonymous) {
       saveOnboardingDataToSupabase(user.id, data).catch(() => {});
     }
 
     const levelResult = classifySurveyLevel(data);
     setSurveyLevelResult(levelResult);
-    navigation.replace('AILevelResult');
+    navigation.replace('AILevelResult', { entry: onboardingEntry });
   };
 
   const s = styles(colors, {
@@ -633,9 +639,13 @@ export default function AIOnboardingScreen() {
           </TouchableOpacity>
         }
       >
-        <Text style={s.questionText}>기본 정보를 알려주세요</Text>
+        <Text style={s.questionText}>
+          {isSharedEntry ? '친구가 공유한 레벨 테스트예요' : '기본 정보를 알려주세요'}
+        </Text>
         <Text style={s.helperText}>
-          레벨 판정과 추천 정확도를 높이기 위해 먼저 필요한 정보예요.
+          {isSharedEntry
+            ? '간단한 설문으로 내 운동 레벨을 확인해볼 수 있어요. 답변은 몇 분 안에 끝나요.'
+            : '레벨 판정과 추천 정확도를 높이기 위해 먼저 필요한 정보예요.'}
         </Text>
         <View style={s.genderRow}>
           {[

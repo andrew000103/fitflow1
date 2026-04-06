@@ -2,6 +2,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Button, Text, TextInput } from 'react-native-paper';
+import { useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { AuthStackParamList } from '../../types/navigation';
 
@@ -14,6 +15,8 @@ export default function LoginScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const { signIn, signInAnonymously, loading } = useAuthStore();
+  const pendingPostSignupIntent = useAIPlanStore((s) => s.pendingPostSignupIntent);
+  const pendingPostSignupEmail = useAIPlanStore((s) => s.pendingPostSignupEmail);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -35,6 +38,13 @@ export default function LoginScreen({ navigation }: Props) {
       <View style={styles.inner}>
         <Text variant="headlineMedium" style={styles.title}>FitLog</Text>
         <Text variant="bodyMedium" style={styles.subtitle}>운동과 식단을 한 곳에서</Text>
+        {pendingPostSignupIntent ? (
+          <Text style={styles.resumeHint}>
+            {pendingPostSignupIntent === 'plan'
+              ? `로그인하면${pendingPostSignupEmail ? ` ${pendingPostSignupEmail}` : ''} 계정으로 방금 설문한 결과 기반 AI 플랜 받기를 이어서 진행할 수 있어요.`
+              : `로그인하면${pendingPostSignupEmail ? ` ${pendingPostSignupEmail}` : ''} 계정으로 방금 설문한 결과 화면으로 다시 이어갈 수 있어요.`}
+          </Text>
+        ) : null}
 
         <TextInput
           label="이메일"
@@ -117,7 +127,13 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     color: '#666',
-    marginBottom: 40,
+    marginBottom: 12,
+  },
+  resumeHint: {
+    textAlign: 'center',
+    color: '#666',
+    marginBottom: 28,
+    lineHeight: 20,
   },
   input: {
     marginBottom: 12,

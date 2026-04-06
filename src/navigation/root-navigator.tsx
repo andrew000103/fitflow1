@@ -1,7 +1,8 @@
 import { NavigationContainer } from '@react-navigation/native';
-import React, { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Linking, View } from 'react-native';
 import { loadTodayEntries } from '../lib/diet-supabase';
+import { parseSharedEntryUrl, SharedEntryTarget } from '../lib/shared-entry';
 import { supabase } from '../lib/supabase';
 import { useAIPlanStore } from '../stores/ai-plan-store';
 import { useAuthStore } from '../stores/auth-store';
@@ -10,7 +11,7 @@ import AuthNavigator from './auth-navigator';
 import MainNavigator from './main-navigator';
 
 export default function RootNavigator() {
-  const { user, initialized, initialize } = useAuthStore();
+  const { user, initialized, initialize, signInAnonymously } = useAuthStore();
   const setDietCurrentUser = useDietStore((state) => state.setCurrentUser);
   const hydrateFromSupabase = useDietStore((state) => state.hydrateFromSupabase);
   const {
@@ -22,28 +23,72 @@ export default function RootNavigator() {
     setCurrentPlan,
     setOnboardingData,
   } = useAIPlanStore();
+  const [pendingSharedEntry, setPendingSharedEntry] = useState<SharedEntryTarget | null>(null);
+  const [processingSharedEntry, setProcessingSharedEntry] = useState(false);
+  const initialUrlHandledRef = useRef(false);
+  const isAnonymousUser = Boolean(user?.isAnonymous);
 
   useEffect(() => {
     initialize();
   }, []);
 
   useEffect(() => {
-    setDietCurrentUser(user?.id ?? null);
-  }, [setDietCurrentUser, user?.id]);
+    let mounted = true;
+
+    const handleIncomingUrl = async (url: string | null | undefined) => {
+      const sharedTarget = parseSharedEntryUrl(url);
+      if (!sharedTarget || !mounted) return;
+
+      setPendingSharedEntry(sharedTarget);
+
+      if (user) {
+        return;
+      }
+
+      setProcessingSharedEntry(true);
+      try {
+        await signInAnonymously();
+      } catch {
+        setPendingSharedEntry(null);
+      } finally {
+        if (mounted) {
+          setProcessingSharedEntry(false);
+        }
+      }
+    };
+
+    if (!initialUrlHandledRef.current) {
+      initialUrlHandledRef.current = true;
+      Linking.getInitialURL().then(handleIncomingUrl).catch(() => {});
+    }
+
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleIncomingUrl(url).catch(() => {});
+    });
+
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, [signInAnonymously, user]);
+
+  useEffect(() => {
+    setDietCurrentUser(user?.id && !isAnonymousUser ? user.id : null);
+  }, [setDietCurrentUser, isAnonymousUser, user?.id]);
 
   // 앱 시작 시 오늘 식단 Supabase → diet-store 복원
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || isAnonymousUser) return;
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     loadTodayEntries(user.id, today)
       .then((entries) => { hydrateFromSupabase(today, entries); })
       .catch(() => {});
-  }, [user?.id, hydrateFromSupabase]);
+  }, [user?.id, hydrateFromSupabase, isAnonymousUser]);
 
   // 앱 재시작 시 Supabase에서 활성 플랜 로드 (로컬 플랜 없을 때만)
   useEffect(() => {
-    if (!user?.id || currentPlan) return;
+    if (!user?.id || currentPlan || isAnonymousUser) return;
     const loadPlan = async () => {
       try {
         const { data } = await supabase
@@ -63,10 +108,10 @@ export default function RootNavigator() {
       }
     };
     loadPlan();
-  }, [onboardingData, setCurrentPlan, setOnboardingData, user?.id, currentPlan]);
+  }, [onboardingData, setCurrentPlan, setOnboardingData, user?.id, currentPlan, isAnonymousUser]);
 
   useEffect(() => {
-    if (!user?.id || onboardingData) return;
+    if (!user?.id || onboardingData || isAnonymousUser) return;
 
     const loadOnboardingData = async () => {
       try {
@@ -97,12 +142,12 @@ export default function RootNavigator() {
     };
 
     loadOnboardingData();
-  }, [onboardingData, setOnboardingData, user?.id]);
+  }, [onboardingData, setOnboardingData, user?.id, isAnonymousUser]);
 
   // AI 온보딩 체크: 로그인 후 최초 1회, 로컬 온보딩 완료 전에만
   // 기존 플랜이 있는 사용자는 온보딩 스킵 (재설정 시에만 다시 진행)
   useEffect(() => {
-    if (!user?.id || hasCompletedOnboarding) return;
+    if (!user?.id || hasCompletedOnboarding || isAnonymousUser) return;
 
     const checkConsent = async () => {
       try {
@@ -136,9 +181,9 @@ export default function RootNavigator() {
       }
     };
     checkConsent();
-  }, [user?.id, hasCompletedOnboarding, setNeedsOnboarding, markOnboardingComplete]);
+  }, [user?.id, hasCompletedOnboarding, setNeedsOnboarding, markOnboardingComplete, isAnonymousUser]);
 
-  if (!initialized) {
+  if (!initialized || processingSharedEntry) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" />
@@ -148,7 +193,14 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer>
-      {user ? <MainNavigator /> : <AuthNavigator />}
+      {user ? (
+        <MainNavigator
+          pendingSharedEntry={pendingSharedEntry === 'level-test'}
+          onSharedEntryHandled={() => setPendingSharedEntry(null)}
+        />
+      ) : (
+        <AuthNavigator />
+      )}
     </NavigationContainer>
   );
 }

@@ -10,14 +10,15 @@ interface AuthStore {
   initialized: boolean;
   initialize: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<{ mode: 'anonymous_upgrade' | 'standard_signup' }>;
   signInAnonymously: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
-const toAuthUser = (user: { id: string; email?: string | null }): AuthUser => ({
+const toAuthUser = (user: { id: string; email?: string | null; is_anonymous?: boolean }): AuthUser => ({
   id: user.id,
   email: user.email ?? null,
+  isAnonymous: user.is_anonymous ?? false,
 });
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -61,8 +62,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   signUp: async (email, password) => {
     set({ loading: true });
     try {
+      if (get().user?.isAnonymous) {
+        const { error } = await supabase.auth.updateUser({ email, password });
+        if (error) throw error;
+        return { mode: 'anonymous_upgrade' as const };
+      }
+
       const { error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
+      return { mode: 'standard_signup' as const };
     } finally {
       set({ loading: false });
     }

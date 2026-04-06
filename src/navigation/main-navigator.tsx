@@ -9,10 +9,12 @@ import AIConsentScreen from '../screens/ai/ai-consent-screen';
 import AIExerciseSearchScreen from '../screens/ai/ai-exercise-search-screen';
 import AILevelResultScreen from '../screens/ai/ai-level-result-screen';
 import AIOnboardingScreen from '../screens/ai/ai-onboarding-screen';
+import SignupScreen from '../screens/auth/signup-screen';
 import HomeScreen from '../screens/home/home-screen';
 import CharacterSetupScreen from '../screens/persona/character-setup-screen';
 import ProfileScreen from '../screens/profile/profile-screen';
 import { useAIPlanStore } from '../stores/ai-plan-store';
+import { useAuthStore } from '../stores/auth-store';
 import { useAppTheme } from '../theme';
 import { MainTabParamList, RootStackParamList } from '../types/navigation';
 import DietNavigator from './diet-navigator';
@@ -88,10 +90,86 @@ function AIOnboardingTrigger() {
   return null;
 }
 
+function PostSignupResumeTrigger() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const user = useAuthStore((s) => s.user);
+  const onboardingData = useAIPlanStore((s) => s.onboardingData);
+  const surveyLevelResult = useAIPlanStore((s) => s.surveyLevelResult);
+  const pendingPostSignupIntent = useAIPlanStore((s) => s.pendingPostSignupIntent);
+  const pendingPostSignupEmail = useAIPlanStore((s) => s.pendingPostSignupEmail);
+  const setPendingPostSignupIntent = useAIPlanStore((s) => s.setPendingPostSignupIntent);
+  const setPendingPostSignupEmail = useAIPlanStore((s) => s.setPendingPostSignupEmail);
+
+  useEffect(() => {
+    if (!user || user.isAnonymous || !pendingPostSignupIntent || !onboardingData || !surveyLevelResult) {
+      return;
+    }
+
+    if (pendingPostSignupEmail && user.email && user.email !== pendingPostSignupEmail) {
+      setPendingPostSignupIntent(null);
+      setPendingPostSignupEmail(null);
+      return;
+    }
+
+    const t = setTimeout(() => {
+      navigation.navigate('AILevelResult', {
+        entry: 'shared',
+        autoCreatePlan: pendingPostSignupIntent === 'plan',
+      });
+      setPendingPostSignupIntent(null);
+      setPendingPostSignupEmail(null);
+    }, 100);
+
+    return () => clearTimeout(t);
+  }, [
+    navigation,
+    onboardingData,
+    pendingPostSignupEmail,
+    pendingPostSignupIntent,
+    setPendingPostSignupEmail,
+    setPendingPostSignupIntent,
+    surveyLevelResult,
+    user,
+  ]);
+
+  return null;
+}
+
 // ─── 루트 스택 (탭 + AI 모달 화면) ────────────────────────────────────────────
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
-export default function MainNavigator() {
+type MainNavigatorProps = {
+  pendingSharedEntry?: boolean;
+  onSharedEntryHandled?: () => void;
+};
+
+function SharedEntryTrigger({
+  pendingSharedEntry = false,
+  onSharedEntryHandled,
+}: MainNavigatorProps) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  useEffect(() => {
+    if (!pendingSharedEntry) return;
+
+    const t = setTimeout(() => {
+      navigation.navigate('AIOnboarding', {
+        entry: 'shared',
+        resetAt: Date.now(),
+      });
+      onSharedEntryHandled?.();
+    }, 100);
+
+    return () => clearTimeout(t);
+  }, [navigation, onSharedEntryHandled, pendingSharedEntry]);
+
+  return null;
+}
+
+export default function MainNavigator({
+  pendingSharedEntry = false,
+  onSharedEntryHandled,
+}: MainNavigatorProps) {
   return (
     <RootStack.Navigator screenOptions={{ headerShown: false }}>
       <RootStack.Screen name="Main">
@@ -99,6 +177,11 @@ export default function MainNavigator() {
           <>
             <TabNavigator />
             <AIOnboardingTrigger />
+            <PostSignupResumeTrigger />
+            <SharedEntryTrigger
+              pendingSharedEntry={pendingSharedEntry}
+              onSharedEntryHandled={onSharedEntryHandled}
+            />
           </>
         )}
       </RootStack.Screen>
@@ -106,6 +189,11 @@ export default function MainNavigator() {
         name="CharacterSetup"
         component={CharacterSetupScreen}
         options={{ presentation: 'modal' }}
+      />
+      <RootStack.Screen
+        name="Signup"
+        component={SignupScreen}
+        options={{ presentation: 'modal', title: '회원가입', headerShown: true }}
       />
       <RootStack.Screen
         name="AIConsent"

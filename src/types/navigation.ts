@@ -1,6 +1,11 @@
+export type SignupRouteParams = {
+  source?: 'default' | 'ai-level-result';
+  intent?: 'plan' | 'signup_only';
+};
+
 export type AuthStackParamList = {
   Login: undefined;
-  Signup: undefined;
+  Signup: SignupRouteParams | undefined;
 };
 
 export type MainTabParamList = {
@@ -70,8 +75,8 @@ export type ProfileStackParamList = {
 
 export type AIModalParamList = {
   AIConsent: undefined;
-  AIOnboarding: { resetAt?: number } | undefined;
-  AILevelResult: undefined;
+  AIOnboarding: { resetAt?: number; entry?: 'direct' | 'shared' } | undefined;
+  AILevelResult: { entry?: 'direct' | 'shared'; autoCreatePlan?: boolean } | undefined;
   AIPlanResult: { planId?: string };
   AIPlanWeekly: { weekStart: string };
 };
@@ -79,9 +84,10 @@ export type AIModalParamList = {
 export type RootStackParamList = {
   Main: undefined;
   CharacterSetup: undefined;
+  Signup: SignupRouteParams | undefined;
   AIConsent: undefined;
-  AIOnboarding: { resetAt?: number } | undefined;
-  AILevelResult: undefined;
+  AIOnboarding: { resetAt?: number; entry?: 'direct' | 'shared' } | undefined;
+  AILevelResult: { entry?: 'direct' | 'shared'; autoCreatePlan?: boolean } | undefined;
   AIPlanResult: { planId?: string };
   AIPlanWeekly: { weekStart: string };
   AIExerciseSearch: {

@@ -233,6 +233,8 @@ function normalizeAIPlan(plan: AIPlan | LegacyAIPlan | null): AIPlan | null {
 interface AIPlanState {
   onboardingData: OnboardingData | null;
   surveyLevelResult: SurveyLevelResult | null;
+  pendingPostSignupIntent: 'plan' | 'signup_only' | null;
+  pendingPostSignupEmail: string | null;
   currentPlan: AIPlan | null;
   previousPlan: AIPlan | null;
   isGenerating: boolean;
@@ -243,6 +245,8 @@ interface AIPlanState {
 
   setOnboardingData: (data: OnboardingData) => void;
   setSurveyLevelResult: (result: SurveyLevelResult | null) => void;
+  setPendingPostSignupIntent: (intent: 'plan' | 'signup_only' | null) => void;
+  setPendingPostSignupEmail: (email: string | null) => void;
   setCurrentPlan: (plan: AIPlan) => void;
   updateWeekStart: (weekStart: string) => void;
   markCurrentPlanApplied: (appliedSections?: string[]) => void;
@@ -263,6 +267,8 @@ export const useAIPlanStore = create<AIPlanState>()(
     (set, get) => ({
       onboardingData: null,
       surveyLevelResult: null,
+      pendingPostSignupIntent: null,
+      pendingPostSignupEmail: null,
       currentPlan: null,
       previousPlan: null,
       isGenerating: false,
@@ -282,6 +288,10 @@ export const useAIPlanStore = create<AIPlanState>()(
         }),
 
       setSurveyLevelResult: (result) => set({ surveyLevelResult: result }),
+
+      setPendingPostSignupIntent: (intent) => set({ pendingPostSignupIntent: intent }),
+
+      setPendingPostSignupEmail: (email) => set({ pendingPostSignupEmail: email }),
 
       setCurrentPlan: (plan) =>
         set((state) => ({
@@ -344,16 +354,24 @@ export const useAIPlanStore = create<AIPlanState>()(
         })),
 
       reset: () =>
-        set({
-          onboardingData: null,
-          surveyLevelResult: null,
-          currentPlan: null,
-          previousPlan: null,
-          isGenerating: false,
-          isAdjusting: false,
-          error: null,
-          hasCompletedOnboarding: false,
-          needsOnboarding: false,
+        set((state) => {
+          const shouldPreserveResumeContext = Boolean(
+            state.pendingPostSignupIntent && state.onboardingData && state.surveyLevelResult
+          );
+
+          return {
+            onboardingData: shouldPreserveResumeContext ? state.onboardingData : null,
+            surveyLevelResult: shouldPreserveResumeContext ? state.surveyLevelResult : null,
+            pendingPostSignupIntent: shouldPreserveResumeContext ? state.pendingPostSignupIntent : null,
+            pendingPostSignupEmail: shouldPreserveResumeContext ? state.pendingPostSignupEmail : null,
+            currentPlan: null,
+            previousPlan: null,
+            isGenerating: false,
+            isAdjusting: false,
+            error: null,
+            hasCompletedOnboarding: shouldPreserveResumeContext,
+            needsOnboarding: false,
+          };
         }),
 
       applyRuleBasedAdjustment: async (userId: string) => {
@@ -507,6 +525,8 @@ export const useAIPlanStore = create<AIPlanState>()(
           ...state,
           onboardingData: normalizeOnboardingData(state.onboardingData),
           surveyLevelResult: state.surveyLevelResult ?? null,
+          pendingPostSignupIntent: state.pendingPostSignupIntent ?? null,
+          pendingPostSignupEmail: state.pendingPostSignupEmail ?? null,
           currentPlan: normalizeAIPlan(state.currentPlan as AIPlan | LegacyAIPlan | null),
           previousPlan: normalizeAIPlan(state.previousPlan as AIPlan | LegacyAIPlan | null),
         } as AIPlanState;

@@ -1,8 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Image, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
 import { AILoadingScreen } from '../../components/ai/AILoadingScreen';
@@ -13,6 +13,7 @@ import {
   generateAIPlan,
   saveAIPlanToSupabase,
 } from '../../lib/ai-planner';
+import { getSharedLevelTestUrl } from '../../lib/shared-entry';
 import type { SurveyLevelId } from '../../lib/ai-level-classifier';
 import {
   DEFAULT_PIXEL_VARIANT,
@@ -29,9 +30,13 @@ type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function AILevelResultScreen() {
   const navigation = useNavigation<NavProp>();
+  const route = useRoute<RouteProp<RootStackParamList, 'AILevelResult'>>();
   const { colors } = useAppTheme();
   const user = useAuthStore((s) => s.user);
+  const isSharedEntry = route.params?.entry === 'shared';
+  const isAnonymousUser = Boolean(user?.isAnonymous);
   const onboardingData = useAIPlanStore((s) => s.onboardingData);
+  const setPendingPostSignupIntent = useAIPlanStore((s) => s.setPendingPostSignupIntent);
   const surveyLevelResult = useAIPlanStore((s) => s.surveyLevelResult);
   const setCurrentPlan = useAIPlanStore((s) => s.setCurrentPlan);
   const setGenerating = useAIPlanStore((s) => s.setGenerating);
@@ -40,6 +45,7 @@ export default function AILevelResultScreen() {
   const [generating, setLocalGenerating] = useState(false);
   const [planReady, setPlanReady] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
+  const autoCreateHandledRef = useRef(false);
 
   useEffect(() => {
     if (!onboardingData || !surveyLevelResult) {
@@ -61,6 +67,36 @@ export default function AILevelResultScreen() {
 
   const handleNavigate = () => {
     navigation.replace('AIPlanResult', {});
+  };
+
+  const handleShare = async () => {
+    try {
+      const shareUrl = getSharedLevelTestUrl();
+      if (!shareUrl) {
+        Alert.alert(
+          '공유 링크 설정 필요',
+          '운영 웹 주소를 먼저 설정해야 친구에게 열리는 링크를 공유할 수 있어요. EXPO_PUBLIC_WEB_URL을 설정한 뒤 다시 시도해주세요.',
+          [{ text: '확인' }]
+        );
+        return;
+      }
+      await Share.share({
+        title: '헬스 레벨 테스트 공유',
+        message: `내 헬스 레벨 테스트 해봤는데 너도 해봐. ${shareUrl}`,
+        url: shareUrl,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '공유를 열지 못했습니다.';
+      Alert.alert('공유 실패', msg, [{ text: '확인' }]);
+    }
+  };
+
+  const handleSignupPrompt = (intent: 'plan' | 'signup_only') => {
+    setPendingPostSignupIntent(intent);
+    navigation.navigate('Signup', {
+      source: 'ai-level-result',
+      intent,
+    });
   };
 
   const handleCreatePlan = async () => {
@@ -99,6 +135,14 @@ export default function AILevelResultScreen() {
     }
   };
 
+  useEffect(() => {
+    if (autoCreateHandledRef.current) return;
+    if (!route.params?.autoCreatePlan || isAnonymousUser || !onboardingData) return;
+
+    autoCreateHandledRef.current = true;
+    handleCreatePlan();
+  }, [isAnonymousUser, onboardingData, route.params?.autoCreatePlan]);
+
   if (generating) {
     return (
       <AIFlowScreen scroll={false}>
@@ -121,12 +165,43 @@ export default function AILevelResultScreen() {
       contentContainerStyle={styles(colors).content}
       footer={
         <>
-          <TouchableOpacity style={styles(colors).primaryBtn} onPress={handleCreatePlan} activeOpacity={0.85}>
-            <Text style={styles(colors).primaryBtnText}>이 정보로 AI 플랜 만들기</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles(colors).secondaryBtn} onPress={() => navigation.popToTop()} activeOpacity={0.8}>
-            <Text style={styles(colors).secondaryBtnText}>일단 여기까지 볼게요</Text>
-          </TouchableOpacity>
+          {isAnonymousUser ? (
+            <>
+              <TouchableOpacity
+                style={styles(colors).primaryBtn}
+                onPress={() => handleSignupPrompt('plan')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles(colors).primaryBtnText}>회원가입하고 AI 플랜 받기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles(colors).secondaryBtn}
+                onPress={handleShare}
+                activeOpacity={0.8}
+              >
+                <Text style={styles(colors).secondaryBtnText}>친구에게 공유하기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles(colors).tertiaryBtn}
+                onPress={() => handleSignupPrompt('signup_only')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles(colors).tertiaryBtnText}>그냥 회원가입만 하기</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity style={styles(colors).primaryBtn} onPress={handleCreatePlan} activeOpacity={0.85}>
+                <Text style={styles(colors).primaryBtnText}>이 정보로 AI 플랜 만들기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles(colors).secondaryBtn} onPress={handleShare} activeOpacity={0.8}>
+                <Text style={styles(colors).secondaryBtnText}>친구에게 공유하기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles(colors).tertiaryBtn} onPress={() => navigation.popToTop()} activeOpacity={0.8}>
+                <Text style={styles(colors).tertiaryBtnText}>일단 여기까지 볼게요</Text>
+              </TouchableOpacity>
+            </>
+          )}
           <TouchableOpacity
             style={styles(colors).retryTestBtn}
             onPress={() => navigation.replace('AIOnboarding', { resetAt: Date.now() })}
@@ -138,7 +213,9 @@ export default function AILevelResultScreen() {
       }
     >
       <View style={styles(colors).badge}>
-        <Text style={styles(colors).badgeText}>헬스 레벨 판정</Text>
+        <Text style={styles(colors).badgeText}>
+          {isSharedEntry ? '공유로 시작한 헬스 레벨 판정' : '헬스 레벨 판정'}
+        </Text>
       </View>
 
       {imageSource ? (
@@ -193,10 +270,32 @@ export default function AILevelResultScreen() {
         </View>
       ) : null}
 
+      {isAnonymousUser ? (
+        <View style={styles(colors).signupBenefitCard}>
+          <View style={styles(colors).signupBenefitHeader}>
+            <MaterialCommunityIcons name="account-plus-outline" size={18} color={colors.accent} />
+            <Text style={styles(colors).signupBenefitTitle}>회원가입하면 바로 이어서 할 수 있어요</Text>
+          </View>
+          <Text style={styles(colors).signupBenefitText}>
+            • 방금 입력한 설문 결과를 기준으로 맞춤 AI 플랜 받기
+          </Text>
+          <Text style={styles(colors).signupBenefitText}>
+            • 나중에 다시 돌아와 결과와 플랜 이어서 보기
+          </Text>
+          <Text style={styles(colors).signupBenefitHint}>
+            설문은 이미 끝났어요. 계정만 만들면 다음 단계로 바로 이어집니다.
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles(colors).ctaCard}>
-        <Text style={styles(colors).ctaTitle}>원하시면 여기서 끝내도 괜찮아요.</Text>
+        <Text style={styles(colors).ctaTitle}>
+          {isAnonymousUser ? '계정을 만들면 여기서 바로 다음 단계로 갈 수 있어요.' : '원하시면 여기서 끝내도 괜찮아요.'}
+        </Text>
         <Text style={styles(colors).ctaBody}>
-          입력하신 내용을 바탕으로 운동과 식단까지 엮은 맞춤 AI 플랜을 이어서 만들어드릴 수 있어요.
+          {isAnonymousUser
+            ? '회원가입 후 로그인하면 지금 확인한 레벨 결과를 바탕으로 운동과 식단까지 엮은 맞춤 AI 플랜을 이어서 받을 수 있어요.'
+            : '입력하신 내용을 바탕으로 운동과 식단까지 엮은 맞춤 AI 플랜을 이어서 만들어드릴 수 있어요.'}
         </Text>
       </View>
     </AIFlowScreen>
@@ -354,6 +453,38 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       fontSize: 12,
       lineHeight: 18,
     },
+    signupBenefitCard: {
+      backgroundColor: colors.card,
+      borderRadius: 18,
+      padding: 16,
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: colors.accentMuted,
+    },
+    signupBenefitHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 10,
+    },
+    signupBenefitTitle: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '700',
+      flex: 1,
+    },
+    signupBenefitText: {
+      color: colors.text,
+      fontSize: 13,
+      lineHeight: 20,
+      marginBottom: 6,
+    },
+    signupBenefitHint: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: 4,
+    },
     ctaCard: {
       backgroundColor: colors.accentMuted,
       borderRadius: 18,
@@ -387,6 +518,15 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       paddingVertical: 12,
     },
     secondaryBtnText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    tertiaryBtn: {
+      alignItems: 'center',
+      paddingVertical: 10,
+    },
+    tertiaryBtnText: {
       color: colors.textSecondary,
       fontSize: 14,
       fontWeight: '500',
