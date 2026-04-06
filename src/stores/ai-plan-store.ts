@@ -235,6 +235,8 @@ interface AIPlanState {
   surveyLevelResult: SurveyLevelResult | null;
   pendingPostSignupIntent: 'plan' | 'signup_only' | null;
   pendingPostSignupEmail: string | null;
+  pendingResumeOnboardingData: OnboardingData | null;
+  pendingResumeSurveyLevelResult: SurveyLevelResult | null;
   currentPlan: AIPlan | null;
   previousPlan: AIPlan | null;
   isGenerating: boolean;
@@ -247,6 +249,9 @@ interface AIPlanState {
   setSurveyLevelResult: (result: SurveyLevelResult | null) => void;
   setPendingPostSignupIntent: (intent: 'plan' | 'signup_only' | null) => void;
   setPendingPostSignupEmail: (email: string | null) => void;
+  stashPendingResumeContext: (data: OnboardingData, result: SurveyLevelResult) => void;
+  applyPendingResumeContext: () => void;
+  clearPendingResumeContext: () => void;
   setCurrentPlan: (plan: AIPlan) => void;
   updateWeekStart: (weekStart: string) => void;
   markCurrentPlanApplied: (appliedSections?: string[]) => void;
@@ -269,6 +274,8 @@ export const useAIPlanStore = create<AIPlanState>()(
       surveyLevelResult: null,
       pendingPostSignupIntent: null,
       pendingPostSignupEmail: null,
+      pendingResumeOnboardingData: null,
+      pendingResumeSurveyLevelResult: null,
       currentPlan: null,
       previousPlan: null,
       isGenerating: false,
@@ -292,6 +299,27 @@ export const useAIPlanStore = create<AIPlanState>()(
       setPendingPostSignupIntent: (intent) => set({ pendingPostSignupIntent: intent }),
 
       setPendingPostSignupEmail: (email) => set({ pendingPostSignupEmail: email }),
+
+      stashPendingResumeContext: (data, result) =>
+        set({
+          pendingResumeOnboardingData: normalizeOnboardingData(data),
+          pendingResumeSurveyLevelResult: result,
+        }),
+
+      applyPendingResumeContext: () =>
+        set((state) => ({
+          onboardingData: state.pendingResumeOnboardingData ?? state.onboardingData,
+          surveyLevelResult: state.pendingResumeSurveyLevelResult ?? state.surveyLevelResult,
+          hasCompletedOnboarding: Boolean(
+            state.pendingResumeOnboardingData ?? state.onboardingData ?? state.hasCompletedOnboarding
+          ),
+        })),
+
+      clearPendingResumeContext: () =>
+        set({
+          pendingResumeOnboardingData: null,
+          pendingResumeSurveyLevelResult: null,
+        }),
 
       setCurrentPlan: (plan) =>
         set((state) => ({
@@ -364,6 +392,12 @@ export const useAIPlanStore = create<AIPlanState>()(
             surveyLevelResult: shouldPreserveResumeContext ? state.surveyLevelResult : null,
             pendingPostSignupIntent: shouldPreserveResumeContext ? state.pendingPostSignupIntent : null,
             pendingPostSignupEmail: shouldPreserveResumeContext ? state.pendingPostSignupEmail : null,
+            pendingResumeOnboardingData: shouldPreserveResumeContext
+              ? state.pendingResumeOnboardingData ?? state.onboardingData
+              : null,
+            pendingResumeSurveyLevelResult: shouldPreserveResumeContext
+              ? state.pendingResumeSurveyLevelResult ?? state.surveyLevelResult
+              : null,
             currentPlan: null,
             previousPlan: null,
             isGenerating: false,
@@ -527,6 +561,8 @@ export const useAIPlanStore = create<AIPlanState>()(
           surveyLevelResult: state.surveyLevelResult ?? null,
           pendingPostSignupIntent: state.pendingPostSignupIntent ?? null,
           pendingPostSignupEmail: state.pendingPostSignupEmail ?? null,
+          pendingResumeOnboardingData: normalizeOnboardingData(state.pendingResumeOnboardingData),
+          pendingResumeSurveyLevelResult: state.pendingResumeSurveyLevelResult ?? null,
           currentPlan: normalizeAIPlan(state.currentPlan as AIPlan | LegacyAIPlan | null),
           previousPlan: normalizeAIPlan(state.previousPlan as AIPlan | LegacyAIPlan | null),
         } as AIPlanState;

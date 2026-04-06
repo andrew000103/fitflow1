@@ -170,9 +170,9 @@ const LEVELS: LevelMeta[] = [
   },
   {
     id: 'veteran',
-    name: '고인물',
-    vibe: '운동 냄새만 맡아도 몸이 반응하는 픽셀',
-    description: '몇 년째 같은 자리, 같은 시간, 같은 기구. 근데 이 픽셀의 몸은 매년 달라지고 있어요. 변화 없어 보이는 루틴 안에서 조금씩, 꾸준히, 묵묵히 쌓아온 것들이 있거든요. 헬스장 직원보다 이 공간을 더 잘 아는 존재. 전설은 갑자기 나타나는 게 아니라 이렇게 만들어집니다.',
+    name: '프로',
+    vibe: '운동 감각과 수행 밀도가 확실히 올라온 단계',
+    description: '기본 수행 능력뿐 아니라 훈련 밀도도 높게 유지할 수 있는 단계예요. 루틴을 단순히 따라가는 수준을 넘어, 스스로 완성도를 끌어올릴 수 있습니다.',
     requirements: [
       { metric: 'total_workouts', target: 40, label: '누적 운동' },
       { metric: 'active_days_28d', target: 12, label: '최근 28일 운동한 날' },
@@ -181,9 +181,9 @@ const LEVELS: LevelMeta[] = [
   },
   {
     id: 'artisan',
-    name: '달인',
-    vibe: '꾸준함이 묵직해진 픽셀',
-    description: '더 이상 무게가 목표가 아니에요. 완성도가 목표입니다. 1kg 차이도 폼이 무너지면 의미 없다는 걸 몸으로 아는 경지예요. 기록보다 감각을 믿고, 숫자보다 질을 쫓는 픽셀. 옆에서 보면 조용한데, 자세히 보면 모든 동작이 정교하게 설계되어 있어요. 장인이란 게 바로 이런 거죠.',
+    name: '전문가',
+    vibe: '루틴의 질과 완성도를 직접 설계할 수 있는 단계',
+    description: '수행 능력뿐 아니라 루틴 운영 감각까지 숙련된 단계예요. 숫자보다 완성도와 지속 가능성을 기준으로 훈련을 조절할 수 있습니다.',
     requirements: [
       { metric: 'total_workouts', target: 60, label: '누적 운동' },
       { metric: 'active_days_28d', target: 14, label: '최근 28일 운동한 날' },
@@ -192,9 +192,9 @@ const LEVELS: LevelMeta[] = [
   },
   {
     id: 'master',
-    name: '마스터',
-    vibe: '루틴을 통제하는 픽셀',
-    description: '헬스장에서 이 픽셀가 운동을 시작하면, 주변 소음이 줄어드는 것 같은 느낌이 납니다. 실제로는 아무것도 안 바뀌었는데, 분위기가 바뀌어요. 오랜 시간이 만들어낸 집중력과 무게감이 공간을 채우는 거예요. 말 한마디 없어도 존경받는 픽셀, 마스터는 그런 존재입니다.',
+    name: '컨텐더',
+    vibe: '훈련 완성도와 존재감이 한 단계 더 올라온 상태',
+    description: '오랜 시간 쌓인 경험을 바탕으로 운동 흐름과 강도를 높은 수준에서 유지할 수 있는 단계예요. 루틴의 완성도와 집중력이 분명하게 드러납니다.',
     requirements: [
       { metric: 'total_workouts', target: 85, label: '누적 운동' },
       { metric: 'active_days_28d', target: 16, label: '최근 28일 운동한 날' },
@@ -203,9 +203,9 @@ const LEVELS: LevelMeta[] = [
   },
   {
     id: 'grandmaster',
-    name: '그랜드마스터',
-    vibe: '기록이 쌓여 존재감이 생긴 픽셀',
-    description: '이미 증명할 게 없는 픽셀에요. 남한테 보여줄 필요도, 기록을 자랑할 필요도 없어요. 그냥 하면 됩니다. 오늘도 어제처럼, 내일도 오늘처럼. 그 반복이 쌓여서 이 경지까지 온 거니까요. 누가 쳐다봐도, 안 쳐다봐도 똑같은 루틴. 그게 그랜드마스터의 힘입니다.',
+    name: '엘리트',
+    vibe: '기록, 수행, 루틴 운영이 모두 매우 높은 수준에 가까워요.',
+    description: '축적된 기록과 높은 수행 안정성이 함께 보이는 단계예요. 루틴의 밀도와 지속성을 모두 높은 수준으로 유지할 수 있습니다.',
     requirements: [
       { metric: 'total_workouts', target: 115, label: '누적 운동' },
       { metric: 'active_days_28d', target: 18, label: '최근 28일 운동한 날' },
@@ -214,9 +214,9 @@ const LEVELS: LevelMeta[] = [
   },
   {
     id: 'god',
-    name: '신',
-    vibe: '루틴의 끝에 도달한 픽셀',
-    description: '월계관, 날개, 지구 한 알. 이 픽셀한테 운동 몇 년 했냐고 물어보는 건 실례입니다. 시간을 초월한 존재니까요. 무게를 드는 게 아니라 중력이 이 픽셀한테 협조하는 거예요. 말이 필요 없고, 설명이 필요 없고, 그냥 빛납니다. 그게 다예요.',
+    name: '챔피언',
+    vibe: '루틴의 완성도와 존재감이 최상위권에 도달한 상태',
+    description: '수행 능력, 루틴 운영, 지속성이 모두 매우 높은 수준으로 올라온 단계예요. 전체적인 운동 완성도가 분명하게 드러나는 최상위 구간입니다.',
     requirements: [
       { metric: 'total_workouts', target: 240, label: '누적 운동' },
       { metric: 'workouts_56d', target: 40, label: '최근 56일 운동' },

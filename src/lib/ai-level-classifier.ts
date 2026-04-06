@@ -1,5 +1,6 @@
 import {
   CHARACTER_LEVELS,
+  PIXEL_VARIANT_META,
   type CharacterArchetypeId,
   type CharacterLevelId,
   type PixelVariantId,
@@ -36,8 +37,9 @@ export interface SurveyLevelScoreBreakdown {
 export interface SurveyLevelResult {
   levelId: SurveyLevelId;
   levelName: string;
-  /** 레벨 별명 (예: 헬린이, 루키, 강철인) */
+  /** 레벨 보조 라벨 */
   nickname: string;
+  typeName: string;
   /** 레벨 분위기 한 줄 설명 */
   vibe: string;
   /** 레벨 상세 설명 */
@@ -313,7 +315,7 @@ function buildReasons(
   }
 
   if (!veteranQualified && levelId !== 'veteran' && data.experience === 'advanced') {
-    reasons.push('고인물 판정은 상급 경험 외에도 3대 기록과 훈련 환경 기준을 함께 통과해야 열려요.');
+    reasons.push('프로 판정은 상급 경험 외에도 3대 기록과 훈련 환경 기준을 함께 통과해야 열려요.');
   }
 
   return reasons;
@@ -373,11 +375,13 @@ export function classifySurveyLevel(data: OnboardingData): SurveyLevelResult {
 
   const variantId = assignPixelVariant(data.gender, data.goal, data.gymType);
   const archetypeId = classifyArchetype(data.goal, data.gymType, data.experience);
+  const variantMeta = PIXEL_VARIANT_META[variantId];
 
   return {
     levelId: meta.id as SurveyLevelId,
     levelName: meta.name,
     nickname: meta.nickname,
+    typeName: variantMeta.label,
     vibe: meta.vibe,
     description: meta.description,
     rationaleTags: buildRationaleTags(data, bigThreeEnteredCount, bigThreeTotalKg),

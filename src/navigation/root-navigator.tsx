@@ -180,7 +180,7 @@ export default function RootNavigator() {
         const { data } = await supabase
           .from('user_profiles')
           .select('ai_onboarding_data')
-          .eq('user_id', user.id)
+          .eq('id', user.id)
           .maybeSingle();
 
         if (data?.ai_onboarding_data) {
@@ -231,7 +231,7 @@ export default function RootNavigator() {
         const { data } = await supabase
           .from('user_profiles')
           .select('ai_consent')
-          .eq('user_id', user.id)
+          .eq('id', user.id)
           .maybeSingle();
         if (data && data.ai_consent === null) {
           setNeedsOnboarding(true);

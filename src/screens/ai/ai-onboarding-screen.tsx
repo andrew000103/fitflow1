@@ -373,6 +373,7 @@ export default function AIOnboardingScreen() {
 
   const onboardingEntry = route.params?.entry ?? 'direct';
   const isSharedEntry = onboardingEntry === 'shared';
+  const onboardingMode = route.params?.mode ?? 'default';
   const [step, setStep] = useState(0);
   const [strengthInputs, setStrengthInputs] = useState<Record<string, string>>({});
   const [rmCalcTarget, setRmCalcTarget] = useState<string | null>(null);
@@ -592,7 +593,7 @@ export default function AIOnboardingScreen() {
 
     const levelResult = classifySurveyLevel(data);
     setSurveyLevelResult(levelResult);
-    navigation.replace('AILevelResult', { entry: onboardingEntry });
+    navigation.replace('AILevelResult', { entry: onboardingEntry, mode: onboardingMode });
   };
 
   const s = styles(colors, {

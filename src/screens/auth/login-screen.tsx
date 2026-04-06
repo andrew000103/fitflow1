@@ -1,22 +1,65 @@
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Button, Text, TextInput } from 'react-native-paper';
 import { useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
-import { AuthStackParamList } from '../../types/navigation';
+import { AuthStackParamList, RootStackParamList } from '../../types/navigation';
 
-type Props = {
-  navigation: NativeStackNavigationProp<AuthStackParamList, 'Login'>;
-};
+type LoginNavParamList = AuthStackParamList & RootStackParamList;
 
-export default function LoginScreen({ navigation }: Props) {
+export default function LoginScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<LoginNavParamList, 'Login'>>();
+  const route = useRoute<RouteProp<LoginNavParamList, 'Login'>>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const { signIn, signInAnonymously, loading } = useAuthStore();
+  const { signIn, signInAnonymously, loading, user } = useAuthStore();
+  const onboardingData = useAIPlanStore((s) => s.onboardingData);
+  const surveyLevelResult = useAIPlanStore((s) => s.surveyLevelResult);
   const pendingPostSignupIntent = useAIPlanStore((s) => s.pendingPostSignupIntent);
   const pendingPostSignupEmail = useAIPlanStore((s) => s.pendingPostSignupEmail);
+  const pendingResumeOnboardingData = useAIPlanStore((s) => s.pendingResumeOnboardingData);
+  const pendingResumeSurveyLevelResult = useAIPlanStore((s) => s.pendingResumeSurveyLevelResult);
+  const setPendingPostSignupIntent = useAIPlanStore((s) => s.setPendingPostSignupIntent);
+  const stashPendingResumeContext = useAIPlanStore((s) => s.stashPendingResumeContext);
+  const loginSource = route.params?.source ?? 'default';
+  const loginIntent = route.params?.intent ?? pendingPostSignupIntent ?? 'signup_only';
+
+  useEffect(() => {
+    if (loginSource !== 'ai-level-result') return;
+
+    if (!pendingPostSignupIntent) {
+      setPendingPostSignupIntent(loginIntent);
+    }
+
+    if (!pendingResumeOnboardingData && !pendingResumeSurveyLevelResult && onboardingData && surveyLevelResult) {
+      stashPendingResumeContext(onboardingData, surveyLevelResult);
+    }
+  }, [
+    loginIntent,
+    loginSource,
+    onboardingData,
+    pendingPostSignupIntent,
+    pendingResumeOnboardingData,
+    pendingResumeSurveyLevelResult,
+    setPendingPostSignupIntent,
+    stashPendingResumeContext,
+    surveyLevelResult,
+  ]);
+
+  useEffect(() => {
+    if (!user || user.isAnonymous) return;
+
+    if (loginSource === 'ai-level-result' && pendingPostSignupIntent) {
+      return;
+    }
+
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  }, [loginSource, navigation, pendingPostSignupIntent, user]);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -25,6 +68,20 @@ export default function LoginScreen({ navigation }: Props) {
     }
     try {
       await signIn(email.trim(), password);
+      if (loginSource === 'ai-level-result' && navigation.canGoBack()) {
+        navigation.goBack();
+        return;
+      }
+
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+        return;
+      }
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main' }],
+      });
     } catch (e: any) {
       Alert.alert('로그인 실패', e.message ?? '다시 시도해주세요.');
     }
@@ -38,6 +95,13 @@ export default function LoginScreen({ navigation }: Props) {
       <View style={styles.inner}>
         <Text variant="headlineMedium" style={styles.title}>FitLog</Text>
         <Text variant="bodyMedium" style={styles.subtitle}>운동과 식단을 한 곳에서</Text>
+        {loginSource === 'ai-level-result' ? (
+          <Text style={styles.resumeHint}>
+            {loginIntent === 'plan'
+              ? '이미 계정이 있다면 로그인해서 방금 테스트한 결과로 AI 플랜 받기를 이어갈 수 있어요.'
+              : '이미 계정이 있다면 로그인해서 방금 테스트한 결과 화면으로 다시 이어갈 수 있어요.'}
+          </Text>
+        ) : null}
         {pendingPostSignupIntent ? (
           <Text style={styles.resumeHint}>
             {pendingPostSignupIntent === 'plan'
@@ -82,7 +146,11 @@ export default function LoginScreen({ navigation }: Props) {
 
         <Button
           mode="text"
-          onPress={() => navigation.navigate('Signup')}
+          onPress={() =>
+            navigation.navigate('Signup', loginSource === 'ai-level-result'
+              ? { source: 'ai-level-result', intent: loginIntent }
+              : undefined)
+          }
           style={styles.linkButton}
         >
           계정이 없으신가요? 회원가입

@@ -3,8 +3,13 @@ export type SignupRouteParams = {
   intent?: 'plan' | 'signup_only';
 };
 
+export type LoginRouteParams = {
+  source?: 'default' | 'ai-level-result';
+  intent?: 'plan' | 'signup_only';
+};
+
 export type AuthStackParamList = {
-  Login: undefined;
+  Login: LoginRouteParams | undefined;
   Signup: SignupRouteParams | undefined;
 };
 
@@ -75,8 +80,8 @@ export type ProfileStackParamList = {
 
 export type AIModalParamList = {
   AIConsent: undefined;
-  AIOnboarding: { resetAt?: number; entry?: 'direct' | 'shared' } | undefined;
-  AILevelResult: { entry?: 'direct' | 'shared'; autoCreatePlan?: boolean } | undefined;
+  AIOnboarding: { resetAt?: number; entry?: 'direct' | 'shared'; mode?: 'default' | 'retest' } | undefined;
+  AILevelResult: { entry?: 'direct' | 'shared'; autoCreatePlan?: boolean; mode?: 'default' | 'retest' } | undefined;
   AIPlanResult: { planId?: string };
   AIPlanWeekly: { weekStart: string };
 };
@@ -84,10 +89,11 @@ export type AIModalParamList = {
 export type RootStackParamList = {
   Main: undefined;
   CharacterSetup: undefined;
+  Login: LoginRouteParams | undefined;
   Signup: SignupRouteParams | undefined;
   AIConsent: undefined;
-  AIOnboarding: { resetAt?: number; entry?: 'direct' | 'shared' } | undefined;
-  AILevelResult: { entry?: 'direct' | 'shared'; autoCreatePlan?: boolean } | undefined;
+  AIOnboarding: { resetAt?: number; entry?: 'direct' | 'shared'; mode?: 'default' | 'retest' } | undefined;
+  AILevelResult: { entry?: 'direct' | 'shared'; autoCreatePlan?: boolean; mode?: 'default' | 'retest' } | undefined;
   AIPlanResult: { planId?: string };
   AIPlanWeekly: { weekStart: string };
   AIExerciseSearch: {

@@ -90,6 +90,13 @@ function AIPlanCard() {
     }
   };
 
+  const handleRetestPress = () => {
+    navigation.navigate('AIOnboarding', {
+      resetAt: Date.now(),
+      mode: 'retest',
+    });
+  };
+
   const getContent = () => {
     if (currentPlan && isAppliedPlan) {
       const cycleInfo = getPlanCycleInfo(currentPlan);
@@ -183,6 +190,20 @@ function AIPlanCard() {
         </View>
         <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
       </TouchableOpacity>
+      {currentPlan ? (
+        <TouchableOpacity
+          onPress={handleRetestPress}
+          activeOpacity={0.82}
+          style={[aiStyles.retestBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+        >
+          <View style={aiStyles.retestBtnInner}>
+            <MaterialCommunityIcons name="refresh" size={16} color={colors.accent} />
+            <Text style={[aiStyles.retestBtnText, { color: colors.accent, fontFamily: typography.fontFamily }]}>
+              헬스 레벨 다시 검사하고 공유하기
+            </Text>
+          </View>
+        </TouchableOpacity>
+      ) : null}
     </AppCard>
   );
 }
@@ -197,6 +218,23 @@ const aiStyles = StyleSheet.create({
   badgeText: { fontSize: 10, fontWeight: '700' },
   sub: { fontSize: 13, marginTop: 2 },
   todayLine: { fontSize: 13, marginTop: 4, fontWeight: '600' },
+  retestBtn: {
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  retestBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  retestBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });
 
 // ─── TodayWorkoutCard ─────────────────────────────────────────────────────────

@@ -2,8 +2,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Image, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Platform, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
+import ViewShot from 'react-native-view-shot';
 
 import { AILoadingScreen } from '../../components/ai/AILoadingScreen';
 import { AIFlowScreen } from '../../components/ai/AIFlowScreen';
@@ -26,7 +27,22 @@ import { useAppTheme } from '../../theme';
 import { RootStackParamList } from '../../types/navigation';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
-
+function buildShareMessage(params: {
+  levelName?: string | null;
+  typeName?: string | null;
+  summary: string;
+  shareUrl: string;
+}) {
+  return [
+    `나는 ${params.levelName ?? '알 수 없음'} ${params.typeName ?? ''}`.trim(),
+    params.summary,
+    '',
+    '지금 바로 헬스 레벨 테스트하기',
+    params.shareUrl,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
 
 export default function AILevelResultScreen() {
   const navigation = useNavigation<NavProp>();
@@ -34,9 +50,12 @@ export default function AILevelResultScreen() {
   const { colors } = useAppTheme();
   const user = useAuthStore((s) => s.user);
   const isSharedEntry = route.params?.entry === 'shared';
+  const isRetestMode = route.params?.mode === 'retest';
   const isAnonymousUser = Boolean(user?.isAnonymous);
   const onboardingData = useAIPlanStore((s) => s.onboardingData);
+  const currentPlan = useAIPlanStore((s) => s.currentPlan);
   const setPendingPostSignupIntent = useAIPlanStore((s) => s.setPendingPostSignupIntent);
+  const stashPendingResumeContext = useAIPlanStore((s) => s.stashPendingResumeContext);
   const surveyLevelResult = useAIPlanStore((s) => s.surveyLevelResult);
   const setCurrentPlan = useAIPlanStore((s) => s.setCurrentPlan);
   const setGenerating = useAIPlanStore((s) => s.setGenerating);
@@ -46,12 +65,47 @@ export default function AILevelResultScreen() {
   const [planReady, setPlanReady] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const autoCreateHandledRef = useRef(false);
+  const missingStateRedirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shareCardRef = useRef<ViewShot | null>(null);
 
   useEffect(() => {
-    if (!onboardingData || !surveyLevelResult) {
-      navigation.goBack();
+    if (onboardingData && surveyLevelResult) {
+      if (missingStateRedirectTimerRef.current) {
+        clearTimeout(missingStateRedirectTimerRef.current);
+        missingStateRedirectTimerRef.current = null;
+      }
+      return;
     }
-  }, [navigation, onboardingData, surveyLevelResult]);
+
+    console.log('[ai-level-result-debug] missing_state_on_mount', {
+      hasOnboardingData: Boolean(onboardingData),
+      hasSurveyLevelResult: Boolean(surveyLevelResult),
+      entry: route.params?.entry ?? null,
+      autoCreatePlan: route.params?.autoCreatePlan ?? null,
+    });
+
+    missingStateRedirectTimerRef.current = setTimeout(() => {
+      const latestState = useAIPlanStore.getState();
+      const hasRecoveredState = Boolean(latestState.onboardingData && latestState.surveyLevelResult);
+
+      console.log('[ai-level-result-debug] missing_state_recheck', {
+        hasRecoveredState,
+        hasOnboardingData: Boolean(latestState.onboardingData),
+        hasSurveyLevelResult: Boolean(latestState.surveyLevelResult),
+      });
+
+      if (!hasRecoveredState) {
+        navigation.replace('AIOnboarding', { resetAt: Date.now(), entry: route.params?.entry });
+      }
+    }, 150);
+
+    return () => {
+      if (missingStateRedirectTimerRef.current) {
+        clearTimeout(missingStateRedirectTimerRef.current);
+        missingStateRedirectTimerRef.current = null;
+      }
+    };
+  }, [navigation, onboardingData, route.params?.autoCreatePlan, route.params?.entry, surveyLevelResult]);
 
   const imageSource = useMemo(() => {
     if (!surveyLevelResult) return null;
@@ -96,23 +150,50 @@ export default function AILevelResultScreen() {
         );
         return;
       }
-      const shareMessage = [
-        `나의 헬스 레벨은 ${surveyLevelResult?.nickname ?? '알 수 없음'}.`,
-        surveyLevelResult?.vibe ?? '',
-        '',
-        shareDescription,
-        '',
-        '헬스 레벨을 바로 테스트해보러 가기.',
+      const shareMessage = buildShareMessage({
+        levelName: surveyLevelResult?.levelName,
+        typeName: surveyLevelResult?.typeName ?? variantMeta?.label ?? null,
+        summary: shareDescription,
         shareUrl,
-      ]
-        .filter(Boolean)
-        .join('\n');
+      });
 
+      if (Platform.OS === 'web' || !shareCardRef.current?.capture) {
+        await Share.share({
+          title: '헬스 레벨 테스트 공유',
+          message: shareMessage,
+        });
+        return;
+      }
+
+      const captureUri = await shareCardRef.current.capture();
       await Share.share({
         title: '헬스 레벨 테스트 공유',
         message: shareMessage,
+        url: captureUri,
       });
     } catch (e) {
+      const shareUrl = getSharedLevelTestUrl();
+      const fallbackMessage = shareUrl
+        ? buildShareMessage({
+            levelName: surveyLevelResult?.levelName,
+            typeName: surveyLevelResult?.typeName ?? variantMeta?.label ?? null,
+            summary: shareDescription,
+            shareUrl,
+          })
+        : null;
+
+      if (fallbackMessage) {
+        try {
+          await Share.share({
+            title: '헬스 레벨 테스트 공유',
+            message: fallbackMessage,
+          });
+          return;
+        } catch {
+          // 폴백 실패 시 아래 Alert 사용
+        }
+      }
+
       const msg = e instanceof Error ? e.message : '공유를 열지 못했습니다.';
       Alert.alert('공유 실패', msg, [{ text: '확인' }]);
     }
@@ -120,6 +201,9 @@ export default function AILevelResultScreen() {
 
   const handleSignupPrompt = (intent: 'plan' | 'signup_only') => {
     setPendingPostSignupIntent(intent);
+    if (onboardingData && surveyLevelResult) {
+      stashPendingResumeContext(onboardingData, surveyLevelResult);
+    }
     navigation.navigate('Signup', {
       source: 'ai-level-result',
       intent,
@@ -193,20 +277,26 @@ export default function AILevelResultScreen() {
       footer={
         <>
           {isAnonymousUser ? (
-            <>
+            <View style={styles(colors).anonymousFooterGroup}>
               <TouchableOpacity
                 style={styles(colors).primaryBtn}
                 onPress={() => handleSignupPrompt('plan')}
                 activeOpacity={0.85}
               >
-                <Text style={styles(colors).primaryBtnText}>회원가입하고 AI 플랜 받기</Text>
+                <View style={styles(colors).ctaBtnInner}>
+                  <MaterialCommunityIcons name="account-plus" size={20} color="#fff" />
+                  <Text style={styles(colors).primaryBtnText}>회원가입하고 AI 플랜 받기</Text>
+                </View>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles(colors).secondaryBtn}
+                style={styles(colors).shareHeroBtn}
                 onPress={handleShare}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
-                <Text style={styles(colors).secondaryBtnText}>친구에게 공유하기</Text>
+                <View style={styles(colors).ctaBtnInner}>
+                  <MaterialCommunityIcons name="share-variant" size={20} color={colors.accent} />
+                  <Text style={styles(colors).shareHeroBtnText}>친구에게 공유하기</Text>
+                </View>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles(colors).tertiaryBtn}
@@ -215,7 +305,7 @@ export default function AILevelResultScreen() {
               >
                 <Text style={styles(colors).tertiaryBtnText}>그냥 회원가입만 하기</Text>
               </TouchableOpacity>
-            </>
+            </View>
           ) : (
             <>
               <TouchableOpacity style={styles(colors).primaryBtn} onPress={handleCreatePlan} activeOpacity={0.85}>
@@ -231,7 +321,10 @@ export default function AILevelResultScreen() {
           )}
           <TouchableOpacity
             style={styles(colors).retryTestBtn}
-            onPress={() => navigation.replace('AIOnboarding', { resetAt: Date.now() })}
+            onPress={() => navigation.replace('AIOnboarding', {
+              resetAt: Date.now(),
+              mode: currentPlan ? 'retest' : 'default',
+            })}
             activeOpacity={0.8}
           >
             <Text style={styles(colors).retryTestBtnText}>테스트 다시 하기</Text>
@@ -251,8 +344,9 @@ export default function AILevelResultScreen() {
         </View>
       ) : null}
 
-      <Text style={styles(colors).title}>{surveyLevelResult.nickname}</Text>
-      <Text style={styles(colors).subtitle}>{surveyLevelResult.vibe}</Text>
+      <Text style={styles(colors).eyebrowTitle}>당신의 레벨은</Text>
+      <Text style={styles(colors).title}>{surveyLevelResult.levelName}</Text>
+      <Text style={styles(colors).subtitle}>{surveyLevelResult.typeName ?? variantMeta?.label}</Text>
       <Text style={styles(colors).body}>{surveyLevelResult.description}</Text>
 
       <View style={styles(colors).tagWrap}>
@@ -275,12 +369,24 @@ export default function AILevelResultScreen() {
       {variantMeta ? (
         <View style={styles(colors).variantCard}>
           <View style={styles(colors).variantHeader}>
-            <MaterialCommunityIcons name="palette-outline" size={18} color={colors.accent} />
-            <Text style={styles(colors).variantTitle}>배정된 캐릭터 성향: {variantMeta.label}</Text>
+            <MaterialCommunityIcons name="dumbbell" size={18} color={colors.accent} />
+            <Text style={styles(colors).variantTitle}>당신의 헬스 유형: {variantMeta.label}</Text>
           </View>
           <Text style={styles(colors).variantBody}>{variantMeta.shortReason}</Text>
           <Text style={styles(colors).variantHint}>
             {variantMeta.detailReason}
+          </Text>
+        </View>
+      ) : null}
+
+      {isRetestMode && currentPlan ? (
+        <View style={styles(colors).retestInfoCard}>
+          <View style={styles(colors).retestInfoHeader}>
+            <MaterialCommunityIcons name="refresh-circle" size={18} color={colors.accent} />
+            <Text style={styles(colors).retestInfoTitle}>기존 AI 플랜은 그대로 유지되고 있어요</Text>
+          </View>
+          <Text style={styles(colors).retestInfoBody}>
+            이번 결과는 다시 검사한 현재 레벨 기준이에요. 원하면 여기서 공유만 하고, 나중에 새 플랜을 다시 만들 수도 있어요.
           </Text>
         </View>
       ) : null}
@@ -325,6 +431,30 @@ export default function AILevelResultScreen() {
             : '입력하신 내용을 바탕으로 운동과 식단까지 엮은 맞춤 AI 플랜을 이어서 만들어드릴 수 있어요.'}
         </Text>
       </View>
+
+      {imageSource ? (
+        <ViewShot
+          ref={shareCardRef}
+          options={{ format: 'png', quality: 1, result: 'tmpfile' }}
+          style={styles(colors).shareCaptureCanvas}
+        >
+          <View style={styles(colors).shareCard}>
+            <View style={styles(colors).shareBadge}>
+              <Text style={styles(colors).shareBadgeText}>FITLOG 헬스 레벨 테스트</Text>
+            </View>
+            <View style={styles(colors).shareImagePanel}>
+              <Image source={imageSource} style={styles(colors).shareImage} resizeMode="contain" />
+            </View>
+            <Text style={styles(colors).shareCardTitle}>{surveyLevelResult.levelName}</Text>
+            <Text style={styles(colors).shareCardSubtitle}>{surveyLevelResult.typeName ?? variantMeta?.label}</Text>
+            <Text style={styles(colors).shareCardBody}>{shareDescription}</Text>
+            <View style={styles(colors).shareFooter}>
+              <Text style={styles(colors).shareFooterText}>지금 바로 헬스 레벨 테스트하기</Text>
+              <Text style={styles(colors).shareFooterUrl}>{getSharedLevelTestUrl() ?? '링크를 설정해주세요'}</Text>
+            </View>
+          </View>
+        </ViewShot>
+      ) : null}
     </AIFlowScreen>
   );
 }
@@ -374,10 +504,17 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       fontWeight: '800',
       marginBottom: 8,
     },
+    eyebrowTitle: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '700',
+      letterSpacing: 0.4,
+      marginBottom: 6,
+    },
     subtitle: {
-      color: colors.text,
+      color: colors.accent,
       fontSize: 16,
-      fontWeight: '600',
+      fontWeight: '700',
       lineHeight: 24,
       marginBottom: 10,
     },
@@ -455,6 +592,31 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       fontSize: 12,
       lineHeight: 18,
     },
+    retestInfoCard: {
+      backgroundColor: colors.card,
+      borderRadius: 18,
+      padding: 16,
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: colors.accentMuted,
+    },
+    retestInfoHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 8,
+    },
+    retestInfoTitle: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '700',
+      flex: 1,
+    },
+    retestInfoBody: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 20,
+    },
     errorCard: {
       backgroundColor: colors.card,
       borderRadius: 18,
@@ -528,17 +690,46 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       fontSize: 14,
       lineHeight: 20,
     },
+    anonymousFooterGroup: {
+      width: '100%',
+      gap: 10,
+    },
     primaryBtn: {
       backgroundColor: colors.accent,
       borderRadius: 14,
       paddingVertical: 16,
       alignItems: 'center',
       width: '100%',
+      shadowColor: colors.accent,
+      shadowOpacity: 0.22,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 3,
+    },
+    ctaBtnInner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
     },
     primaryBtnText: {
       fontSize: 17,
-      fontWeight: '600',
+      fontWeight: '700',
       color: '#fff',
+    },
+    shareHeroBtn: {
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+      width: '100%',
+      borderWidth: 1.5,
+      borderColor: colors.accent,
+    },
+    shareHeroBtnText: {
+      color: colors.accent,
+      fontSize: 17,
+      fontWeight: '700',
     },
     secondaryBtn: {
       alignItems: 'center',
@@ -567,5 +758,79 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
       color: colors.textTertiary,
       fontSize: 13,
       fontWeight: '500',
+    },
+    shareCaptureCanvas: {
+      position: 'absolute',
+      left: -2000,
+      top: 0,
+      width: 1080,
+    },
+    shareCard: {
+      width: 1080,
+      backgroundColor: colors.background,
+      paddingHorizontal: 80,
+      paddingTop: 88,
+      paddingBottom: 96,
+    },
+    shareBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: colors.accentMuted,
+      borderRadius: 999,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      marginBottom: 28,
+    },
+    shareBadgeText: {
+      color: colors.accent,
+      fontSize: 28,
+      fontWeight: '800',
+    },
+    shareImagePanel: {
+      backgroundColor: colors.card,
+      borderRadius: 36,
+      paddingVertical: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 30,
+    },
+    shareImage: {
+      width: 460,
+      height: 460,
+    },
+    shareCardTitle: {
+      color: colors.text,
+      fontSize: 64,
+      fontWeight: '800',
+      marginBottom: 12,
+    },
+    shareCardSubtitle: {
+      color: colors.accent,
+      fontSize: 32,
+      fontWeight: '700',
+      lineHeight: 40,
+      marginBottom: 18,
+    },
+    shareCardBody: {
+      color: colors.textSecondary,
+      fontSize: 28,
+      lineHeight: 40,
+      marginBottom: 34,
+    },
+    shareFooter: {
+      borderRadius: 28,
+      backgroundColor: colors.card,
+      paddingHorizontal: 28,
+      paddingVertical: 24,
+    },
+    shareFooterText: {
+      color: colors.text,
+      fontSize: 26,
+      fontWeight: '700',
+      marginBottom: 8,
+    },
+    shareFooterUrl: {
+      color: colors.accent,
+      fontSize: 24,
+      fontWeight: '600',
     },
   });

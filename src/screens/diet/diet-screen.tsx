@@ -1,12 +1,14 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
 import { AppCard } from '../../components/common/AppCard';
+import { WorkoutContextCard } from '../../components/diet/WorkoutContextCard';
 import { AppProgressBar } from '../../components/common/AppProgressBar';
 import { AppHeader } from '../../components/common/AppHeader';
 import { AppButton } from '../../components/common/AppButton';
@@ -15,6 +17,7 @@ import { useDietStore } from '../../stores/diet-store';
 import { useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { getUserProfile, getLatestUserGoal } from '../../lib/profile';
+import { fetchTodayWorkoutAdjustment, WorkoutDietAdjustment } from '../../lib/workout-diet-sync';
 import { useAppTheme } from '../../theme';
 import { UserProfileRecord } from '../../types/profile';
 import { DietStackParamList } from '../../types/navigation';
@@ -158,9 +161,28 @@ export default function DietScreen({ navigation }: Props) {
 
   const [calorieGoal, setCalorieGoal] = useState(2000);
   const [macroGoals, setMacroGoals] = useState({ protein_g: 150, carbs_g: 250, fat_g: 65 });
+  const [workoutAdjustment, setWorkoutAdjustment] = useState<WorkoutDietAdjustment | null>(null);
+  const [cardDismissed, setCardDismissed] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<MealEntry | null>(null);
   const [editingAmount, setEditingAmount] = useState('');
   const [recommendedMeal, setRecommendedMeal] = useState<AIPlannedMeal | null>(null);
+
+  const today = useMemo(() => getTodayKey(), []);
+
+  // 오늘 카드 dismissal 상태 로드
+  useEffect(() => {
+    AsyncStorage.getItem(`diet_workout_card_dismissed_${today}`).then((v) => {
+      if (v === '1') setCardDismissed(true);
+    }).catch(() => {});
+  }, [today]);
+
+  // 오늘 운동 조정값 로드 (기존 목표 로드와 독립적으로 실행)
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchTodayWorkoutAdjustment(user.id, today).then((adj) => {
+      if (adj.hasWorkout) setWorkoutAdjustment(adj);
+    }).catch(() => {});
+  }, [user?.id, today]);
 
   useEffect(() => {
     if (appliedGoalPlan) {
@@ -194,7 +216,6 @@ export default function DietScreen({ navigation }: Props) {
     })();
   }, [appliedGoalPlan, user?.id]);
 
-  const today = useMemo(() => getTodayKey(), []);
   const dayEntries = entriesByDate[today] ?? [];
   const todayPlanDiet = useMemo(() => {
     if (!appliedDietPlan) return null;
@@ -212,6 +233,18 @@ export default function DietScreen({ navigation }: Props) {
     return mapped;
   }, [todayPlanDiet]);
 
+  const effectiveGoals = useMemo(() => ({
+    calories: calorieGoal + (workoutAdjustment?.additionalCalories ?? 0),
+    protein_g: macroGoals.protein_g + (workoutAdjustment?.additionalProtein ?? 0),
+    carbs_g: macroGoals.carbs_g + (workoutAdjustment?.additionalCarbs ?? 0),
+    fat_g: macroGoals.fat_g,
+  }), [calorieGoal, macroGoals, workoutAdjustment]);
+
+  const handleDismissCard = useCallback(async () => {
+    setCardDismissed(true);
+    await AsyncStorage.setItem(`diet_workout_card_dismissed_${today}`, '1');
+  }, [today]);
+
   const totals = useMemo(() => dayEntries.reduce((acc, e) => ({
     calories: acc.calories + e.calories,
     protein_g: acc.protein_g + e.protein_g,
@@ -226,7 +259,7 @@ export default function DietScreen({ navigation }: Props) {
 
   const radius = (RING_SIZE - RING_STROKE) / 2;
   const circumference = 2 * Math.PI * radius;
-  const progress = Math.min(totals.calories / calorieGoal, 1);
+  const progress = Math.min(totals.calories / effectiveGoals.calories, 1);
   const strokeDashoffset = circumference * (1 - progress);
 
   const handleSaveAmount = () => {
@@ -241,22 +274,30 @@ export default function DietScreen({ navigation }: Props) {
       <AppHeader title="식단" subtitle={formatDateLabel(today)} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {workoutAdjustment?.hasWorkout && !cardDismissed && (
+          <WorkoutContextCard
+            adjustment={workoutAdjustment}
+            hasAIPlanGoal={Boolean(appliedGoalPlan)}
+            onDismiss={handleDismissCard}
+          />
+        )}
+
         <AppCard variant="elevated" style={styles.summaryCard}>
           <View style={styles.ringArea}>
             <Svg width={RING_SIZE} height={RING_SIZE}>
               <Circle cx={RING_SIZE/2} cy={RING_SIZE/2} r={radius} stroke={colors.trackBg} strokeWidth={RING_STROKE} fill="none" />
-              <Circle cx={RING_SIZE/2} cy={RING_SIZE/2} r={radius} stroke={totals.calories > calorieGoal ? colors.error : colors.accent} strokeWidth={RING_STROKE} fill="none" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" rotation="-90" originX={RING_SIZE/2} originY={RING_SIZE/2} />
+              <Circle cx={RING_SIZE/2} cy={RING_SIZE/2} r={radius} stroke={totals.calories > effectiveGoals.calories ? colors.error : colors.accent} strokeWidth={RING_STROKE} fill="none" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" rotation="-90" originX={RING_SIZE/2} originY={RING_SIZE/2} />
             </Svg>
             <View style={styles.ringCenter}>
               <Text style={[styles.caloriesTotal, { color: colors.text, fontFamily: typography.fontFamily }]}>{totals.calories}</Text>
-              <Text style={[styles.caloriesGoal, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>/ {calorieGoal} kcal</Text>
+              <Text style={[styles.caloriesGoal, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>/ {effectiveGoals.calories} kcal</Text>
             </View>
           </View>
 
           <View style={styles.macroList}>
-            <MacroProgress label="단백질" current={totals.protein_g} goal={macroGoals.protein_g} color={colors.protein} />
-            <MacroProgress label="탄수화물" current={totals.carbs_g} goal={macroGoals.carbs_g} color={colors.carbs} />
-            <MacroProgress label="지방" current={totals.fat_g} goal={macroGoals.fat_g} color={colors.fat} />
+            <MacroProgress label="단백질" current={totals.protein_g} goal={effectiveGoals.protein_g} color={colors.protein} />
+            <MacroProgress label="탄수화물" current={totals.carbs_g} goal={effectiveGoals.carbs_g} color={colors.carbs} />
+            <MacroProgress label="지방" current={totals.fat_g} goal={effectiveGoals.fat_g} color={colors.fat} />
           </View>
         </AppCard>
 

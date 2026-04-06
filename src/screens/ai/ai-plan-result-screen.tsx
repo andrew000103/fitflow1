@@ -1009,6 +1009,20 @@ export default function AIPlanResultScreen() {
     exerciseName: string;
   } | null>(null);
 
+  const navigateHome = () => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Main' }],
+    });
+  };
+
+  const handleRetestLevel = () => {
+    navigation.navigate('AIOnboarding', {
+      resetAt: Date.now(),
+      mode: 'retest',
+    });
+  };
+
   const handleSwapOpen = (dayLabel: string, exIdx: number, exerciseName: string) => {
     setSwapSheet({ visible: true, dayLabel, exIdx, exerciseName });
   };
@@ -1089,11 +1103,7 @@ export default function AIPlanResultScreen() {
         [
           {
             text: '확인',
-            onPress: () =>
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Main' }],
-              }),
+            onPress: navigateHome,
           },
         ]
       );
@@ -1190,7 +1200,7 @@ export default function AIPlanResultScreen() {
               <Text style={[s.headerTitle, { color: colors.text }]}>내 AI 플랜</Text>
             </View>
             <TouchableOpacity
-              onPress={() => navigation.goBack()}
+              onPress={navigateHome}
               disabled={regenerating || applyingPlan}
               style={s.regenBtn}
             >
@@ -1230,6 +1240,15 @@ export default function AIPlanResultScreen() {
           {!isAppliedPlan ? (
             <>
               <TouchableOpacity
+                style={[s.footerSecondaryBtn, { borderColor: colors.border }, (regenerating || applyingPlan) && { opacity: 0.5 }]}
+                onPress={handleRetestLevel}
+                disabled={regenerating || applyingPlan}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.footerSecondaryText, { color: colors.textSecondary }]}>헬스 레벨 다시 검사</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={[s.footerPrimaryBtn, { backgroundColor: regenerating ? colors.border : colors.accent }]}
                 onPress={openApplySheet}
                 disabled={regenerating || applyingPlan}
@@ -1250,16 +1269,27 @@ export default function AIPlanResultScreen() {
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity
-              style={[s.footerPrimaryBtn, { backgroundColor: regenerating ? colors.border : colors.accent }]}
-              onPress={() => setRegenSheetVisible(true)}
-              disabled={regenerating || applyingPlan}
-              activeOpacity={0.85}
-            >
-              <Text style={s.footerPrimaryText}>
-                {regenerating ? '생성 중...' : '플랜 재설정'}
-              </Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={[s.footerSecondaryBtn, { borderColor: colors.border }, (regenerating || applyingPlan) && { opacity: 0.5 }]}
+                onPress={handleRetestLevel}
+                disabled={regenerating || applyingPlan}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.footerSecondaryText, { color: colors.textSecondary }]}>헬스 레벨 다시 검사</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[s.footerPrimaryBtn, { backgroundColor: regenerating ? colors.border : colors.accent }]}
+                onPress={() => setRegenSheetVisible(true)}
+                disabled={regenerating || applyingPlan}
+                activeOpacity={0.85}
+              >
+                <Text style={s.footerPrimaryText}>
+                  {regenerating ? '생성 중...' : '플랜 재설정'}
+                </Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
       }

@@ -211,14 +211,11 @@ function PixelLevelViewer({
                 <View style={[styles.slide, { width: sliderWidth, paddingHorizontal: spacing.lg }]}>
                   <View style={[styles.slideCard, { backgroundColor: colors.background, borderRadius: radius.xl, padding: spacing.lg }]}>
                     <View style={styles.slideHeader}>
-                      <View style={styles.slideTitleWrap}>
-                        <Text style={[styles.slideLevel, { color: colors.text, fontFamily: typography.fontFamily }]}>
-                          {item.name}
-                        </Text>
-                        <Text style={[styles.slideNickname, { color: colors.accent, fontFamily: typography.fontFamily }]}>
-                          {item.nickname}
-                        </Text>
-                      </View>
+                    <View style={styles.slideTitleWrap}>
+                      <Text style={[styles.slideLevel, { color: colors.text, fontFamily: typography.fontFamily }]}>
+                        {item.name}
+                      </Text>
+                    </View>
                       {isCurrent && (
                         <View style={[styles.currentBadge, { backgroundColor: colors.accentMuted, borderRadius: radius.full }]}>
                           <Text style={[styles.currentBadgeText, { color: colors.accent, fontFamily: typography.fontFamily }]}>
@@ -377,13 +374,6 @@ export default function PixelEvolutionCard({
               <Text style={[styles.levelTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
                 {levelName ?? levelMeta?.name ?? '헬스 레벨'}
               </Text>
-              {levelMeta?.nickname && (
-                <View style={[styles.levelBadge, { backgroundColor: colors.accentMuted, borderRadius: radius.full }]}>
-                  <Text style={[styles.levelBadgeText, { color: colors.accent, fontFamily: typography.fontFamily }]}>
-                    {levelMeta.nickname}
-                  </Text>
-                </View>
-              )}
               {archetypeMeta && (
                 <View style={[styles.levelBadge, { backgroundColor: colors.separator, borderRadius: radius.full }]}>
                   <Text style={[styles.secondaryBadgeText, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
