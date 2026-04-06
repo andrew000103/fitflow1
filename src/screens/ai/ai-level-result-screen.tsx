@@ -65,6 +65,22 @@ export default function AILevelResultScreen() {
     return PIXEL_VARIANT_META[variant];
   }, [surveyLevelResult]);
 
+  const shareDescription = useMemo(() => {
+    if (!surveyLevelResult) return '';
+
+    const condensed = surveyLevelResult.description
+      .replace(/\s+/g, ' ')
+      .trim()
+      .split('. ')[0]
+      .trim();
+
+    if (condensed.length <= 80) {
+      return condensed.endsWith('.') ? condensed : `${condensed}.`;
+    }
+
+    return `${condensed.slice(0, 77).trimEnd()}...`;
+  }, [surveyLevelResult]);
+
   const handleNavigate = () => {
     navigation.replace('AIPlanResult', {});
   };
@@ -80,10 +96,21 @@ export default function AILevelResultScreen() {
         );
         return;
       }
+      const shareMessage = [
+        `나의 헬스 레벨은 ${surveyLevelResult?.nickname ?? '알 수 없음'}.`,
+        surveyLevelResult?.vibe ?? '',
+        '',
+        shareDescription,
+        '',
+        '헬스 레벨을 바로 테스트해보러 가기.',
+        shareUrl,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
       await Share.share({
         title: '헬스 레벨 테스트 공유',
-        message: `내 헬스 레벨 테스트 해봤는데 너도 해봐. ${shareUrl}`,
-        url: shareUrl,
+        message: shareMessage,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : '공유를 열지 못했습니다.';
