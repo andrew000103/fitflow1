@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, View } from 'react-native';
+import { ActivityIndicator, Linking, TouchableOpacity, View } from 'react-native';
+import { Text } from 'react-native-paper';
 import { loadTodayEntries } from '../lib/diet-supabase';
 import { parseSharedEntryUrl, SharedEntryTarget } from '../lib/shared-entry';
 import { supabase } from '../lib/supabase';
@@ -25,6 +26,7 @@ export default function RootNavigator() {
   } = useAIPlanStore();
   const [pendingSharedEntry, setPendingSharedEntry] = useState<SharedEntryTarget | null>(null);
   const [processingSharedEntry, setProcessingSharedEntry] = useState(false);
+  const [sharedEntryError, setSharedEntryError] = useState<string | null>(null);
   const initialUrlHandledRef = useRef(false);
   const isAnonymousUser = Boolean(user?.isAnonymous);
 
@@ -39,6 +41,7 @@ export default function RootNavigator() {
       const sharedTarget = parseSharedEntryUrl(url);
       if (!sharedTarget || !mounted) return;
 
+      setSharedEntryError(null);
       setPendingSharedEntry(sharedTarget);
 
       if (user) {
@@ -47,9 +50,19 @@ export default function RootNavigator() {
 
       setProcessingSharedEntry(true);
       try {
-        await signInAnonymously();
-      } catch {
+        await Promise.race([
+          signInAnonymously(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('게스트 로그인 응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.')), 12000)
+          ),
+        ]);
+      } catch (error) {
         setPendingSharedEntry(null);
+        const message =
+          error instanceof Error
+            ? error.message
+            : '게스트 로그인을 시작하지 못했어요. Supabase Anonymous Sign-Ins 설정을 확인해주세요.';
+        setSharedEntryError(message);
       } finally {
         if (mounted) {
           setProcessingSharedEntry(false);
@@ -187,6 +200,62 @@ export default function RootNavigator() {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (sharedEntryError) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
+        <Text style={{ fontSize: 20, fontWeight: '700', marginBottom: 12, textAlign: 'center' }}>
+          공유 링크를 여는 중 문제가 생겼어요
+        </Text>
+        <Text style={{ fontSize: 14, lineHeight: 22, textAlign: 'center', marginBottom: 20, color: '#666' }}>
+          {sharedEntryError}
+        </Text>
+        <TouchableOpacity
+          onPress={() => {
+            setSharedEntryError(null);
+            Linking.getInitialURL()
+              .then((url) => {
+                if (!url) {
+                  setSharedEntryError('공유 링크를 다시 열어주세요.');
+                  return;
+                }
+                const sharedTarget = parseSharedEntryUrl(url);
+                if (!sharedTarget) {
+                  setSharedEntryError('공유 링크 형식을 다시 확인해주세요.');
+                  return;
+                }
+                setPendingSharedEntry(sharedTarget);
+                setProcessingSharedEntry(true);
+                Promise.race([
+                  signInAnonymously(),
+                  new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('게스트 로그인 응답이 지연되고 있어요. 잠시 후 다시 시도해주세요.')), 12000)
+                  ),
+                ])
+                  .catch((error) => {
+                    setPendingSharedEntry(null);
+                    setSharedEntryError(error instanceof Error ? error.message : '다시 시도해주세요.');
+                  })
+                  .finally(() => {
+                    setProcessingSharedEntry(false);
+                  });
+              })
+              .catch(() => {
+                setSharedEntryError('공유 링크를 다시 열어주세요.');
+              });
+          }}
+          style={{
+            backgroundColor: '#2f80ed',
+            paddingHorizontal: 18,
+            paddingVertical: 12,
+            borderRadius: 10,
+          }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>다시 시도</Text>
+        </TouchableOpacity>
       </View>
     );
   }
