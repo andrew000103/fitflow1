@@ -128,8 +128,8 @@ export default function RootNavigator() {
       setSharedEntryStage('waiting-navigation');
       setSharedEntryDebug(
         user.isAnonymous
-          ? '게스트 로그인 완료. 공유 설문 화면으로 이동하는 중입니다.'
-          : '로그인된 세션이 확인되어 공유 설문 화면으로 이동하는 중입니다.'
+          ? '게스트 로그인 완료. 공유 테스트 화면으로 이동하는 중입니다.'
+          : '로그인된 세션이 확인되어 공유 테스트 화면으로 이동하는 중입니다.'
       );
     }
   }, [pendingSharedEntry, user]);
@@ -255,7 +255,7 @@ export default function RootNavigator() {
             : sharedEntryStage === 'starting-guest-login'
               ? '공유 링크용 게스트 로그인을 시도하는 중이에요'
               : sharedEntryStage === 'waiting-navigation'
-                ? '공유 설문 화면으로 이동하는 중이에요'
+                ? '공유 테스트 화면으로 이동하는 중이에요'
                 : '앱을 준비하는 중이에요'}
         </Text>
         <Text style={{ marginTop: 10, fontSize: 13, lineHeight: 20, color: '#666', textAlign: 'center' }}>
@@ -330,7 +330,7 @@ export default function RootNavigator() {
           onSharedEntryHandled={() => {
             setPendingSharedEntry(null);
             setSharedEntryStage('ready');
-            setSharedEntryDebug('공유 설문 라우팅이 완료됐어요.');
+            setSharedEntryDebug('공유 테스트 화면 이동이 완료됐어요.');
           }}
         />
       ) : (

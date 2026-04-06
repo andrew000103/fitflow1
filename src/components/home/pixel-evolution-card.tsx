@@ -345,7 +345,7 @@ export default function PixelEvolutionCard({
               내 헬스 레벨을 확인해보세요
             </Text>
             <Text style={[styles.emptyStateDescription, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-              설문을 바탕으로 현재 수준과 다음 단계를 간단히 정리해드려요.
+              테스트를 바탕으로 현재 수준과 다음 단계를 간단히 정리해드려요.
             </Text>
             <TouchableOpacity
               activeOpacity={0.85}

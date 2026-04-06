@@ -644,7 +644,7 @@ export default function AIOnboardingScreen() {
         </Text>
         <Text style={s.helperText}>
           {isSharedEntry
-            ? '간단한 설문으로 내 운동 레벨을 확인해볼 수 있어요. 답변은 몇 분 안에 끝나요.'
+            ? '간단한 테스트로 내 운동 레벨을 확인해볼 수 있어요. 답변은 몇 분 안에 끝나요.'
             : '레벨 판정과 추천 정확도를 높이기 위해 먼저 필요한 정보예요.'}
         </Text>
         <View style={s.genderRow}>

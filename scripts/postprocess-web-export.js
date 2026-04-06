@@ -127,7 +127,7 @@ function buildSharedLevelTestHeadMarkup(ogImagePath) {
   const ogImageUrl = normalizedBaseUrl && ogImagePath ? `${normalizedBaseUrl}${ogImagePath}` : ogImagePath;
   const title = '나의 헬스 레벨은 어디쯤일까? | fit';
   const description =
-    '픽셀 캐릭터와 함께 나의 헬스 레벨을 확인해보세요. 몇 가지 질문만 답하면 바로 결과를 볼 수 있어요.';
+    '픽셀 캐릭터와 함께 나의 헬스 레벨을 확인해보세요. 몇 가지 질문만 답하면 테스트 결과를 바로 볼 수 있어요.';
   const tags = [
     `<meta name="description" content="${escapeHtmlAttribute(description)}" />`,
     `<link rel="canonical" href="${escapeHtmlAttribute(canonicalUrl)}" />`,

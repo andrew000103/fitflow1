@@ -709,14 +709,14 @@ function RegenBottomSheet({
                 </Text>
               </TouchableOpacity>
 
-              {/* 새로 설문하기 */}
+              {/* 테스트 다시 하기 */}
               <TouchableOpacity
                 style={{ paddingVertical: 18, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
                 onPress={onRegenNew}
                 activeOpacity={0.7}
               >
                 <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
-                  새로 설문하기
+                  테스트 다시 하기
                 </Text>
                 <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 3 }}>
                   질문에 다시 답해서 더 정확한 플랜 만들기

@@ -68,7 +68,7 @@ function getQuickCharacterStyleCopy(
 
   return {
     headline: `${styleCopy}에 맞춰 현재 수준을 먼저 정리해두었어요.`,
-    supporting: `${dietCopy} 더 정확한 운동·식단 가이드를 원하면 설문을 진행해보세요.`,
+    supporting: `${dietCopy} 더 정확한 운동·식단 가이드를 원하면 테스트를 해보세요.`,
   };
 }
 
@@ -456,12 +456,12 @@ export default function HomeScreen() {
       ? `최근 기록 기준: ${personaSupportingMessage}`
       : surveyLevelResult?.description ?? null
     : hasQuickCharacterProfile
-      ? '예전 빠른 설정 대신, 이제는 설문 한 번으로 현재 헬스 레벨과 다음 단계를 더 정확하게 정리해드려요.'
-      : 'AI 플랜 없이도 괜찮아요. 설문 한 번으로 지금 내 루틴 기준 헬스 레벨을 먼저 확인할 수 있어요.';
+      ? '예전 빠른 설정 대신, 이제는 테스트 한 번으로 현재 헬스 레벨과 다음 단계를 더 정확하게 정리해드려요.'
+      : 'AI 플랜 없이도 괜찮아요. 테스트 한 번으로 지금 내 루틴 기준 헬스 레벨을 먼저 확인할 수 있어요.';
   const hamsterCtaHeadline = hasDetailedCharacterProfile
     ? surveyLevelResult?.vibe ?? (personaHeadline ? `최근 기록 기준: ${personaHeadline}` : null)
     : hasQuickCharacterProfile
-      ? `${quickCharacterCopy.headline} 지금은 설문 기반 판정으로 더 정확하게 다시 볼 수 있어요.`
+      ? `${quickCharacterCopy.headline} 지금은 테스트 기반 판정으로 더 정확하게 다시 볼 수 있어요.`
       : null;
   const handleHamsterCtaPress = useCallback(() => {
     if (hasCompletedOnboarding && surveyLevelResult) {

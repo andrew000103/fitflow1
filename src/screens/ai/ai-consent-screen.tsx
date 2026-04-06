@@ -76,7 +76,7 @@ export default function AIConsentScreen() {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={s.primaryBtnText}>설문 시작하기</Text>
+              <Text style={s.primaryBtnText}>테스트 시작하기</Text>
             )}
           </TouchableOpacity>
 
@@ -90,7 +90,7 @@ export default function AIConsentScreen() {
           <MaterialCommunityIcons name="creation" size={40} color={colors.accent} />
         </View>
 
-        <Text style={s.title}>설문을 바탕으로{'\n'}현재 헬스 레벨을 먼저 판정해드릴게요</Text>
+        <Text style={s.title}>테스트를 바탕으로{'\n'}현재 헬스 레벨을 먼저 판정해드릴게요</Text>
         <Text style={s.subtitle}>
           먼저 지금 내 수준과 다음 단계를 정리해드리고,{'\n'}
           원하시면 그다음 맞춤 AI 플랜까지 이어서 만들 수 있어요

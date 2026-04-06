@@ -41,8 +41,8 @@ export default function LoginScreen({ navigation }: Props) {
         {pendingPostSignupIntent ? (
           <Text style={styles.resumeHint}>
             {pendingPostSignupIntent === 'plan'
-              ? `로그인하면${pendingPostSignupEmail ? ` ${pendingPostSignupEmail}` : ''} 계정으로 방금 설문한 결과 기반 AI 플랜 받기를 이어서 진행할 수 있어요.`
-              : `로그인하면${pendingPostSignupEmail ? ` ${pendingPostSignupEmail}` : ''} 계정으로 방금 설문한 결과 화면으로 다시 이어갈 수 있어요.`}
+              ? `로그인하면${pendingPostSignupEmail ? ` ${pendingPostSignupEmail}` : ''} 계정으로 방금 테스트한 결과 기반 AI 플랜 받기를 이어서 진행할 수 있어요.`
+              : `로그인하면${pendingPostSignupEmail ? ` ${pendingPostSignupEmail}` : ''} 계정으로 방금 테스트한 결과 화면으로 다시 이어갈 수 있어요.`}
           </Text>
         ) : null}
 

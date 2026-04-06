@@ -304,13 +304,13 @@ export default function AILevelResultScreen() {
             <Text style={styles(colors).signupBenefitTitle}>회원가입하면 바로 이어서 할 수 있어요</Text>
           </View>
           <Text style={styles(colors).signupBenefitText}>
-            • 방금 입력한 설문 결과를 기준으로 맞춤 AI 플랜 받기
+            • 방금 입력한 테스트 결과를 기준으로 맞춤 AI 플랜 받기
           </Text>
           <Text style={styles(colors).signupBenefitText}>
             • 나중에 다시 돌아와 결과와 플랜 이어서 보기
           </Text>
           <Text style={styles(colors).signupBenefitHint}>
-            설문은 이미 끝났어요. 계정만 만들면 다음 단계로 바로 이어집니다.
+            테스트는 이미 끝났어요. 계정만 만들면 다음 단계로 바로 이어집니다.
           </Text>
         </View>
       ) : null}
