@@ -28,7 +28,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   initialize: async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const sessionResult = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('auth session init timeout')), 10000)
+        ),
+      ]);
+      const { data: { session } } = sessionResult;
       set({
         user: session?.user ? toAuthUser(session.user) : null,
         initialized: true,
