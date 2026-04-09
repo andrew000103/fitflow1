@@ -89,6 +89,7 @@ const CUSTOM_MINUTE_OPTIONS = Array.from({ length: CUSTOM_MAX_MINUTES + 1 }, (_,
 const CUSTOM_SECOND_OPTIONS = Array.from({ length: 12 }, (_, index) => index * 5);
 const WHEEL_ITEM_HEIGHT = 56;
 const WHEEL_PICKER_HEIGHT = WHEEL_ITEM_HEIGHT * 5;
+const WHEEL_SNAP_DELAY_MS = 80;
 
 function splitRestSeconds(totalSeconds: number): { minutes: number; seconds: number } {
   const clampedSeconds = Math.max(0, Math.min(totalSeconds, CUSTOM_MAX_MINUTES * 60 + 55));
@@ -184,6 +185,10 @@ function RestTimerSheet({ state, onClose, onSave, onReset }: RestTimerSheetProps
   const [customSeconds, setCustomSeconds] = useState(0);
   const minuteScrollRef = useRef<ScrollView>(null);
   const secondScrollRef = useRef<ScrollView>(null);
+  const wheelSnapTimers = useRef<{ minutes: ReturnType<typeof setTimeout> | null; seconds: ReturnType<typeof setTimeout> | null }>({
+    minutes: null,
+    seconds: null,
+  });
 
   const syncWheelToValue = useCallback(
     (ref: React.RefObject<ScrollView | null>, options: number[], value: number, animated: boolean) => {
@@ -210,18 +215,51 @@ function RestTimerSheet({ state, onClose, onSave, onReset }: RestTimerSheetProps
     return () => clearTimeout(timer);
   }, [mode, state, syncWheelToValue]);
 
+  useEffect(() => () => {
+    if (wheelSnapTimers.current.minutes) clearTimeout(wheelSnapTimers.current.minutes);
+    if (wheelSnapTimers.current.seconds) clearTimeout(wheelSnapTimers.current.seconds);
+  }, []);
+
   if (!state) return null;
 
   const canApplyCustom = customMinutes > 0 || customSeconds > 0;
-  const handleWheelMomentumEnd = (
+  const getWheelIndexFromOffset = (offsetY: number, options: number[]) =>
+    Math.max(0, Math.min(options.length - 1, Math.round(offsetY / WHEEL_ITEM_HEIGHT)));
+
+  const syncWheelStateFromOffset = (
+    options: number[],
+    setter: React.Dispatch<React.SetStateAction<number>>,
+    offsetY: number,
+  ) => {
+    const index = getWheelIndexFromOffset(offsetY, options);
+    setter(options[index]);
+  };
+
+  const snapWheelToNearest = (
+    wheel: 'minutes' | 'seconds',
     options: number[],
     setter: React.Dispatch<React.SetStateAction<number>>,
     ref: React.RefObject<ScrollView | null>,
-  ) => (event: any) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    const index = Math.max(0, Math.min(options.length - 1, Math.round(offsetY / WHEEL_ITEM_HEIGHT)));
+    offsetY: number,
+    animated: boolean,
+  ) => {
+    const index = getWheelIndexFromOffset(offsetY, options);
     setter(options[index]);
-    ref.current?.scrollTo({ y: index * WHEEL_ITEM_HEIGHT, animated: false });
+    ref.current?.scrollTo({ y: index * WHEEL_ITEM_HEIGHT, animated });
+  };
+
+  const scheduleWheelSnap = (
+    wheel: 'minutes' | 'seconds',
+    options: number[],
+    setter: React.Dispatch<React.SetStateAction<number>>,
+    ref: React.RefObject<ScrollView | null>,
+    offsetY: number,
+  ) => {
+    const existingTimer = wheelSnapTimers.current[wheel];
+    if (existingTimer) clearTimeout(existingTimer);
+    wheelSnapTimers.current[wheel] = setTimeout(() => {
+      snapWheelToNearest(wheel, options, setter, ref, offsetY, true);
+    }, WHEEL_SNAP_DELAY_MS);
   };
 
   const handleSelectPreset = (seconds: number) => {
@@ -248,6 +286,7 @@ function RestTimerSheet({ state, onClose, onSave, onReset }: RestTimerSheetProps
   };
 
   const renderWheel = (
+    wheel: 'minutes' | 'seconds',
     label: string,
     options: number[],
     value: number,
@@ -277,9 +316,21 @@ function RestTimerSheet({ state, onClose, onSave, onReset }: RestTimerSheetProps
           snapToInterval={WHEEL_ITEM_HEIGHT}
           decelerationRate="fast"
           bounces={false}
+          scrollEventThrottle={16}
           contentContainerStyle={styles.restWheelContent}
-          onMomentumScrollEnd={handleWheelMomentumEnd(options, setter, ref)}
-          onScrollEndDrag={handleWheelMomentumEnd(options, setter, ref)}
+          onScroll={(event) => {
+            const offsetY = event.nativeEvent.contentOffset.y;
+            syncWheelStateFromOffset(options, setter, offsetY);
+            scheduleWheelSnap(wheel, options, setter, ref, offsetY);
+          }}
+          onMomentumScrollEnd={(event) => {
+            const offsetY = event.nativeEvent.contentOffset.y;
+            snapWheelToNearest(wheel, options, setter, ref, offsetY, false);
+          }}
+          onScrollEndDrag={(event) => {
+            const offsetY = event.nativeEvent.contentOffset.y;
+            scheduleWheelSnap(wheel, options, setter, ref, offsetY);
+          }}
         >
           {options.map((option) => {
             const selected = option === value;
@@ -296,6 +347,7 @@ function RestTimerSheet({ state, onClose, onSave, onReset }: RestTimerSheetProps
                 <Text
                   style={[
                     styles.restWheelItemText,
+                    selected && styles.restWheelItemTextSelected,
                     {
                       color: selected ? colors.text : colors.textTertiary,
                       fontFamily: typography.fontFamily,
@@ -448,8 +500,8 @@ function RestTimerSheet({ state, onClose, onSave, onReset }: RestTimerSheetProps
             </Text>
 
             <View style={styles.restWheelRow}>
-              {renderWheel('분', CUSTOM_MINUTE_OPTIONS, customMinutes, setCustomMinutes, minuteScrollRef)}
-              {renderWheel('초', CUSTOM_SECOND_OPTIONS, customSeconds, setCustomSeconds, secondScrollRef)}
+              {renderWheel('minutes', '분', CUSTOM_MINUTE_OPTIONS, customMinutes, setCustomMinutes, minuteScrollRef)}
+              {renderWheel('seconds', '초', CUSTOM_SECOND_OPTIONS, customSeconds, setCustomSeconds, secondScrollRef)}
             </View>
 
             <View style={styles.restSheetFooter}>
@@ -1709,11 +1761,13 @@ const styles = StyleSheet.create({
     marginTop: 36,
     paddingHorizontal: 18,
     gap: 18,
+    alignItems: 'center',
   },
   restPresetRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     gap: 18,
+    alignSelf: 'center',
   },
   restPresetButton: {
     width: 95,
@@ -1763,6 +1817,8 @@ const styles = StyleSheet.create({
   },
   restWheelContent: {
     paddingVertical: WHEEL_ITEM_HEIGHT * 2,
+    position: 'relative',
+    zIndex: 1,
   },
   restWheelSelection: {
     position: 'absolute',
@@ -1772,16 +1828,21 @@ const styles = StyleSheet.create({
     height: WHEEL_ITEM_HEIGHT,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
-    zIndex: 1,
+    backgroundColor: 'transparent',
+    zIndex: 0,
   },
   restWheelItem: {
     height: WHEEL_ITEM_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 1,
   },
   restWheelItemText: {
     fontSize: 28,
     fontWeight: '500',
+  },
+  restWheelItemTextSelected: {
+    fontWeight: '800',
   },
   restSheetFooter: {
     marginTop: 28,
