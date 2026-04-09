@@ -83,6 +83,30 @@ function formatRestLabel(totalSeconds: number): string {
   return formatSeconds(totalSeconds);
 }
 
+const REST_PRESET_OPTIONS = [60, 120, 180, 300];
+const CUSTOM_MAX_MINUTES = 59;
+const CUSTOM_MINUTE_OPTIONS = Array.from({ length: CUSTOM_MAX_MINUTES + 1 }, (_, index) => index);
+const CUSTOM_SECOND_OPTIONS = Array.from({ length: 12 }, (_, index) => index * 5);
+const WHEEL_ITEM_HEIGHT = 56;
+const WHEEL_PICKER_HEIGHT = WHEEL_ITEM_HEIGHT * 5;
+
+function splitRestSeconds(totalSeconds: number): { minutes: number; seconds: number } {
+  const clampedSeconds = Math.max(0, Math.min(totalSeconds, CUSTOM_MAX_MINUTES * 60 + 55));
+  let minutes = Math.floor(clampedSeconds / 60);
+  let seconds = Math.round((clampedSeconds % 60) / 5) * 5;
+
+  if (seconds === 60) {
+    if (minutes >= CUSTOM_MAX_MINUTES) {
+      seconds = 55;
+    } else {
+      minutes += 1;
+      seconds = 0;
+    }
+  }
+
+  return { minutes, seconds };
+}
+
 // ─── BottomSheet ──────────────────────────────────────────────────────────────
 
 interface BottomSheetProps {
@@ -155,24 +179,155 @@ interface RestTimerSheetProps {
 
 function RestTimerSheet({ state, onClose, onSave, onReset }: RestTimerSheetProps) {
   const { colors, typography } = useAppTheme();
-  const [customSecondsText, setCustomSecondsText] = useState('');
+  const [mode, setMode] = useState<'presets' | 'custom'>('presets');
+  const [customMinutes, setCustomMinutes] = useState(0);
+  const [customSeconds, setCustomSeconds] = useState(0);
+  const minuteScrollRef = useRef<ScrollView>(null);
+  const secondScrollRef = useRef<ScrollView>(null);
+
+  const syncWheelToValue = useCallback(
+    (ref: React.RefObject<ScrollView | null>, options: number[], value: number, animated: boolean) => {
+      const index = Math.max(0, options.indexOf(value));
+      ref.current?.scrollTo({ y: index * WHEEL_ITEM_HEIGHT, animated });
+    },
+    [],
+  );
 
   useEffect(() => {
-    setCustomSecondsText(state ? String(state.currentSeconds) : '');
+    if (!state) return;
+    const nextValue = splitRestSeconds(state.currentSeconds);
+    setMode('presets');
+    setCustomMinutes(nextValue.minutes);
+    setCustomSeconds(nextValue.seconds);
   }, [state]);
+
+  useEffect(() => {
+    if (!state || mode !== 'custom') return;
+    const timer = setTimeout(() => {
+      syncWheelToValue(minuteScrollRef, CUSTOM_MINUTE_OPTIONS, customMinutes, false);
+      syncWheelToValue(secondScrollRef, CUSTOM_SECOND_OPTIONS, customSeconds, false);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [mode, state, syncWheelToValue]);
 
   if (!state) return null;
 
-  const presetOptions = [60, 120, 180, 300];
-  const parsedCustomSeconds = parseInt(customSecondsText, 10);
-  const canApplyCustom = Number.isFinite(parsedCustomSeconds) && parsedCustomSeconds > 0;
+  const canApplyCustom = customMinutes > 0 || customSeconds > 0;
+  const handleWheelMomentumEnd = (
+    options: number[],
+    setter: React.Dispatch<React.SetStateAction<number>>,
+    ref: React.RefObject<ScrollView | null>,
+  ) => (event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    const index = Math.max(0, Math.min(options.length - 1, Math.round(offsetY / WHEEL_ITEM_HEIGHT)));
+    setter(options[index]);
+    ref.current?.scrollTo({ y: index * WHEEL_ITEM_HEIGHT, animated: false });
+  };
+
+  const handleSelectPreset = (seconds: number) => {
+    onSave(seconds);
+    onClose();
+  };
+
+  const handleEnterCustom = () => {
+    const nextValue = splitRestSeconds(state.currentSeconds);
+    setCustomMinutes(nextValue.minutes);
+    setCustomSeconds(nextValue.seconds);
+    setMode('custom');
+  };
+
+  const handleApplyCustom = () => {
+    if (!canApplyCustom) return;
+    onSave(customMinutes * 60 + customSeconds);
+    onClose();
+  };
+
+  const handleResetAndClose = () => {
+    onReset();
+    onClose();
+  };
+
+  const renderWheel = (
+    label: string,
+    options: number[],
+    value: number,
+    setter: React.Dispatch<React.SetStateAction<number>>,
+    ref: React.RefObject<ScrollView | null>,
+  ) => (
+    <View style={styles.restWheelColumn}>
+      <Text
+        style={[
+          styles.restWheelLabel,
+          { color: colors.textSecondary, fontFamily: typography.fontFamily },
+        ]}
+      >
+        {label}
+      </Text>
+      <View style={styles.restWheelFrame}>
+        <View
+          pointerEvents="none"
+          style={[
+            styles.restWheelSelection,
+            { backgroundColor: colors.background, borderColor: colors.border },
+          ]}
+        />
+        <ScrollView
+          ref={ref}
+          showsVerticalScrollIndicator={false}
+          snapToInterval={WHEEL_ITEM_HEIGHT}
+          decelerationRate="fast"
+          bounces={false}
+          contentContainerStyle={styles.restWheelContent}
+          onMomentumScrollEnd={handleWheelMomentumEnd(options, setter, ref)}
+          onScrollEndDrag={handleWheelMomentumEnd(options, setter, ref)}
+        >
+          {options.map((option) => {
+            const selected = option === value;
+            return (
+              <TouchableOpacity
+                key={`${label}-${option}`}
+                style={styles.restWheelItem}
+                onPress={() => {
+                  setter(option);
+                  syncWheelToValue(ref, options, option, true);
+                }}
+                activeOpacity={0.75}
+              >
+                <Text
+                  style={[
+                    styles.restWheelItemText,
+                    {
+                      color: selected ? colors.text : colors.textTertiary,
+                      fontFamily: typography.fontFamily,
+                    },
+                  ]}
+                >
+                  {String(option).padStart(2, '0')}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </View>
+  );
 
   return (
     <View style={sheetStyles.overlay}>
       <TouchableOpacity style={sheetStyles.backdrop} onPress={onClose} activeOpacity={1} />
       <View style={[sheetStyles.sheet, { backgroundColor: colors.card }]}>
         <View style={styles.restSheetHeader}>
-          <View style={styles.restSheetHeaderSpacer} />
+          {mode === 'custom' ? (
+            <TouchableOpacity
+              onPress={() => setMode('presets')}
+              style={styles.restSheetCloseBtn}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="chevron-left" size={32} color={colors.text} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.restSheetHeaderSpacer} />
+          )}
           <Text
             style={[
               styles.restSheetTitle,
@@ -186,134 +341,148 @@ function RestTimerSheet({ state, onClose, onSave, onReset }: RestTimerSheetProps
           </TouchableOpacity>
         </View>
 
-        <Text
-          style={[
-            styles.restSheetExerciseName,
-            { color: colors.textSecondary, fontFamily: typography.fontFamily },
-          ]}
-        >
-          {state.exerciseName}
-        </Text>
+        {mode === 'presets' ? (
+          <>
+            <View style={styles.restPresetGrid}>
+              <View style={styles.restPresetRow}>
+                {REST_PRESET_OPTIONS.slice(0, 3).map((seconds) => {
+                  const selected = seconds === state.currentSeconds;
+                  return (
+                    <TouchableOpacity
+                      key={seconds}
+                      style={[
+                        styles.restPresetButton,
+                        {
+                          backgroundColor: selected ? colors.accent : colors.background,
+                          borderColor: selected ? colors.accent : colors.border,
+                        },
+                      ]}
+                      onPress={() => handleSelectPreset(seconds)}
+                      activeOpacity={0.82}
+                    >
+                      <View style={[styles.restPresetInnerRing, { borderColor: colors.border }]}>
+                        <Text
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          style={[
+                            styles.restPresetText,
+                            {
+                              color: selected ? '#fff' : colors.text,
+                              fontFamily: typography.fontFamily,
+                            },
+                          ]}
+                        >
+                          {formatSeconds(seconds)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-        <Text
-          style={[
-            styles.restSheetCurrent,
-            { color: colors.text, fontFamily: typography.fontFamily },
-          ]}
-        >
-          현재 휴식 {formatRestLabel(state.currentSeconds)}
-        </Text>
-        <Text
-          style={[
-            styles.restSheetRecommended,
-            { color: colors.textSecondary, fontFamily: typography.fontFamily },
-          ]}
-        >
-          추천 휴식 {formatRestLabel(state.recommendedSeconds)}
-        </Text>
+              <View style={styles.restPresetRow}>
+                {[REST_PRESET_OPTIONS[3], 'custom' as const].map((item) => {
+                  const isCustom = item === 'custom';
+                  const seconds = typeof item === 'number' ? item : null;
+                  const selected = seconds !== null && seconds === state.currentSeconds;
+                  return (
+                    <TouchableOpacity
+                      key={isCustom ? 'custom' : String(seconds)}
+                      style={[
+                        styles.restPresetButton,
+                        {
+                          backgroundColor: selected ? colors.accent : colors.background,
+                          borderColor: selected ? colors.accent : colors.border,
+                        },
+                      ]}
+                      onPress={() => (isCustom ? handleEnterCustom() : handleSelectPreset(seconds!))}
+                      activeOpacity={0.82}
+                    >
+                      <View style={[styles.restPresetInnerRing, { borderColor: colors.border }]}>
+                        <Text
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          style={[
+                            styles.restPresetText,
+                            {
+                              color: selected ? '#fff' : colors.text,
+                              fontFamily: typography.fontFamily,
+                            },
+                          ]}
+                        >
+                          {isCustom ? 'Custom' : formatSeconds(seconds!)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
 
-        <View style={styles.restPresetGrid}>
-          {presetOptions.map((seconds) => {
-            const selected = seconds === state.currentSeconds;
-            return (
+            <View style={styles.restSheetFooter}>
               <TouchableOpacity
-                key={seconds}
-                style={[
-                  styles.restPresetButton,
-                  {
-                    backgroundColor: selected ? colors.accent : colors.background,
-                    borderColor: selected ? colors.accent : colors.border,
-                  },
-                ]}
-                onPress={() => {
-                  onSave(seconds);
-                  onClose();
-                }}
+                style={[styles.restSecondaryBtn, { borderColor: colors.border }]}
+                onPress={handleResetAndClose}
                 activeOpacity={0.8}
               >
                 <Text
                   style={[
-                    styles.restPresetText,
-                    {
-                      color: selected ? '#fff' : colors.text,
-                      fontFamily: typography.fontFamily,
-                    },
+                    styles.restSecondaryBtnText,
+                    { color: colors.textSecondary, fontFamily: typography.fontFamily },
                   ]}
                 >
-                  {formatRestLabel(seconds)}
+                  추천값으로 복원
                 </Text>
               </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <View style={[styles.restCustomCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
-          <Text
-            style={[
-              styles.restCustomLabel,
-              { color: colors.text, fontFamily: typography.fontFamily },
-            ]}
-          >
-            직접 입력
-          </Text>
-          <View style={styles.restCustomRow}>
-            <TextInput
-              style={[
-                styles.restCustomInput,
-                {
-                  color: colors.text,
-                  fontFamily: typography.fontFamily,
-                  borderColor: colors.border,
-                  backgroundColor: colors.card,
-                },
-              ]}
-              keyboardType="number-pad"
-              value={customSecondsText}
-              onChangeText={setCustomSecondsText}
-              placeholder="초"
-              placeholderTextColor={colors.textTertiary}
-            />
-            <TouchableOpacity
-              style={[
-                styles.restApplyBtn,
-                { backgroundColor: canApplyCustom ? colors.accent : colors.border },
-              ]}
-              onPress={() => {
-                if (!canApplyCustom) return;
-                onSave(parsedCustomSeconds);
-                onClose();
-              }}
-              activeOpacity={0.8}
-              disabled={!canApplyCustom}
-            >
-              <Text
-                style={[
-                  styles.restApplyBtnText,
-                  { fontFamily: typography.fontFamily },
-                ]}
-              >
-                적용
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.restSheetFooter}>
-          <TouchableOpacity
-            style={[styles.restSecondaryBtn, { borderColor: colors.border }]}
-            onPress={onReset}
-            activeOpacity={0.8}
-          >
+            </View>
+          </>
+        ) : (
+          <>
             <Text
               style={[
-                styles.restSecondaryBtnText,
+                styles.restCustomSummary,
                 { color: colors.textSecondary, fontFamily: typography.fontFamily },
               ]}
             >
-              추천값으로 복원
+              {String(customMinutes).padStart(2, '0')}:{String(customSeconds).padStart(2, '0')}
             </Text>
-          </TouchableOpacity>
-        </View>
+
+            <View style={styles.restWheelRow}>
+              {renderWheel('분', CUSTOM_MINUTE_OPTIONS, customMinutes, setCustomMinutes, minuteScrollRef)}
+              {renderWheel('초', CUSTOM_SECOND_OPTIONS, customSeconds, setCustomSeconds, secondScrollRef)}
+            </View>
+
+            <View style={styles.restSheetFooter}>
+              <TouchableOpacity
+                style={[
+                  styles.restPrimaryBtn,
+                  { backgroundColor: canApplyCustom ? colors.accent : colors.border },
+                ]}
+                onPress={handleApplyCustom}
+                activeOpacity={0.85}
+                disabled={!canApplyCustom}
+              >
+                <Text style={[styles.restPrimaryBtnText, { fontFamily: typography.fontFamily }]}>
+                  Start
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.restSecondaryBtn, { borderColor: colors.border }]}
+                onPress={handleResetAndClose}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.restSecondaryBtnText,
+                    { color: colors.textSecondary, fontFamily: typography.fontFamily },
+                  ]}
+                >
+                  추천값으로 복원
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
@@ -1536,83 +1705,92 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  restSheetExerciseName: {
-    marginTop: 4,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  restSheetCurrent: {
-    marginTop: 20,
-    fontSize: 26,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  restSheetRecommended: {
-    marginTop: 6,
-    fontSize: 14,
-    textAlign: 'center',
-  },
   restPresetGrid: {
+    marginTop: 36,
+    paddingHorizontal: 18,
+    gap: 18,
+  },
+  restPresetRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 12,
-    marginTop: 24,
+    justifyContent: 'flex-start',
+    gap: 18,
   },
   restPresetButton: {
-    width: 94,
-    height: 94,
-    borderRadius: 47,
+    width: 95,
+    aspectRatio: 1,
+    borderRadius: 999,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  restPresetText: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  restCustomCard: {
+  restPresetInnerRing: {
+    width: '76%',
+    height: '76%',
+    borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    padding: 14,
-    marginTop: 24,
-  },
-  restCustomLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  restCustomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  restCustomInput: {
-    flex: 1,
-    height: 46,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    fontSize: 16,
-  },
-  restApplyBtn: {
-    height: 46,
-    paddingHorizontal: 18,
-    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  restApplyBtnText: {
-    fontSize: 14,
+  restPresetText: {
+    fontSize: 17,
     fontWeight: '700',
-    color: '#fff',
+  },
+  restCustomSummary: {
+    marginTop: 26,
+    fontSize: 18,
+    textAlign: 'center',
+    letterSpacing: 1.2,
+  },
+  restWheelRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 26,
+    paddingHorizontal: 18,
+  },
+  restWheelColumn: {
+    flex: 1,
+  },
+  restWheelLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  restWheelFrame: {
+    height: WHEEL_PICKER_HEIGHT,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  restWheelContent: {
+    paddingVertical: WHEEL_ITEM_HEIGHT * 2,
+  },
+  restWheelSelection: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: WHEEL_ITEM_HEIGHT * 2,
+    height: WHEEL_ITEM_HEIGHT,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    zIndex: 1,
+  },
+  restWheelItem: {
+    height: WHEEL_ITEM_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restWheelItemText: {
+    fontSize: 28,
+    fontWeight: '500',
   },
   restSheetFooter: {
-    marginTop: 16,
+    marginTop: 28,
+    paddingHorizontal: 18,
+    gap: 12,
   },
   restSecondaryBtn: {
-    height: 46,
-    borderRadius: 12,
+    height: 52,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1620,6 +1798,17 @@ const styles = StyleSheet.create({
   restSecondaryBtnText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  restPrimaryBtn: {
+    height: 56,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restPrimaryBtnText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111',
   },
   noteRow: {
     paddingHorizontal: 16,
