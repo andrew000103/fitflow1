@@ -1,8 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Sharing from 'expo-sharing';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Image, Platform, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Platform, Share, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Text } from 'react-native-paper';
 import ViewShot from 'react-native-view-shot';
 
@@ -46,10 +47,44 @@ function buildShareMessage(params: {
     .join('\n');
 }
 
+function isShareDismissed(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return (
+    error.name === 'AbortError' ||
+    message.includes('cancel') ||
+    message.includes('dismiss') ||
+    message.includes('aborted')
+  );
+}
+
+function getImageAssetMeta(source: unknown): { uri?: string; width?: number; height?: number } {
+  if (!source) return {};
+
+  if (typeof source === 'object') {
+    const objectSource = source as { uri?: string; width?: number; height?: number };
+    if (objectSource.uri || objectSource.width || objectSource.height) {
+      return objectSource;
+    }
+  }
+
+  const resolveAssetSource = (Image as typeof Image & {
+    resolveAssetSource?: (asset: unknown) => { uri?: string; width?: number; height?: number } | undefined;
+  }).resolveAssetSource;
+
+  if (typeof resolveAssetSource === 'function') {
+    return resolveAssetSource(source) ?? {};
+  }
+
+  return {};
+}
+
 export default function AILevelResultScreen() {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<RouteProp<RootStackParamList, 'AILevelResult'>>();
   const { colors } = useAppTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const user = useAuthStore((s) => s.user);
   const isSharedEntry = route.params?.entry === 'shared';
   const isRetestMode = route.params?.mode === 'retest';
@@ -141,6 +176,24 @@ export default function AILevelResultScreen() {
     return `${condensed.slice(0, 77).trimEnd()}...`;
   }, [surveyLevelResult]);
 
+  const resultImageSize = useMemo(() => {
+    const horizontalPadding = 48;
+    const availableWidth = Math.max(windowWidth - horizontalPadding, 0);
+    return Math.min(Math.max(availableWidth * 0.9, 250), 420);
+  }, [windowWidth]);
+
+  const resultImageStyle = useMemo(() => {
+    const assetMeta = getImageAssetMeta(imageSource);
+    const assetWidth = assetMeta.width ?? 1;
+    const assetHeight = assetMeta.height ?? 1;
+    const aspectRatio = assetWidth / assetHeight;
+
+    return {
+      width: resultImageSize,
+      height: resultImageSize / aspectRatio,
+    };
+  }, [imageSource, resultImageSize]);
+
   const handleNavigate = () => {
     navigation.replace('AIPlanResult', {});
   };
@@ -163,7 +216,41 @@ export default function AILevelResultScreen() {
         shareUrl,
       });
 
-      if (Platform.OS === 'web' || !shareCardRef.current?.capture) {
+      const captureUri = shareCardRef.current?.capture ? await shareCardRef.current.capture() : null;
+
+      if (Platform.OS === 'web') {
+        const webNavigator = typeof navigator !== 'undefined' ? (navigator as {
+          share?: (data: { title?: string; text?: string; url?: string; files?: File[] }) => Promise<void>;
+          canShare?: (data?: { files?: File[] }) => boolean;
+        }) : null;
+        const assetMeta = getImageAssetMeta(imageSource);
+        const assetUri = captureUri ?? assetMeta.uri;
+
+        if (webNavigator?.share && assetUri) {
+          try {
+            const response = await fetch(assetUri);
+            const blob = await response.blob();
+            const fileExtension = blob.type.includes('png') ? 'png' : 'jpg';
+            const sharedImageFile = new File([blob], `fitlog-health-type-share.${fileExtension}`, {
+              type: blob.type || 'image/png',
+            });
+
+            if (!webNavigator.canShare || webNavigator.canShare({ files: [sharedImageFile] })) {
+              await webNavigator.share({
+                title: '헬스 유형 테스트',
+                text: shareMessage,
+                files: [sharedImageFile],
+              });
+              return;
+            }
+          } catch (shareError) {
+            if (isShareDismissed(shareError)) {
+              return;
+            }
+            // 브라우저/에셋 환경에 따라 파일 공유가 불가능할 수 있어 텍스트 공유로 폴백
+          }
+        }
+
         await Share.share({
           title: '헬스 유형 테스트',
           message: shareMessage,
@@ -171,13 +258,42 @@ export default function AILevelResultScreen() {
         return;
       }
 
-      const captureUri = await shareCardRef.current.capture();
+      if (!shareCardRef.current?.capture) {
+        await Share.share({
+          title: '헬스 유형 테스트',
+          message: shareMessage,
+        });
+        return;
+      }
+
+      if (!captureUri) {
+        await Share.share({
+          title: '헬스 유형 테스트',
+          message: shareMessage,
+        });
+        return;
+      }
+
+      const sharingAvailable = await Sharing.isAvailableAsync();
+      if (sharingAvailable) {
+        await Sharing.shareAsync(captureUri, {
+          mimeType: 'image/png',
+          UTI: 'public.png',
+          dialogTitle: '헬스 유형 테스트 공유하기',
+        });
+        return;
+      }
+
       await Share.share({
         title: '헬스 유형 테스트',
         message: shareMessage,
         url: captureUri,
       });
     } catch (e) {
+      if (isShareDismissed(e)) {
+        return;
+      }
+
       const shareUrl = getSharedLevelTestUrl();
       const fallbackMessage = shareUrl
         ? buildShareMessage({
@@ -346,7 +462,11 @@ export default function AILevelResultScreen() {
 
       {imageSource ? (
         <View style={styles(colors).imageWrap}>
-          <Image source={imageSource} style={styles(colors).image} resizeMode="contain" />
+          <Image
+            source={imageSource}
+            style={[styles(colors).image, resultImageStyle]}
+            resizeMode="contain"
+          />
         </View>
       ) : null}
 
@@ -496,11 +616,11 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
     imageWrap: {
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: 10,
+      width: '100%',
+      marginBottom: 14,
     },
     image: {
-      width: 220,
-      height: 220,
+      maxWidth: '100%',
     },
     title: {
       color: colors.text,
@@ -766,14 +886,15 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
     shareImagePanel: {
       backgroundColor: colors.card,
       borderRadius: 36,
-      paddingVertical: 48,
+      paddingVertical: 56,
+      minHeight: 560,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 30,
     },
     shareImage: {
-      width: 460,
-      height: 460,
+      width: 560,
+      height: 560,
     },
     shareCardTitle: {
       color: colors.text,
