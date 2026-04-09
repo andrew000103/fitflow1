@@ -1,0 +1,25 @@
+# Food Search/Add Path Unification
+
+- Date: 2026-04-07
+- Scope: 음식 검색 경로와 식단 추가 저장 경로 단일화
+- Search decision:
+  - Public food search is API-first through `src/lib/food-api.ts` and `supabase/functions/search-food`.
+  - User-owned custom foods are read from `foods` only by `user_id` and `source = 'user'`.
+  - `src/lib/food-search.ts` merges page-1 user foods with public API results, then dedupes, ranks, caches, and returns `FoodItem[]`.
+- Save decision:
+  - Meal logging no longer inserts directly into `meal_items` from the food search screen.
+  - `src/screens/diet/food-search-screen.tsx` calls `diet-store.addEntry()` only.
+  - Supabase meal persistence remains behind `src/lib/diet-supabase.ts` using `meal_logs`, `food_json`, and `entry_local_id`.
+- Data-layer cleanup:
+  - `src/lib/diet-search.ts` now owns custom `foods` CRUD and user-food search only.
+  - Direct meal insert helper exports were removed.
+  - `saveUserFood()` stores custom foods as `visibility = 'private'`.
+- UX cleanup:
+  - Search errors and direct-input save errors are visible instead of silently swallowed.
+  - Anonymous users are explicitly blocked from adding/saving diet entries in this screen.
+- Verification:
+  - `npx tsc --noEmit` passed.
+  - `git diff --check` passed.
+- Remaining validation:
+  - Manual Expo/native test: public search -> add -> app restart -> restored entry.
+  - Supabase runtime check: `search-food` Edge Function deployment and `MFDS_API_KEY`.

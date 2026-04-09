@@ -323,7 +323,7 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer key={user ? `authed:${user.id}:${user.isAnonymous ? 'anon' : 'member'}` : 'auth'}>
       {user ? (
         <MainNavigator
           pendingSharedEntry={pendingSharedEntry === 'level-test'}

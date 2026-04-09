@@ -25,6 +25,7 @@ import WorkoutNavigator from './workout-navigator';
 
 import AIPlanResultScreen from '../screens/ai/ai-plan-result-screen';
 import AIPlanWeeklyScreen from '../screens/ai/ai-plan-weekly-screen';
+import FitnessTypeTestScreen from '../screens/ai/fitness-type-test-screen';
 import { View } from 'react-native';
 
 // ─── 탭 네비게이터 ─────────────────────────────────────────────────────────────
@@ -370,6 +371,11 @@ export default function MainNavigator({
         name="AIExerciseSearch"
         component={AIExerciseSearchScreen}
         options={{ presentation: 'card' }}
+      />
+      <RootStack.Screen
+        name="FitnessTypeTest"
+        component={FitnessTypeTestScreen}
+        options={{ presentation: 'modal', gestureEnabled: true }}
       />
     </RootStack.Navigator>
   );

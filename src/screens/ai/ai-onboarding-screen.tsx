@@ -563,7 +563,7 @@ export default function AIOnboardingScreen() {
     };
   };
 
-  // ─── 완료 및 레벨 판정 ───────────────────────────────────────────────────────
+  // ─── 완료 및 유형 결과 ───────────────────────────────────────────────────────
   const handleFinish = async () => {
     let data: OnboardingData;
     try {
@@ -641,12 +641,12 @@ export default function AIOnboardingScreen() {
         }
       >
         <Text style={s.questionText}>
-          {isSharedEntry ? '친구가 공유한 레벨 테스트예요' : '기본 정보를 알려주세요'}
+          {isSharedEntry ? '친구가 공유한 헬스 유형 테스트예요' : '기본 정보를 알려주세요'}
         </Text>
         <Text style={s.helperText}>
           {isSharedEntry
-            ? '간단한 테스트로 내 운동 레벨을 확인해볼 수 있어요. 답변은 몇 분 안에 끝나요.'
-            : '레벨 판정과 추천 정확도를 높이기 위해 먼저 필요한 정보예요.'}
+            ? '간단한 테스트로 내 운동 유형을 확인해볼 수 있어요. 답변은 몇 분 안에 끝나요.'
+            : '테스트 결과와 추천 정확도를 높이기 위해 먼저 필요한 정보예요.'}
         </Text>
         <View style={s.genderRow}>
           {[

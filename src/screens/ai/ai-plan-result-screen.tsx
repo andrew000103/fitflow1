@@ -1245,7 +1245,7 @@ export default function AIPlanResultScreen() {
                 disabled={regenerating || applyingPlan}
                 activeOpacity={0.8}
               >
-                <Text style={[s.footerSecondaryText, { color: colors.textSecondary }]}>헬스 레벨 다시 검사</Text>
+                <Text style={[s.footerSecondaryText, { color: colors.textSecondary }]}>헬스 유형 다시 테스트</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1276,7 +1276,7 @@ export default function AIPlanResultScreen() {
                 disabled={regenerating || applyingPlan}
                 activeOpacity={0.8}
               >
-                <Text style={[s.footerSecondaryText, { color: colors.textSecondary }]}>헬스 레벨 다시 검사</Text>
+                <Text style={[s.footerSecondaryText, { color: colors.textSecondary }]}>헬스 유형 다시 테스트</Text>
               </TouchableOpacity>
 
               <TouchableOpacity

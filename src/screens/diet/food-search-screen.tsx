@@ -4,6 +4,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -20,7 +21,6 @@ import {
   FoodRow,
   SaveUserFoodParams,
   foodRowToFoodItem,
-  saveMealItemFromFoodItem,
   saveUserFood,
 } from '../../lib/diet-search';
 import { useAuthStore } from '../../stores/auth-store';
@@ -490,6 +490,8 @@ export default function FoodSearchScreen({ navigation, route }: Props) {
   const [results, setResults] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [directError, setDirectError] = useState<string | null>(null);
 
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   const [adding, setAdding] = useState(false);
@@ -507,11 +509,13 @@ export default function FoodSearchScreen({ navigation, route }: Props) {
     if (!normalized) {
       setResults([]);
       setHasSearched(false);
+      setSearchError(null);
       return;
     }
     if (pg === 1) {
       setLoading(true);
       setHasSearched(false);
+      setSearchError(null);
     } else {
       setLoadingMore(true);
     }
@@ -520,8 +524,15 @@ export default function FoodSearchScreen({ navigation, route }: Props) {
       if (pg === 1) setResults(items);
       else setResults(prev => [...prev, ...items]);
       setPage(pg);
-    } catch {
+    } catch (err) {
       if (pg === 1) setResults([]);
+      if (pg === 1) {
+        setSearchError(
+          err instanceof Error
+            ? err.message
+            : '음식 검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+        );
+      }
     } finally {
       if (pg === 1) {
         setLoading(false);
@@ -545,29 +556,30 @@ export default function FoodSearchScreen({ navigation, route }: Props) {
 
   // ── 항목 선택 → 섭취량 입력 → 저장 ─────────────────────────────────────
   const handleConfirmAmount = async (amountG: number) => {
-    if (!selectedFood || !user?.id) return;
-    setAdding(true);
-    try {
-      await saveMealItemFromFoodItem({
-        userId: user.id,
-        foodItem: selectedFood,
-        mealType,
-        date,
-        amountG,
-      });
-    } catch {
-      // Supabase 실패해도 로컬 스토어는 업데이트
+    if (!selectedFood) return;
+    if (!user?.id || user.isAnonymous) {
+      Alert.alert('로그인 필요', '음식을 식단에 추가하려면 일반 로그인이 필요합니다.');
+      return;
     }
 
-    // 로컬 diet-store 즉시 반영
-    addEntry(selectedFood, amountG, 'g', mealType, date);
-    setAdding(false);
-    navigation.goBack();
+    setAdding(true);
+    try {
+      addEntry(selectedFood, amountG, 'g', mealType, date);
+      setSelectedFood(null);
+      navigation.goBack();
+    } finally {
+      setAdding(false);
+    }
   };
 
   // ── 직접 입력 저장 ───────────────────────────────────────────────────────
   const handleSaveDirect = async (form: DirectForm) => {
-    if (!user?.id) return;
+    if (!user?.id || user.isAnonymous) {
+      setDirectError('직접 입력으로 음식을 저장하려면 일반 로그인이 필요합니다.');
+      return;
+    }
+
+    setDirectError(null);
     setSavingDirect(true);
     try {
       const params: SaveUserFoodParams = {
@@ -585,9 +597,13 @@ export default function FoodSearchScreen({ navigation, route }: Props) {
 
       const saved = await saveUserFood(params);
       setMode('search');
-      setSelectedFood(toFoodItem(saved));  // FoodRow → FoodItem 변환 후 섭취량 입력 모달로
-    } catch {
-      // 저장 실패 무시
+      setSelectedFood(toFoodItem(saved));
+    } catch (err) {
+      setDirectError(
+        err instanceof Error
+          ? err.message
+          : '직접 입력 음식 저장 중 오류가 발생했습니다. 다시 시도해 주세요.',
+      );
     } finally {
       setSavingDirect(false);
     }
@@ -610,12 +626,24 @@ export default function FoodSearchScreen({ navigation, route }: Props) {
 
       {mode === 'direct' ? (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <DirectInputForm
-            initialName={query.trim()}
-            onSave={handleSaveDirect}
-            onCancel={() => setMode('search')}
-            saving={savingDirect}
-          />
+          <>
+            {directError ? (
+              <View style={[styles.inlineBanner, { backgroundColor: colors.errorMuted, borderColor: colors.error }]}>
+                <Text style={{ color: colors.error, fontFamily: typography.fontFamily, fontSize: typography.size.sm }}>
+                  {directError}
+                </Text>
+              </View>
+            ) : null}
+            <DirectInputForm
+              initialName={query.trim()}
+              onSave={handleSaveDirect}
+              onCancel={() => {
+                setDirectError(null);
+                setMode('search');
+              }}
+              saving={savingDirect}
+            />
+          </>
         </KeyboardAvoidingView>
       ) : (
         <>
@@ -630,13 +658,14 @@ export default function FoodSearchScreen({ navigation, route }: Props) {
               onChangeText={(v) => {
                 setQuery(v);
                 setMode('search');
+                setSearchError(null);
               }}
               autoFocus
               autoCapitalize="none"
               autoCorrect={false}
             />
             {query.length > 0 ? (
-              <TouchableOpacity onPress={() => { setQuery(''); setResults([]); setHasSearched(false); }}>
+              <TouchableOpacity onPress={() => { setQuery(''); setResults([]); setHasSearched(false); setSearchError(null); }}>
                 <MaterialCommunityIcons name="close-circle" size={18} color={colors.textTertiary} />
               </TouchableOpacity>
             ) : null}
@@ -645,6 +674,22 @@ export default function FoodSearchScreen({ navigation, route }: Props) {
           {/* 상태별 콘텐츠 */}
           {loading ? (
             <ActivityIndicator style={{ marginTop: 56 }} color={colors.accent} />
+          ) : searchError ? (
+            <View style={styles.centerState}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={52} color={colors.error} />
+              <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.md, color: colors.error, textAlign: 'center', marginTop: 12 }}>
+                {searchError}
+              </Text>
+              <TouchableOpacity
+                style={[styles.primaryBtn, { backgroundColor: colors.accent }]}
+                onPress={() => doSearch(query, 1)}
+              >
+                <MaterialCommunityIcons name="refresh" size={18} color="#fff" />
+                <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.md, fontWeight: typography.weight.semibold, color: '#fff' }}>
+                  다시 시도
+                </Text>
+              </TouchableOpacity>
+            </View>
           ) : hasSearched && results.length === 0 ? (
             // 결과 없음
             <View style={styles.centerState}>
@@ -654,7 +699,10 @@ export default function FoodSearchScreen({ navigation, route }: Props) {
               </Text>
               <TouchableOpacity
                 style={[styles.primaryBtn, { backgroundColor: colors.accent }]}
-                onPress={() => setMode('direct')}
+                onPress={() => {
+                  setDirectError(null);
+                  setMode('direct');
+                }}
               >
                 <MaterialCommunityIcons name="pencil-plus-outline" size={18} color="#fff" />
                 <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.md, fontWeight: typography.weight.semibold, color: '#fff' }}>
@@ -671,7 +719,10 @@ export default function FoodSearchScreen({ navigation, route }: Props) {
               </Text>
               <TouchableOpacity
                 style={[styles.outlineBtn, { borderColor: colors.accent }]}
-                onPress={() => setMode('direct')}
+                onPress={() => {
+                  setDirectError(null);
+                  setMode('direct');
+                }}
               >
                 <MaterialCommunityIcons name="pencil-plus-outline" size={18} color={colors.accent} />
                 <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.md, fontWeight: typography.weight.medium, color: colors.accent }}>
@@ -679,45 +730,50 @@ export default function FoodSearchScreen({ navigation, route }: Props) {
                 </Text>
               </TouchableOpacity>
             </View>
-          ) : (
+            ) : (
             // 결과 목록
-            <FlatList
-              data={results}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <FoodResultCard food={item} onSelect={() => setSelectedFood(item)} />
-              )}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-              ListFooterComponent={
-                <View style={{ gap: 10, paddingTop: 4 }}>
-                  {/* 더 보기 */}
-                  <TouchableOpacity
-                    style={[styles.outlineBtn, { borderColor: colors.border }]}
-                    onPress={handleLoadMore}
-                    disabled={loadingMore}
-                  >
-                    {loadingMore ? (
-                      <ActivityIndicator size="small" color={colors.accent} />
-                    ) : (
-                      <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.md, fontWeight: typography.weight.medium, color: colors.textSecondary }}>
-                        더 보기
+            <>
+              <FlatList
+                data={results}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <FoodResultCard food={item} onSelect={() => setSelectedFood(item)} />
+                )}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                ListFooterComponent={
+                  <View style={{ gap: 10, paddingTop: 4 }}>
+                    {/* 더 보기 */}
+                    <TouchableOpacity
+                      style={[styles.outlineBtn, { borderColor: colors.border }]}
+                      onPress={handleLoadMore}
+                      disabled={loadingMore}
+                    >
+                      {loadingMore ? (
+                        <ActivityIndicator size="small" color={colors.accent} />
+                      ) : (
+                        <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.md, fontWeight: typography.weight.medium, color: colors.textSecondary }}>
+                          더 보기
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                    {/* 직접 입력 */}
+                    <TouchableOpacity
+                      style={[styles.outlineBtn, { borderColor: colors.accent }]}
+                      onPress={() => {
+                        setDirectError(null);
+                        setMode('direct');
+                      }}
+                    >
+                      <MaterialCommunityIcons name="pencil-plus-outline" size={18} color={colors.accent} />
+                      <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.md, fontWeight: typography.weight.medium, color: colors.accent }}>
+                        직접 입력하기
                       </Text>
-                    )}
-                  </TouchableOpacity>
-                  {/* 직접 입력 */}
-                  <TouchableOpacity
-                    style={[styles.outlineBtn, { borderColor: colors.accent }]}
-                    onPress={() => setMode('direct')}
-                  >
-                    <MaterialCommunityIcons name="pencil-plus-outline" size={18} color={colors.accent} />
-                    <Text style={{ fontFamily: typography.fontFamily, fontSize: typography.size.md, fontWeight: typography.weight.medium, color: colors.accent }}>
-                      직접 입력하기
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              }
-            />
+                    </TouchableOpacity>
+                  </View>
+                }
+              />
+            </>
           )}
         </>
       )}
@@ -791,5 +847,13 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 10,
     paddingBottom: 40,
+  },
+  inlineBanner: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginHorizontal: 16,
+    marginTop: 16,
   },
 });

@@ -1,0 +1,26 @@
+## 홈 헬스 레벨 카드 정리
+
+- 날짜: 2026-04-06
+- 작업: 홈 메인에서 캐릭터 이미지를 제거하고, 헬스 레벨 설명과 다음 단계, 운동 팁, 식단 팁 중심 카드로 전환
+- 상세 노출: 캐릭터는 설문 결과 화면과 홈 카드의 `현재 단계 보기` 모달에서만 노출
+- 카피 방향: 홈 표면에서 `진화 상태`, `다음 진화`, `햄식이` 같은 RPG 톤 문구 제거
+- 구현 파일:
+  - `src/components/home/pixel-evolution-card.tsx`
+  - `src/lib/health-level-content.ts`
+  - `src/screens/home/home-screen.tsx`
+  - `src/screens/ai/ai-consent-screen.tsx`
+  - `src/screens/persona/character-setup-screen.tsx`
+  - `src/lib/persona-engine.ts`
+  - `src/stores/persona-store.ts`
+- 검증: `npx tsc --noEmit` 통과
+- 마감 패스:
+  - 홈 카드 내부의 과거 RPG 톤 보정 정규식 제거
+  - 빠른 설정 화면 서브타이틀과 CTA를 헬스 레벨 톤으로 통일
+- QA 마감:
+  - 코드/문구 기준 최종 검색 완료 (`현재 단계 보기`, `헬스 레벨`, `다음 단계`, `운동 팁`, `식단 팁` 노출 확인)
+  - 금지 톤 검색 완료 (`진화`, `도감`, `햄식이`, `Quick Setup` 사용자 노출 코드 없음)
+  - 타입체크 재실행 완료 (`npx tsc --noEmit`)
+- 남은 실기기 체크:
+  - 작은 화면에서 홈 카드 3개 정보 블록 줄바꿈 확인
+  - `현재 단계 보기` 버튼 터치 영역과 모달 닫기 동작 확인
+  - 설문 전/후, 빠른 설정 사용자, AI 플랜 보유 사용자 각각 홈 카드 문구 확인

@@ -1,27 +1,16 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
-  FlatList,
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { Text } from 'react-native-paper';
 
 import { getHealthLevelContent } from '../../lib/health-level-content';
 import {
-  ARCHETYPE_META,
   CHARACTER_LEVELS,
-  DEFAULT_PIXEL_VARIANT,
-  PIXEL_IMAGE_MAP,
-  type CharacterArchetypeId,
   type CharacterLevelId,
-  type PixelVariantId,
 } from '../../lib/pixel-character-config';
 import type { EvolutionChecklistItem, PersonaDailyState } from '../../lib/persona-engine';
 import { useAppTheme } from '../../theme';
@@ -43,11 +32,7 @@ interface PixelEvolutionCardProps {
   loading?: boolean;
   ctaLabel?: string | null;
   onPressCta?: (() => void) | null;
-  variantId?: PixelVariantId | null;
-  archetypeId?: CharacterArchetypeId | null;
 }
-
-type CharacterLevelMetaItem = (typeof CHARACTER_LEVELS)[number];
 
 function formatPercent(progress?: number | null) {
   if (typeof progress !== 'number' || !Number.isFinite(progress)) return '0%';
@@ -136,139 +121,6 @@ function buildSimpleHeadline(
   return '지금 페이스를 이어가보세요.';
 }
 
-function PixelLevelViewer({
-  currentLevelId,
-  variantId,
-  visible,
-  onClose,
-}: {
-  currentLevelId?: CharacterLevelId | null;
-  variantId: PixelVariantId;
-  visible: boolean;
-  onClose: () => void;
-}) {
-  const { colors, spacing, radius, typography } = useAppTheme();
-  const { width, height } = useWindowDimensions();
-  const listRef = useRef<FlatList<CharacterLevelMetaItem>>(null);
-  const sliderWidth = Math.max(width - 32, 280);
-  const currentIndex = Math.max(CHARACTER_LEVELS.findIndex((item) => item.id === currentLevelId), 0);
-
-  useEffect(() => {
-    if (!visible) return;
-    const timer = setTimeout(() => {
-      listRef.current?.scrollToIndex({ index: currentIndex, animated: false });
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [currentIndex, visible]);
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View
-          style={[
-            styles.modalSheet,
-            {
-              backgroundColor: colors.card,
-              borderTopLeftRadius: radius.xl,
-              borderTopRightRadius: radius.xl,
-              maxHeight: Math.min(height * 0.82, 760),
-              paddingBottom: spacing.xl,
-            },
-          ]}
-        >
-          <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
-          <View style={[styles.modalHeader, { paddingHorizontal: spacing.lg }]}>
-            <View style={styles.modalHeaderCopy}>
-              <Text style={[styles.modalTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
-                현재 단계 보기
-              </Text>
-              <Text style={[styles.modalSubtitle, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-                지금 단계와 다음 단계를 한눈에 확인해보세요.
-              </Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: colors.separator, borderRadius: radius.full }]}>
-              <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          <FlatList
-            ref={listRef}
-            data={CHARACTER_LEVELS}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            decelerationRate="fast"
-            snapToAlignment="center"
-            keyExtractor={(item) => item.id}
-            getItemLayout={(_, index) => ({ index, length: sliderWidth, offset: sliderWidth * index })}
-            renderItem={({ item }: { item: CharacterLevelMetaItem }) => {
-              const isCurrent = item.id === currentLevelId;
-              const imageSource = PIXEL_IMAGE_MAP[variantId][item.id];
-              const levelContent = getHealthLevelContent(item.id);
-
-              return (
-                <View style={[styles.slide, { width: sliderWidth, paddingHorizontal: spacing.lg }]}>
-                  <View style={[styles.slideCard, { backgroundColor: colors.background, borderRadius: radius.xl, padding: spacing.lg }]}>
-                    <View style={styles.slideHeader}>
-                    <View style={styles.slideTitleWrap}>
-                      <Text style={[styles.slideLevel, { color: colors.text, fontFamily: typography.fontFamily }]}>
-                        {item.name}
-                      </Text>
-                    </View>
-                      {isCurrent && (
-                        <View style={[styles.currentBadge, { backgroundColor: colors.accentMuted, borderRadius: radius.full }]}>
-                          <Text style={[styles.currentBadgeText, { color: colors.accent, fontFamily: typography.fontFamily }]}>
-                            현재 단계
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-
-                    <View style={[styles.slideImageWrap, { backgroundColor: colors.separator, borderRadius: radius.lg }]}>
-                      {imageSource ? (
-                        <Image source={imageSource} style={styles.slideImage} resizeMode="contain" />
-                      ) : (
-                        <MaterialCommunityIcons name="human" size={72} color={colors.textTertiary} />
-                      )}
-                    </View>
-
-                    <ScrollView
-                      style={styles.slideDescriptionScroll}
-                      contentContainerStyle={styles.slideDescriptionContent}
-                      showsVerticalScrollIndicator={false}
-                    >
-                      <Text style={[styles.slideDescription, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-                        {levelContent?.shortBlurb ?? levelContent?.summary ?? item.description}
-                      </Text>
-                      {levelContent && (
-                        <>
-                          <Text style={[styles.slideTipTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
-                            운동 팁
-                          </Text>
-                          <Text style={[styles.slideTipBody, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-                            {levelContent.workoutTip}
-                          </Text>
-                          <Text style={[styles.slideTipTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
-                            식단 팁
-                          </Text>
-                          <Text style={[styles.slideTipBody, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-                            {levelContent.dietTip}
-                          </Text>
-                        </>
-                      )}
-                    </ScrollView>
-                  </View>
-                </View>
-              );
-            }}
-          />
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 function InfoBlock({
   icon,
   title,
@@ -313,19 +165,14 @@ export default function PixelEvolutionCard({
   loading = false,
   ctaLabel,
   onPressCta,
-  variantId,
-  archetypeId,
 }: PixelEvolutionCardProps) {
   const { colors, spacing, radius, typography } = useAppTheme();
-  const [viewerOpen, setViewerOpen] = useState(false);
-  const activeVariant: PixelVariantId = variantId ?? DEFAULT_PIXEL_VARIANT;
   const hasAssignedCharacter = Boolean(levelId && levelName);
   const isEmptyState = !hasAssignedCharacter && Boolean(ctaLabel && onPressCta);
   const levelMeta = useMemo(
     () => CHARACTER_LEVELS.find((item) => item.id === levelId),
     [levelId],
   );
-  const archetypeMeta = archetypeId ? ARCHETYPE_META[archetypeId] : null;
   const levelContent = getHealthLevelContent(levelId);
   const nextStepMessage = buildNextStepMessage(nextLevelName, checklist, progressToNext, progressMessage);
   const reliabilityNote = supportingMessage?.trim() || null;
@@ -335,70 +182,45 @@ export default function PixelEvolutionCard({
 
   if (isEmptyState) {
     return (
-      <>
-        <View style={[styles.container, { borderBottomColor: colors.border, padding: spacing.lg }]}>
-          <View style={styles.emptyStateWrap}>
-            <Text style={[styles.emptyStateTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
-              내 헬스 레벨을 확인해보세요
+      <View style={[styles.container, { borderBottomColor: colors.border, padding: spacing.lg }]}>
+        <View style={styles.emptyStateWrap}>
+          <Text style={[styles.emptyStateTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
+            내 현재 레벨을 확인해보세요
+          </Text>
+          <Text style={[styles.emptyStateDescription, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
+            테스트를 바탕으로 현재 수준과 다음 단계를 간단히 정리해드려요.
+          </Text>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={onPressCta ?? undefined}
+            style={[styles.emptyStateButton, { backgroundColor: colors.accent, borderRadius: radius.full }]}
+          >
+            <Text style={[styles.emptyStateButtonLabel, { color: '#FFFFFF', fontFamily: typography.fontFamily }]}>
+              {ctaLabel}
             </Text>
-            <Text style={[styles.emptyStateDescription, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-              테스트를 바탕으로 현재 수준과 다음 단계를 간단히 정리해드려요.
-            </Text>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={onPressCta ?? undefined}
-              style={[styles.emptyStateButton, { backgroundColor: colors.accent, borderRadius: radius.full }]}
-            >
-              <Text style={[styles.emptyStateButtonLabel, { color: '#FFFFFF', fontFamily: typography.fontFamily }]}>
-                {ctaLabel}
-              </Text>
-              <MaterialCommunityIcons name="chevron-right" size={16} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+            <MaterialCommunityIcons name="chevron-right" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
-
-        <PixelLevelViewer currentLevelId={levelId} variantId={activeVariant} visible={viewerOpen} onClose={() => setViewerOpen(false)} />
-      </>
+      </View>
     );
   }
 
   return (
-    <>
-      <View style={[styles.container, { borderBottomColor: colors.border, padding: spacing.lg }]}>
+    <View style={[styles.container, { borderBottomColor: colors.border, padding: spacing.lg }]}>
         <View style={styles.headerRow}>
           <View style={styles.headerCopy}>
             <Text style={[styles.eyebrow, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-              현재 헬스 레벨
+              현재 레벨
             </Text>
             <View style={styles.titleRow}>
               <Text style={[styles.levelTitle, { color: colors.text, fontFamily: typography.fontFamily }]}>
-                {levelName ?? levelMeta?.name ?? '헬스 레벨'}
+                {levelName ?? levelMeta?.name ?? '현재 레벨'}
               </Text>
-              {archetypeMeta && (
-                <View style={[styles.levelBadge, { backgroundColor: colors.separator, borderRadius: radius.full }]}>
-                  <Text style={[styles.secondaryBadgeText, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
-                    {archetypeMeta.name}
-                  </Text>
-                </View>
-              )}
             </View>
             <Text style={[styles.headline, { color: colors.textSecondary, fontFamily: typography.fontFamily }]}>
               {simpleHeadline}
             </Text>
           </View>
-
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => {
-              if (levelId) setViewerOpen(true);
-            }}
-            style={[styles.detailButton, { backgroundColor: colors.separator, borderRadius: radius.full }]}
-          >
-            <Text style={[styles.detailButtonText, { color: colors.text, fontFamily: typography.fontFamily }]}>
-              현재 단계 보기
-            </Text>
-            <MaterialCommunityIcons name="chevron-right" size={16} color={colors.textSecondary} />
-          </TouchableOpacity>
         </View>
 
         <View style={[styles.infoGrid, { marginTop: spacing.md }]}>
@@ -444,10 +266,7 @@ export default function PixelEvolutionCard({
             <MaterialCommunityIcons name="chevron-right" size={16} color={colors.accent} />
           </TouchableOpacity>
         )}
-      </View>
-
-      <PixelLevelViewer currentLevelId={levelId} variantId={activeVariant} visible={viewerOpen} onClose={() => setViewerOpen(false)} />
-    </>
+    </View>
   );
 }
 
@@ -477,35 +296,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
   },
-  levelBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  levelBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  secondaryBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
   headline: {
     fontSize: 13,
     lineHeight: 20,
     marginTop: 8,
-  },
-  detailButton: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    gap: 4,
-    marginTop: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  detailButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
   },
   infoGrid: {
     gap: 10,
@@ -585,112 +379,5 @@ const styles = StyleSheet.create({
   ctaLabel: {
     fontSize: 13,
     fontWeight: '800',
-  },
-  modalBackdrop: {
-    backgroundColor: 'rgba(0,0,0,0.28)',
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    minHeight: 320,
-  },
-  modalHandle: {
-    alignSelf: 'center',
-    borderRadius: 999,
-    height: 4,
-    marginTop: 10,
-    width: 42,
-  },
-  modalHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    marginBottom: 16,
-  },
-  modalHeaderCopy: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginTop: 4,
-  },
-  closeButton: {
-    alignItems: 'center',
-    height: 34,
-    justifyContent: 'center',
-    width: 34,
-  },
-  slide: {
-    paddingBottom: 8,
-  },
-  slideCard: {
-    flex: 1,
-  },
-  slideHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  slideTitleWrap: {
-    flex: 1,
-  },
-  slideLevel: {
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  slideNickname: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  currentBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  currentBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  slideImageWrap: {
-    alignItems: 'center',
-    height: 152,
-    justifyContent: 'center',
-    marginTop: 14,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  slideImage: {
-    height: 144,
-    width: '72%',
-  },
-  slideDescriptionScroll: {
-    flex: 1,
-    marginTop: 12,
-    minHeight: 120,
-  },
-  slideDescriptionContent: {
-    paddingBottom: 12,
-  },
-  slideDescription: {
-    fontSize: 14,
-    lineHeight: 22,
-  },
-  slideTipTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    marginTop: 16,
-  },
-  slideTipBody: {
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 6,
   },
 });

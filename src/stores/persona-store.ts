@@ -12,7 +12,7 @@ import {
   type PersonaMealDaySummary,
   type PersonaOnboardingInput,
 } from '../lib/persona-engine';
-import { assignPixelVariant, classifyArchetype } from '../lib/ai-level-classifier';
+import { assignFitnessType, classifyArchetype } from '../lib/ai-level-classifier';
 import {
   type CharacterArchetypeId,
   type CharacterLevelId,
@@ -342,7 +342,7 @@ export const usePersonaStore = create<PersonaStoreState>()(
         onboardingRaw?.gender ?? (quickProfileForVariant?.gender === 'female' ? 'female' : 'male');
       const variantGoal: import('../stores/ai-plan-store').AIGoal = onboardingRaw?.goal ?? 'maintenance';
       const variantGymType: import('../stores/ai-plan-store').GymType = onboardingRaw?.gymType ?? 'bodyweight';
-      const computedVariantId = assignPixelVariant(variantGender, variantGoal, variantGymType);
+      const computedVariantId = assignFitnessType(variantGender, variantGoal, variantGymType).typeId;
       const computedArchetypeId = classifyArchetype(variantGoal, variantGymType, onboardingRaw?.experience ?? 'beginner');
 
       set({

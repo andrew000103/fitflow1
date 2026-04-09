@@ -18,8 +18,8 @@ import { getSharedLevelTestUrl } from '../../lib/shared-entry';
 import type { SurveyLevelId } from '../../lib/ai-level-classifier';
 import {
   DEFAULT_PIXEL_VARIANT,
-  PIXEL_IMAGE_MAP,
-  PIXEL_VARIANT_META,
+  getFitnessTypeContent,
+  getFitnessTypeImage,
 } from '../../lib/pixel-character-config';
 import { useAIPlanStore } from '../../stores/ai-plan-store';
 import { useAuthStore } from '../../stores/auth-store';
@@ -33,11 +33,13 @@ function buildShareMessage(params: {
   summary: string;
   shareUrl: string;
 }) {
+  const typeHeadline = [params.levelName, params.typeName].filter(Boolean).join(' ').trim() || '알 수 없음';
+
   return [
-    `나는 ${params.levelName ?? '알 수 없음'} ${params.typeName ?? ''}`.trim(),
+    `나의 헬스 유형은 ${typeHeadline}`,
     params.summary,
     '',
-    '지금 바로 헬스 레벨 테스트하기',
+    '지금 바로 헬스 유형 테스트하러 가기',
     params.shareUrl,
   ]
     .filter(Boolean)
@@ -109,14 +111,18 @@ export default function AILevelResultScreen() {
 
   const imageSource = useMemo(() => {
     if (!surveyLevelResult) return null;
-    const variant = surveyLevelResult.variantId ?? DEFAULT_PIXEL_VARIANT;
-    return PIXEL_IMAGE_MAP[variant][surveyLevelResult.levelId];
+    return getFitnessTypeImage(
+      surveyLevelResult.variantId ?? DEFAULT_PIXEL_VARIANT,
+      surveyLevelResult.genderVariant ?? 'male',
+    );
   }, [surveyLevelResult]);
 
-  const variantMeta = useMemo(() => {
+  const celebContent = useMemo(() => {
     if (!surveyLevelResult) return null;
-    const variant = surveyLevelResult.variantId ?? DEFAULT_PIXEL_VARIANT;
-    return PIXEL_VARIANT_META[variant];
+    return getFitnessTypeContent(
+      surveyLevelResult.variantId ?? DEFAULT_PIXEL_VARIANT,
+      surveyLevelResult.genderVariant ?? 'male',
+    );
   }, [surveyLevelResult]);
 
   const shareDescription = useMemo(() => {
@@ -151,15 +157,15 @@ export default function AILevelResultScreen() {
         return;
       }
       const shareMessage = buildShareMessage({
-        levelName: surveyLevelResult?.levelName,
-        typeName: surveyLevelResult?.typeName ?? variantMeta?.label ?? null,
-        summary: shareDescription,
+        levelName: celebContent?.headline ?? surveyLevelResult?.levelName,
+        typeName: null,
+        summary: celebContent?.typeStory?.split('.')[0] ?? shareDescription,
         shareUrl,
       });
 
       if (Platform.OS === 'web' || !shareCardRef.current?.capture) {
         await Share.share({
-          title: '헬스 레벨 테스트 공유',
+          title: '헬스 유형 테스트',
           message: shareMessage,
         });
         return;
@@ -167,7 +173,7 @@ export default function AILevelResultScreen() {
 
       const captureUri = await shareCardRef.current.capture();
       await Share.share({
-        title: '헬스 레벨 테스트 공유',
+        title: '헬스 유형 테스트',
         message: shareMessage,
         url: captureUri,
       });
@@ -175,9 +181,9 @@ export default function AILevelResultScreen() {
       const shareUrl = getSharedLevelTestUrl();
       const fallbackMessage = shareUrl
         ? buildShareMessage({
-            levelName: surveyLevelResult?.levelName,
-            typeName: surveyLevelResult?.typeName ?? variantMeta?.label ?? null,
-            summary: shareDescription,
+            levelName: celebContent?.headline ?? surveyLevelResult?.levelName,
+            typeName: null,
+            summary: celebContent?.typeStory?.split('.')[0] ?? shareDescription,
             shareUrl,
           })
         : null;
@@ -185,7 +191,7 @@ export default function AILevelResultScreen() {
       if (fallbackMessage) {
         try {
           await Share.share({
-            title: '헬스 레벨 테스트 공유',
+            title: '헬스 유형 테스트',
             message: fallbackMessage,
           });
           return;
@@ -334,7 +340,7 @@ export default function AILevelResultScreen() {
     >
       <View style={styles(colors).badge}>
         <Text style={styles(colors).badgeText}>
-          {isSharedEntry ? '공유로 시작한 헬스 레벨 판정' : '헬스 레벨 판정'}
+          {isSharedEntry ? '공유로 시작한 헬스 유형 테스트 결과' : '헬스 유형 테스트 결과'}
         </Text>
       </View>
 
@@ -344,40 +350,38 @@ export default function AILevelResultScreen() {
         </View>
       ) : null}
 
-      <Text style={styles(colors).eyebrowTitle}>당신의 레벨은</Text>
-      <Text style={styles(colors).title}>{surveyLevelResult.levelName}</Text>
-      <Text style={styles(colors).subtitle}>{surveyLevelResult.typeName ?? variantMeta?.label}</Text>
-      <Text style={styles(colors).body}>{surveyLevelResult.description}</Text>
+      <Text style={styles(colors).title}>{celebContent?.headline}</Text>
+      <View style={styles(colors).levelBadge}>
+        <Text style={styles(colors).levelBadgeText}>{surveyLevelResult.levelName}</Text>
+      </View>
 
-      <View style={styles(colors).tagWrap}>
-        {surveyLevelResult.rationaleTags.map((tag) => (
-          <View key={tag} style={styles(colors).tag}>
-            <Text style={styles(colors).tagText}>{tag}</Text>
-          </View>
+      <View style={styles(colors).sectionCard}>
+        <Text style={styles(colors).sectionLabel}>이런 분이에요</Text>
+        <Text style={styles(colors).sectionBody}>{celebContent?.celebIntro}</Text>
+      </View>
+
+      <View style={styles(colors).sectionCard}>
+        <Text style={styles(colors).sectionLabel}>이 유형의 이야기</Text>
+        <Text style={styles(colors).sectionBody}>{celebContent?.typeStory}</Text>
+      </View>
+
+      <View style={styles(colors).sectionCard}>
+        <Text style={styles(colors).sectionLabel}>이런 특징이 있어요</Text>
+        {celebContent?.traits.map((trait, i) => (
+          <Text key={i} style={styles(colors).traitText}>✓ {trait}</Text>
         ))}
       </View>
 
-      <View style={styles(colors).infoCard}>
-        <Text style={styles(colors).infoTitle}>왜 이렇게 판정됐나요?</Text>
-        {surveyLevelResult.reasons.map((reason) => (
-          <Text key={reason} style={styles(colors).infoText}>
-            • {reason}
-          </Text>
-        ))}
-      </View>
-
-      {variantMeta ? (
-        <View style={styles(colors).variantCard}>
-          <View style={styles(colors).variantHeader}>
-            <MaterialCommunityIcons name="dumbbell" size={18} color={colors.accent} />
-            <Text style={styles(colors).variantTitle}>당신의 헬스 유형: {variantMeta.label}</Text>
-          </View>
-          <Text style={styles(colors).variantBody}>{variantMeta.shortReason}</Text>
-          <Text style={styles(colors).variantHint}>
-            {variantMeta.detailReason}
-          </Text>
+      <View style={styles(colors).tipsRow}>
+        <View style={[styles(colors).tipCard, { flex: 1 }]}>
+          <Text style={styles(colors).tipLabel}>운동 방향</Text>
+          <Text style={styles(colors).tipBody}>{celebContent?.trainingTip}</Text>
         </View>
-      ) : null}
+        <View style={[styles(colors).tipCard, { flex: 1 }]}>
+          <Text style={styles(colors).tipLabel}>식단 방향</Text>
+          <Text style={styles(colors).tipBody}>{celebContent?.dietTip}</Text>
+        </View>
+      </View>
 
       {isRetestMode && currentPlan ? (
         <View style={styles(colors).retestInfoCard}>
@@ -386,7 +390,7 @@ export default function AILevelResultScreen() {
             <Text style={styles(colors).retestInfoTitle}>기존 AI 플랜은 그대로 유지되고 있어요</Text>
           </View>
           <Text style={styles(colors).retestInfoBody}>
-            이번 결과는 다시 검사한 현재 레벨 기준이에요. 원하면 여기서 공유만 하고, 나중에 새 플랜을 다시 만들 수도 있어요.
+            이번 결과는 다시 테스트한 현재 유형 기준이에요. 원하면 여기서 공유만 하고, 나중에 새 플랜을 다시 만들 수도 있어요.
           </Text>
         </View>
       ) : null}
@@ -440,16 +444,16 @@ export default function AILevelResultScreen() {
         >
           <View style={styles(colors).shareCard}>
             <View style={styles(colors).shareBadge}>
-              <Text style={styles(colors).shareBadgeText}>FITLOG 헬스 레벨 테스트</Text>
+              <Text style={styles(colors).shareBadgeText}>FITLOG 헬스 유형 테스트</Text>
             </View>
             <View style={styles(colors).shareImagePanel}>
               <Image source={imageSource} style={styles(colors).shareImage} resizeMode="contain" />
             </View>
-            <Text style={styles(colors).shareCardTitle}>{surveyLevelResult.levelName}</Text>
-            <Text style={styles(colors).shareCardSubtitle}>{surveyLevelResult.typeName ?? variantMeta?.label}</Text>
+            <Text style={styles(colors).shareCardTitle}>{celebContent?.headline}</Text>
+            <Text style={styles(colors).shareCardSubtitle}>{surveyLevelResult.levelName}</Text>
             <Text style={styles(colors).shareCardBody}>{shareDescription}</Text>
             <View style={styles(colors).shareFooter}>
-              <Text style={styles(colors).shareFooterText}>지금 바로 헬스 레벨 테스트하기</Text>
+              <Text style={styles(colors).shareFooterText}>지금 바로 헬스 유형 테스트하러 가기</Text>
               <Text style={styles(colors).shareFooterUrl}>{getSharedLevelTestUrl() ?? '링크를 설정해주세요'}</Text>
             </View>
           </View>
@@ -500,97 +504,71 @@ const styles = (colors: ReturnType<typeof useAppTheme>['colors']) =>
     },
     title: {
       color: colors.text,
-      fontSize: 30,
+      fontSize: 28,
       fontWeight: '800',
-      marginBottom: 8,
-    },
-    eyebrowTitle: {
-      color: colors.textSecondary,
-      fontSize: 13,
-      fontWeight: '700',
-      letterSpacing: 0.4,
-      marginBottom: 6,
-    },
-    subtitle: {
-      color: colors.accent,
-      fontSize: 16,
-      fontWeight: '700',
-      lineHeight: 24,
       marginBottom: 10,
+      lineHeight: 36,
     },
-    body: {
-      color: colors.textSecondary,
-      fontSize: 14,
-      lineHeight: 21,
-      marginBottom: 18,
-    },
-    tagWrap: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
-      marginBottom: 18,
-    },
-    tag: {
-      borderWidth: 1,
-      borderColor: colors.border,
+    levelBadge: {
+      alignSelf: 'flex-start',
       backgroundColor: colors.card,
       borderRadius: 999,
-      paddingHorizontal: 10,
+      paddingHorizontal: 12,
       paddingVertical: 6,
-    },
-    tagText: {
-      color: colors.textSecondary,
-      fontSize: 12,
-      fontWeight: '500',
-    },
-    infoCard: {
-      backgroundColor: colors.card,
-      borderRadius: 18,
-      padding: 16,
-      marginBottom: 14,
-    },
-    infoTitle: {
-      color: colors.text,
-      fontSize: 15,
-      fontWeight: '700',
-      marginBottom: 10,
-    },
-    infoText: {
-      color: colors.textSecondary,
-      fontSize: 13,
-      lineHeight: 20,
-      marginBottom: 6,
-    },
-    variantCard: {
-      backgroundColor: colors.card,
-      borderRadius: 18,
-      padding: 16,
-      marginBottom: 14,
+      marginBottom: 20,
       borderWidth: 1,
       borderColor: colors.border,
     },
-    variantHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      marginBottom: 10,
-    },
-    variantTitle: {
-      color: colors.text,
-      fontSize: 15,
+    levelBadgeText: {
+      color: colors.textSecondary,
+      fontSize: 13,
       fontWeight: '700',
-      flex: 1,
     },
-    variantBody: {
+    sectionCard: {
+      backgroundColor: colors.card,
+      borderRadius: 18,
+      padding: 16,
+      marginBottom: 12,
+    },
+    sectionLabel: {
+      color: colors.accent,
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.4,
+      marginBottom: 8,
+    },
+    sectionBody: {
+      color: colors.text,
+      fontSize: 14,
+      lineHeight: 22,
+    },
+    traitText: {
+      color: colors.text,
+      fontSize: 14,
+      lineHeight: 22,
+      marginBottom: 4,
+    },
+    tipsRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginBottom: 16,
+    },
+    tipCard: {
+      backgroundColor: colors.card,
+      borderRadius: 18,
+      padding: 14,
+    },
+    tipLabel: {
+      color: colors.accent,
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.4,
+      marginBottom: 8,
+    },
+    tipBody: {
       color: colors.text,
       fontSize: 13,
       lineHeight: 20,
-      marginBottom: 8,
-    },
-    variantHint: {
-      color: colors.textSecondary,
-      fontSize: 12,
-      lineHeight: 18,
     },
     retestInfoCard: {
       backgroundColor: colors.card,

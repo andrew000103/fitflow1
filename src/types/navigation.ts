@@ -101,4 +101,5 @@ export type RootStackParamList = {
     exerciseIndex: number;
     exerciseName: string;
   };
+  FitnessTypeTest: undefined;
 };

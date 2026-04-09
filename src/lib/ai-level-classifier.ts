@@ -1,8 +1,9 @@
 import {
   CHARACTER_LEVELS,
-  PIXEL_VARIANT_META,
+  getFitnessTypeContent,
   type CharacterArchetypeId,
   type CharacterLevelId,
+  type FitnessTypeGenderVariant,
   type PixelVariantId,
 } from './pixel-character-config';
 import type {
@@ -52,30 +53,56 @@ export interface SurveyLevelResult {
   veteranQualified: boolean;
   bigThreeTotalKg: number | null;
   bigThreeEnteredCount: number;
-  /** 성별+목표 기반으로 배정된 픽셀 캐릭터 변형 */
+  /** 헬스 유형 ID (하위 호환 필드명 유지) */
   variantId: PixelVariantId;
+  /** 성별 변형 — 이미지/콘텐츠 선택에 사용 (신규) */
+  genderVariant: FitnessTypeGenderVariant;
   /** 운동 목표 분류 유형 */
   archetypeId: CharacterArchetypeId;
 }
 
 // ─── 픽셀 캐릭터 변형·아키타입 배정 ──────────────────────────────────────────
 
-const POWER_GOALS = new Set<OnboardingData['goal']>(['strength_gain', 'muscle_gain', 'lean_bulk']);
 const POWER_GYM_TYPES = new Set<GymType>(['full_gym', 'garage_gym']);
 
 /**
- * 성별 + 목표 + 운동 환경 기반으로 픽셀 캐릭터 변형을 배정합니다.
- * power 성향은 성장 목표가 있으면서 장비를 활용하는 환경일 때만 열립니다.
+ * 운동 목표 + 환경 + 성별 기반으로 헬스 유형 ID와 성별 변형을 반환합니다.
+ *
+ * 우선순위 (위가 높음):
+ * 1. gymType === 'bodyweight'                    → calisthenics
+ * 2. strength_gain + full/garage gym             → powerlifter
+ * 3. muscle_gain + full_gym                      → bodybuilder
+ * 4. lean_bulk (any gym)                         → lean_athlete
+ * 5. muscle_gain + non-full-gym                  → lean_athlete
+ * 6. weight_loss                                 → transformer
+ * 7. health | maintenance                        → wellness
+ * 8. 기본값                                       → wellness
  */
+export function assignFitnessType(
+  gender: AIGender,
+  goal: OnboardingData['goal'],
+  gymType: GymType,
+): { typeId: PixelVariantId; genderVariant: FitnessTypeGenderVariant } {
+  const genderVariant: FitnessTypeGenderVariant =
+    gender === 'female' ? 'female' : 'male';
+
+  if (gymType === 'bodyweight') return { typeId: 'calisthenics', genderVariant };
+  if (goal === 'strength_gain' && POWER_GYM_TYPES.has(gymType)) return { typeId: 'powerlifter', genderVariant };
+  if (goal === 'muscle_gain' && gymType === 'full_gym') return { typeId: 'bodybuilder', genderVariant };
+  if (goal === 'lean_bulk') return { typeId: 'lean_athlete', genderVariant };
+  if (goal === 'muscle_gain') return { typeId: 'lean_athlete', genderVariant };
+  if (goal === 'weight_loss') return { typeId: 'transformer', genderVariant };
+  if (goal === 'maintenance') return { typeId: 'wellness', genderVariant };
+  return { typeId: 'wellness', genderVariant };
+}
+
+/** @deprecated assignFitnessType 사용 권장. 하위 호환용 래퍼. */
 export function assignPixelVariant(
   gender: AIGender,
   goal: OnboardingData['goal'],
   gymType: GymType,
 ): PixelVariantId {
-  const isPower = POWER_GOALS.has(goal) && POWER_GYM_TYPES.has(gymType);
-  const binaryGender = toBinaryGender(gender);
-  if (binaryGender === 'male') return isPower ? 'male-black' : 'male-lightblue';
-  return isPower ? 'female-pink' : 'female-white';
+  return assignFitnessType(gender, goal, gymType).typeId;
 }
 
 /**
@@ -86,9 +113,13 @@ export function classifyArchetype(
   gymType: GymType,
   experience: OnboardingData['experience'],
 ): CharacterArchetypeId {
+  // calisthenics 최우선 (bodyweight 환경)
+  if (gymType === 'bodyweight') return 'calisthenics';
+
   if (goal === 'strength_gain' && POWER_GYM_TYPES.has(gymType)) return 'powerlifter';
   if ((goal === 'muscle_gain' || goal === 'lean_bulk') && gymType === 'full_gym') return 'mass_builder';
   if (goal === 'lean_bulk') return 'lean_body';
+  if (goal === 'muscle_gain') return 'lean_body';
   if (goal === 'weight_loss') return 'dieter';
   if (goal === 'maintenance') return 'wellness';
   return 'all_rounder';
@@ -373,15 +404,15 @@ export function classifySurveyLevel(data: OnboardingData): SurveyLevelResult {
     throw new Error(`Could not find level meta for ${finalLevel}`);
   }
 
-  const variantId = assignPixelVariant(data.gender, data.goal, data.gymType);
+  const { typeId, genderVariant } = assignFitnessType(data.gender, data.goal, data.gymType);
   const archetypeId = classifyArchetype(data.goal, data.gymType, data.experience);
-  const variantMeta = PIXEL_VARIANT_META[variantId];
+  const celebContent = getFitnessTypeContent(typeId, genderVariant);
 
   return {
     levelId: meta.id as SurveyLevelId,
     levelName: meta.name,
     nickname: meta.nickname,
-    typeName: variantMeta.label,
+    typeName: celebContent.headline,
     vibe: meta.vibe,
     description: meta.description,
     rationaleTags: buildRationaleTags(data, bigThreeEnteredCount, bigThreeTotalKg),
@@ -392,7 +423,8 @@ export function classifySurveyLevel(data: OnboardingData): SurveyLevelResult {
     veteranQualified,
     bigThreeTotalKg,
     bigThreeEnteredCount,
-    variantId,
+    variantId: typeId,
+    genderVariant,
     archetypeId,
   };
 }

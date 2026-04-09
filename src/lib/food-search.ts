@@ -1,15 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 import { FoodItem } from '../types/food';
-import { foodRowToFoodItem, searchFoods as searchDbFoods } from './diet-search';
+import {
+  foodRowToFoodItem,
+  searchUserFoodsOnly,
+} from './diet-search';
 import {
   compareRankableFoodNames,
   normalizeSearchText,
   scoreFoodItem,
 } from './food-search-ranking';
-import { searchMfdsFoods } from './mfds';
-import { searchOpenFoodFactsFoods } from './openfoodfacts';
-import { searchUsdaFoods } from './usda';
+import { searchFoodFromApi } from './food-api';
 
 const CACHE_KEY = 'food-search-cache:v2';
 const RECENT_SEARCHES_KEY = 'food-recent-searches:v1';
@@ -131,30 +131,19 @@ export async function searchFoods(query: string, page = 1, userId?: string): Pro
     return cached;
   }
 
-  let dbItems: FoodItem[] = [];
-  try {
-    dbItems = (await searchDbFoods(query)).map(foodRowToFoodItem);
-  } catch {
-    dbItems = [];
-  }
+  const userFoodsPromise = page === 1 && userId
+    ? withTimeout(
+        searchUserFoodsOnly(query, userId).then((rows) => rows.map(foodRowToFoodItem)),
+        '내 음식 검색',
+      )
+    : Promise.resolve([] as FoodItem[]);
 
-  if (dbItems.length > 0) {
-    const deduped = rerankFoods(dedupeFoods(dbItems), query);
-    await setCachedFoods(query, page, deduped, userId);
-    await saveRecentSearch(query, userId);
-    return deduped;
-  }
+  const publicFoodsPromise = withTimeout(
+    searchFoodFromApi(query, page),
+    '공용 음식 검색',
+  );
 
-  if (Platform.OS === 'web') {
-    return [];
-  }
-
-  const results = await Promise.allSettled([
-    withTimeout(searchMfdsFoods(query), '식약처 검색'),
-    withTimeout(searchOpenFoodFactsFoods(query, page), 'Open Food Facts 검색'),
-    withTimeout(searchUsdaFoods(query), 'USDA 검색'),
-  ]);
-
+  const results = await Promise.allSettled([userFoodsPromise, publicFoodsPromise]);
   const fulfilled = results
     .filter((result): result is PromiseFulfilledResult<FoodItem[]> => result.status === 'fulfilled')
     .flatMap((result) => result.value);

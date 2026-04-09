@@ -50,9 +50,9 @@ export default function LoginScreen() {
   ]);
 
   useEffect(() => {
-    if (!user || user.isAnonymous) return;
+    if (!user) return;
 
-    if (loginSource === 'ai-level-result' && pendingPostSignupIntent) {
+    if (loginSource === 'ai-level-result' && pendingPostSignupIntent && !user.isAnonymous) {
       return;
     }
 
@@ -60,6 +60,25 @@ export default function LoginScreen() {
       navigation.goBack();
     }
   }, [loginSource, navigation, pendingPostSignupIntent, user]);
+
+  const closeAfterAuth = () => {
+    const parentNavigation = navigation.getParent();
+
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    if (parentNavigation?.canGoBack()) {
+      parentNavigation.goBack();
+      return;
+    }
+
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Main' }],
+    });
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -69,12 +88,12 @@ export default function LoginScreen() {
     try {
       await signIn(email.trim(), password);
       if (loginSource === 'ai-level-result' && navigation.canGoBack()) {
-        navigation.goBack();
+        closeAfterAuth();
         return;
       }
 
       if (navigation.canGoBack()) {
-        navigation.goBack();
+        closeAfterAuth();
         return;
       }
 
@@ -161,6 +180,7 @@ export default function LoginScreen() {
           onPress={async () => {
             try {
               await signInAnonymously();
+              closeAfterAuth();
             } catch (e: any) {
               Alert.alert('오류', e.message ?? '다시 시도해주세요.');
             }

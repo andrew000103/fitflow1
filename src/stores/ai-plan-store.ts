@@ -2,6 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { SurveyLevelResult } from '../lib/ai-level-classifier';
+import {
+  DEFAULT_PIXEL_VARIANT,
+  normalizeLegacyVariantId,
+  type PixelVariantId,
+} from '../lib/pixel-character-config';
 
 // ─── 타입 ─────────────────────────────────────────────────────────────────────
 
@@ -139,6 +144,28 @@ export function normalizeExperience(value: unknown): AIExperience {
     default:
       return 'beginner';
   }
+}
+
+// ─── variantId 마이그레이션 ────────────────────────────────────────────────────
+
+/** 구 버전(성별 기반) variantId 목록 */
+const OLD_PIXEL_VARIANT_IDS = new Set([
+  'male-lightblue',
+  'male-black',
+  'female-pink',
+  'female-white',
+]);
+
+/**
+ * AsyncStorage에 저장된 구 버전 variantId를 현재 PixelVariantId로 정규화합니다.
+ * 1차: 구 색상 기반 ID (male-lightblue 등) → 'wellness' 폴백
+ * 2차: 구 의미 기반 ID (mass_builder → bodybuilder 등) → LEGACY_VARIANT_ID_MAP 매핑
+ */
+function normalizeVariantId(variantId: string | undefined): PixelVariantId {
+  if (!variantId || OLD_PIXEL_VARIANT_IDS.has(variantId)) {
+    return DEFAULT_PIXEL_VARIANT;
+  }
+  return normalizeLegacyVariantId(variantId);
 }
 
 function normalizeOnboardingData(
@@ -550,19 +577,34 @@ export const useAIPlanStore = create<AIPlanState>()(
     {
       name: 'ai-plan-store',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 4,
+      version: 5,
       migrate: (persistedState) => {
         const state = persistedState as Partial<AIPlanState> | undefined;
         if (!state) return persistedState as AIPlanState;
 
+        // 구 버전 surveyLevelResult.variantId (male-lightblue 등) → wellness 폴백
+        const surveyLevelResult = state.surveyLevelResult
+          ? {
+              ...state.surveyLevelResult,
+              variantId: normalizeVariantId(state.surveyLevelResult.variantId),
+            }
+          : null;
+
+        const pendingResumeSurveyLevelResult = state.pendingResumeSurveyLevelResult
+          ? {
+              ...state.pendingResumeSurveyLevelResult,
+              variantId: normalizeVariantId(state.pendingResumeSurveyLevelResult.variantId),
+            }
+          : null;
+
         return {
           ...state,
           onboardingData: normalizeOnboardingData(state.onboardingData),
-          surveyLevelResult: state.surveyLevelResult ?? null,
+          surveyLevelResult,
           pendingPostSignupIntent: state.pendingPostSignupIntent ?? null,
           pendingPostSignupEmail: state.pendingPostSignupEmail ?? null,
           pendingResumeOnboardingData: normalizeOnboardingData(state.pendingResumeOnboardingData),
-          pendingResumeSurveyLevelResult: state.pendingResumeSurveyLevelResult ?? null,
+          pendingResumeSurveyLevelResult,
           currentPlan: normalizeAIPlan(state.currentPlan as AIPlan | LegacyAIPlan | null),
           previousPlan: normalizeAIPlan(state.previousPlan as AIPlan | LegacyAIPlan | null),
         } as AIPlanState;

@@ -142,7 +142,7 @@ function AIPlanCard() {
         icon: 'robot-outline',
         title: surveyLevelResult ? `${surveyLevelResult.levelName} 맞춤 AI 플랜` : 'AI 플랜 준비 중',
         subtitle: surveyLevelResult
-          ? '현재 레벨 결과를 바탕으로 운동·식단 계획을 이어서 만들 수 있어요'
+          ? '현재 결과를 바탕으로 운동·식단 계획을 이어서 만들 수 있어요'
           : '정보를 입력하면 맞춤 계획을 생성합니다',
         extra: null,
         badge: null,
@@ -199,7 +199,7 @@ function AIPlanCard() {
           <View style={aiStyles.retestBtnInner}>
             <MaterialCommunityIcons name="refresh" size={16} color={colors.accent} />
             <Text style={[aiStyles.retestBtnText, { color: colors.accent, fontFamily: typography.fontFamily }]}>
-              헬스 레벨 다시 검사하고 공유하기
+              헬스 유형 다시 테스트하고 공유하기
             </Text>
           </View>
         </TouchableOpacity>
@@ -319,8 +319,6 @@ export default function HomeScreen() {
   const personaSupportingMessage = usePersonaStore((s) => s.supportingMessage);
   const personaReliabilityState = usePersonaStore((s) => s.reliabilityState);
   const isPersonaLoading = usePersonaStore((s) => s.isCalculating);
-  const personaVariantId = usePersonaStore((s) => s.variantId);
-  const personaArchetypeId = usePersonaStore((s) => s.archetypeId);
 
   const today = dateStr(new Date());
   const [todayWorkout, setTodayWorkout] = useState<TodayWorkout | null>(null);
@@ -488,18 +486,18 @@ export default function HomeScreen() {
   );
   const hamsterCtaLabel = hasDetailedCharacterProfile
     ? null
-    : '내 헬스 레벨 판정받기';
+    : '내 헬스 유형 테스트하기';
   const hamsterCtaSupportingMessage = hasDetailedCharacterProfile
     ? personaSupportingMessage
       ? `최근 기록 기준: ${personaSupportingMessage}`
       : surveyLevelResult?.description ?? null
     : hasQuickCharacterProfile
-      ? '예전 빠른 설정 대신, 이제는 테스트 한 번으로 현재 헬스 레벨과 다음 단계를 더 정확하게 정리해드려요.'
-      : 'AI 플랜 없이도 괜찮아요. 테스트 한 번으로 지금 내 루틴 기준 헬스 레벨을 먼저 확인할 수 있어요.';
+      ? '예전 빠른 설정 대신, 이제는 테스트 한 번으로 현재 헬스 유형과 다음 단계를 더 정확하게 정리해드려요.'
+      : 'AI 플랜 없이도 괜찮아요. 테스트 한 번으로 지금 내 루틴 기준 헬스 유형을 먼저 확인할 수 있어요.';
   const hamsterCtaHeadline = hasDetailedCharacterProfile
     ? surveyLevelResult?.vibe ?? (personaHeadline ? `최근 기록 기준: ${personaHeadline}` : null)
     : hasQuickCharacterProfile
-      ? `${quickCharacterCopy.headline} 지금은 테스트 기반 판정으로 더 정확하게 다시 볼 수 있어요.`
+      ? `${quickCharacterCopy.headline} 지금은 테스트 기반 결과로 더 정확하게 다시 볼 수 있어요.`
       : null;
   const handleHamsterCtaPress = useCallback(() => {
     if (hasCompletedOnboarding && surveyLevelResult) {
@@ -551,7 +549,7 @@ export default function HomeScreen() {
                 !hasAnyCharacterProfile
                   ? null
                   : personaReliabilityState === 'error'
-                  ? '최근 기록 기준 레벨 안내를 잠시 불러오지 못했어요.'
+                  ? '최근 기록 기준 결과 안내를 잠시 불러오지 못했어요.'
                   : personaProgressMessage
                   ? `최근 기록 기준: ${personaProgressMessage}`
                   : null
@@ -562,8 +560,7 @@ export default function HomeScreen() {
               proteinToday={todayTotals.protein_g}
               proteinGoal={goals.protein}
               supportingMessage={hamsterCtaSupportingMessage}
-              variantId={personaVariantId}
-              archetypeId={personaArchetypeId}
+
             />
           </AppCard>
 
