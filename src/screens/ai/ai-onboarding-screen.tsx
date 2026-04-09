@@ -593,7 +593,12 @@ export default function AIOnboardingScreen() {
 
     const levelResult = classifySurveyLevel(data);
     setSurveyLevelResult(levelResult);
-    navigation.replace('AILevelResult', { entry: onboardingEntry, mode: onboardingMode });
+    navigation.replace('AILevelResult', {
+      entry: onboardingEntry,
+      mode: onboardingMode,
+      seedOnboardingData: data,
+      seedSurveyLevelResult: levelResult,
+    });
   };
 
   const s = styles(colors, {

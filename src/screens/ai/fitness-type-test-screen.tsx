@@ -145,7 +145,11 @@ export default function FitnessTypeTestScreen() {
     setOnboardingData(fullData);
     setSurveyLevelResult(result);
 
-    navigation.replace('AILevelResult', { entry: 'direct' });
+    navigation.replace('AILevelResult', {
+      entry: 'direct',
+      seedOnboardingData: fullData,
+      seedSurveyLevelResult: result,
+    });
   };
 
   const renderOptions = () => {

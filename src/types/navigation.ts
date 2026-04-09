@@ -1,3 +1,6 @@
+import type { SurveyLevelResult } from '../lib/ai-level-classifier';
+import type { OnboardingData } from '../stores/ai-plan-store';
+
 export type SignupRouteParams = {
   source?: 'default' | 'ai-level-result';
   intent?: 'plan' | 'signup_only';
@@ -81,7 +84,15 @@ export type ProfileStackParamList = {
 export type AIModalParamList = {
   AIConsent: undefined;
   AIOnboarding: { resetAt?: number; entry?: 'direct' | 'shared'; mode?: 'default' | 'retest' } | undefined;
-  AILevelResult: { entry?: 'direct' | 'shared'; autoCreatePlan?: boolean; mode?: 'default' | 'retest' } | undefined;
+  AILevelResult:
+    | {
+        entry?: 'direct' | 'shared';
+        autoCreatePlan?: boolean;
+        mode?: 'default' | 'retest';
+        seedOnboardingData?: OnboardingData;
+        seedSurveyLevelResult?: SurveyLevelResult;
+      }
+    | undefined;
   AIPlanResult: { planId?: string };
   AIPlanWeekly: { weekStart: string };
 };
@@ -93,7 +104,15 @@ export type RootStackParamList = {
   Signup: SignupRouteParams | undefined;
   AIConsent: undefined;
   AIOnboarding: { resetAt?: number; entry?: 'direct' | 'shared'; mode?: 'default' | 'retest' } | undefined;
-  AILevelResult: { entry?: 'direct' | 'shared'; autoCreatePlan?: boolean; mode?: 'default' | 'retest' } | undefined;
+  AILevelResult:
+    | {
+        entry?: 'direct' | 'shared';
+        autoCreatePlan?: boolean;
+        mode?: 'default' | 'retest';
+        seedOnboardingData?: OnboardingData;
+        seedSurveyLevelResult?: SurveyLevelResult;
+      }
+    | undefined;
   AIPlanResult: { planId?: string };
   AIPlanWeekly: { weekStart: string };
   AIExerciseSearch: {

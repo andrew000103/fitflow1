@@ -90,13 +90,19 @@ export default function AILevelResultScreen() {
   const isRetestMode = route.params?.mode === 'retest';
   const isAnonymousUser = Boolean(user?.isAnonymous);
   const onboardingData = useAIPlanStore((s) => s.onboardingData);
+  const setOnboardingData = useAIPlanStore((s) => s.setOnboardingData);
   const currentPlan = useAIPlanStore((s) => s.currentPlan);
   const setPendingPostSignupIntent = useAIPlanStore((s) => s.setPendingPostSignupIntent);
   const stashPendingResumeContext = useAIPlanStore((s) => s.stashPendingResumeContext);
   const surveyLevelResult = useAIPlanStore((s) => s.surveyLevelResult);
+  const setSurveyLevelResult = useAIPlanStore((s) => s.setSurveyLevelResult);
   const setCurrentPlan = useAIPlanStore((s) => s.setCurrentPlan);
   const setGenerating = useAIPlanStore((s) => s.setGenerating);
   const setError = useAIPlanStore((s) => s.setError);
+  const seededOnboardingData = route.params?.seedOnboardingData ?? null;
+  const seededSurveyLevelResult = route.params?.seedSurveyLevelResult ?? null;
+  const resolvedOnboardingData = onboardingData ?? seededOnboardingData;
+  const resolvedSurveyLevelResult = surveyLevelResult ?? seededSurveyLevelResult;
 
   const [generating, setLocalGenerating] = useState(false);
   const [planReady, setPlanReady] = useState(false);
@@ -106,7 +112,17 @@ export default function AILevelResultScreen() {
   const shareCardRef = useRef<ViewShot | null>(null);
 
   useEffect(() => {
-    if (onboardingData && surveyLevelResult) {
+    if (!seededOnboardingData || onboardingData) return;
+    setOnboardingData(seededOnboardingData);
+  }, [onboardingData, seededOnboardingData, setOnboardingData]);
+
+  useEffect(() => {
+    if (!seededSurveyLevelResult || surveyLevelResult) return;
+    setSurveyLevelResult(seededSurveyLevelResult);
+  }, [seededSurveyLevelResult, setSurveyLevelResult, surveyLevelResult]);
+
+  useEffect(() => {
+    if (resolvedOnboardingData && resolvedSurveyLevelResult) {
       if (missingStateRedirectTimerRef.current) {
         clearTimeout(missingStateRedirectTimerRef.current);
         missingStateRedirectTimerRef.current = null;
@@ -115,20 +131,23 @@ export default function AILevelResultScreen() {
     }
 
     console.log('[ai-level-result-debug] missing_state_on_mount', {
-      hasOnboardingData: Boolean(onboardingData),
-      hasSurveyLevelResult: Boolean(surveyLevelResult),
+      hasOnboardingData: Boolean(resolvedOnboardingData),
+      hasSurveyLevelResult: Boolean(resolvedSurveyLevelResult),
       entry: route.params?.entry ?? null,
       autoCreatePlan: route.params?.autoCreatePlan ?? null,
     });
 
     missingStateRedirectTimerRef.current = setTimeout(() => {
       const latestState = useAIPlanStore.getState();
-      const hasRecoveredState = Boolean(latestState.onboardingData && latestState.surveyLevelResult);
+      const hasRecoveredState = Boolean(
+        (latestState.onboardingData ?? seededOnboardingData) &&
+        (latestState.surveyLevelResult ?? seededSurveyLevelResult)
+      );
 
       console.log('[ai-level-result-debug] missing_state_recheck', {
         hasRecoveredState,
-        hasOnboardingData: Boolean(latestState.onboardingData),
-        hasSurveyLevelResult: Boolean(latestState.surveyLevelResult),
+        hasOnboardingData: Boolean(latestState.onboardingData ?? seededOnboardingData),
+        hasSurveyLevelResult: Boolean(latestState.surveyLevelResult ?? seededSurveyLevelResult),
       });
 
       if (!hasRecoveredState) {
@@ -142,28 +161,36 @@ export default function AILevelResultScreen() {
         missingStateRedirectTimerRef.current = null;
       }
     };
-  }, [navigation, onboardingData, route.params?.autoCreatePlan, route.params?.entry, surveyLevelResult]);
+  }, [
+    navigation,
+    resolvedOnboardingData,
+    resolvedSurveyLevelResult,
+    route.params?.autoCreatePlan,
+    route.params?.entry,
+    seededOnboardingData,
+    seededSurveyLevelResult,
+  ]);
 
   const imageSource = useMemo(() => {
-    if (!surveyLevelResult) return null;
+    if (!resolvedSurveyLevelResult) return null;
     return getFitnessTypeImage(
-      surveyLevelResult.variantId ?? DEFAULT_PIXEL_VARIANT,
-      surveyLevelResult.genderVariant ?? 'male',
+      resolvedSurveyLevelResult.variantId ?? DEFAULT_PIXEL_VARIANT,
+      resolvedSurveyLevelResult.genderVariant ?? 'male',
     );
-  }, [surveyLevelResult]);
+  }, [resolvedSurveyLevelResult]);
 
   const celebContent = useMemo(() => {
-    if (!surveyLevelResult) return null;
+    if (!resolvedSurveyLevelResult) return null;
     return getFitnessTypeContent(
-      surveyLevelResult.variantId ?? DEFAULT_PIXEL_VARIANT,
-      surveyLevelResult.genderVariant ?? 'male',
+      resolvedSurveyLevelResult.variantId ?? DEFAULT_PIXEL_VARIANT,
+      resolvedSurveyLevelResult.genderVariant ?? 'male',
     );
-  }, [surveyLevelResult]);
+  }, [resolvedSurveyLevelResult]);
 
   const shareDescription = useMemo(() => {
-    if (!surveyLevelResult) return '';
+    if (!resolvedSurveyLevelResult) return '';
 
-    const condensed = surveyLevelResult.description
+    const condensed = resolvedSurveyLevelResult.description
       .replace(/\s+/g, ' ')
       .trim()
       .split('. ')[0]
@@ -174,7 +201,7 @@ export default function AILevelResultScreen() {
     }
 
     return `${condensed.slice(0, 77).trimEnd()}...`;
-  }, [surveyLevelResult]);
+  }, [resolvedSurveyLevelResult]);
 
   const resultImageSize = useMemo(() => {
     const horizontalPadding = 48;
@@ -210,7 +237,7 @@ export default function AILevelResultScreen() {
         return;
       }
       const shareMessage = buildShareMessage({
-        levelName: celebContent?.headline ?? surveyLevelResult?.levelName,
+        levelName: celebContent?.headline ?? resolvedSurveyLevelResult?.levelName,
         typeName: null,
         summary: celebContent?.typeStory?.split('.')[0] ?? shareDescription,
         shareUrl,
@@ -297,7 +324,7 @@ export default function AILevelResultScreen() {
       const shareUrl = getSharedLevelTestUrl();
       const fallbackMessage = shareUrl
         ? buildShareMessage({
-            levelName: celebContent?.headline ?? surveyLevelResult?.levelName,
+            levelName: celebContent?.headline ?? resolvedSurveyLevelResult?.levelName,
             typeName: null,
             summary: celebContent?.typeStory?.split('.')[0] ?? shareDescription,
             shareUrl,
@@ -323,8 +350,8 @@ export default function AILevelResultScreen() {
 
   const handleSignupPrompt = (intent: 'plan' | 'signup_only') => {
     setPendingPostSignupIntent(intent);
-    if (onboardingData && surveyLevelResult) {
-      stashPendingResumeContext(onboardingData, surveyLevelResult);
+    if (resolvedOnboardingData && resolvedSurveyLevelResult) {
+      stashPendingResumeContext(resolvedOnboardingData, resolvedSurveyLevelResult);
     }
     navigation.navigate('Signup', {
       source: 'ai-level-result',
@@ -333,7 +360,7 @@ export default function AILevelResultScreen() {
   };
 
   const handleCreatePlan = async () => {
-    if (!onboardingData) return;
+    if (!resolvedOnboardingData) return;
 
     setInlineError(null);
     setLocalGenerating(true);
@@ -350,11 +377,11 @@ export default function AILevelResultScreen() {
         }
       }
 
-      const plan = await generateAIPlan(onboardingData, history, workoutHistorySection);
+      const plan = await generateAIPlan(resolvedOnboardingData, history, workoutHistorySection);
       setCurrentPlan(plan);
 
       if (user?.id) {
-        saveAIPlanToSupabase(user.id, plan, onboardingData).catch(() => {});
+        saveAIPlanToSupabase(user.id, plan, resolvedOnboardingData).catch(() => {});
       }
 
       setPlanReady(true);
@@ -370,11 +397,11 @@ export default function AILevelResultScreen() {
 
   useEffect(() => {
     if (autoCreateHandledRef.current) return;
-    if (!route.params?.autoCreatePlan || isAnonymousUser || !onboardingData) return;
+    if (!route.params?.autoCreatePlan || isAnonymousUser || !resolvedOnboardingData) return;
 
     autoCreateHandledRef.current = true;
     handleCreatePlan();
-  }, [isAnonymousUser, onboardingData, route.params?.autoCreatePlan]);
+  }, [isAnonymousUser, resolvedOnboardingData, route.params?.autoCreatePlan]);
 
   if (generating) {
     return (
@@ -384,7 +411,7 @@ export default function AILevelResultScreen() {
     );
   }
 
-  if (!onboardingData || !surveyLevelResult) return null;
+  if (!resolvedOnboardingData || !resolvedSurveyLevelResult) return null;
 
   return (
     <AIFlowScreen
@@ -472,7 +499,7 @@ export default function AILevelResultScreen() {
 
       <Text style={styles(colors).title}>{celebContent?.headline}</Text>
       <View style={styles(colors).levelBadge}>
-        <Text style={styles(colors).levelBadgeText}>{surveyLevelResult.levelName}</Text>
+        <Text style={styles(colors).levelBadgeText}>{resolvedSurveyLevelResult.levelName}</Text>
       </View>
 
       <View style={styles(colors).sectionCard}>
@@ -570,7 +597,7 @@ export default function AILevelResultScreen() {
               <Image source={imageSource} style={styles(colors).shareImage} resizeMode="contain" />
             </View>
             <Text style={styles(colors).shareCardTitle}>{celebContent?.headline}</Text>
-            <Text style={styles(colors).shareCardSubtitle}>{surveyLevelResult.levelName}</Text>
+            <Text style={styles(colors).shareCardSubtitle}>{resolvedSurveyLevelResult.levelName}</Text>
             <Text style={styles(colors).shareCardBody}>{shareDescription}</Text>
             <View style={styles(colors).shareFooter}>
               <Text style={styles(colors).shareFooterText}>지금 바로 헬스 유형 테스트하러 가기</Text>
